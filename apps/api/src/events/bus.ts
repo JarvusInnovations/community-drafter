@@ -1,3 +1,4 @@
+import type { Judgement } from "@community-drafter/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -18,6 +19,14 @@ export type DrafterEvent =
   | { type: "resign"; document: string; person: string; commit: string }
   | { type: "revoke"; document: string; person: string; commit: string; reason?: string }
   | { type: "decline"; document: string; person: string; commit: string; reason?: string }
+  | {
+      type: "submit";
+      document: string;
+      person: string;
+      commit: string;
+      submission: string;
+      judgement: Judgement;
+    }
   | { type: "invite"; document: string; people: string[]; commit: string }
   | { type: "send"; document: string; people: string[]; commit: string }
   | { type: "remind"; document: string; people: string[]; commit: string }

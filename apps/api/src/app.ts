@@ -5,6 +5,7 @@ import { ApiError } from "./errors.ts";
 import eventsPlugin from "./events/bus.ts";
 import { PhaseObserver } from "./events/phase-observer.ts";
 import gatewayPlugin from "./gateway/gateway.ts";
+import commentTimingPlugin from "./lib/comment-timing.ts";
 import idempotencyPlugin from "./lib/idempotency.ts";
 import requestContextPlugin from "./lib/request-context.ts";
 import notificationsPlugin, { type NotificationsPluginOptions } from "./notifications/plugin.ts";
@@ -48,6 +49,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   await fastify.register(eventsPlugin);
   await fastify.register(renderingPlugin);
   await fastify.register(idempotencyPlugin);
+  await fastify.register(commentTimingPlugin);
 
   // 3. Storage: the data repo, read model, tracker, push daemon.
   await fastify.register(storagePlugin, opts.storage ?? {});

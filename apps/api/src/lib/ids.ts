@@ -1,3 +1,4 @@
+import type { Comment } from "@community-drafter/shared";
 import type { FastifyInstance } from "fastify";
 
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -21,4 +22,14 @@ export function mintSubmissionId(
     if (!fastify.storage.readModel.getSubmission(document, id)) return id;
   }
   throw new Error("mintSubmissionId: exhausted retries without finding a free id");
+}
+
+/** `specs/data-model.md` → `submissions.comments[].id`: `c<n>`, unique within the submission. */
+export function nextCommentId(existing: Comment[]): string {
+  let max = 0;
+  for (const comment of existing) {
+    const match = /^c(\d+)$/.exec(comment.id);
+    if (match?.[1]) max = Math.max(max, Number(match[1]));
+  }
+  return `c${max + 1}`;
 }

@@ -224,10 +224,86 @@ export const copy = {
     noChanges: "No changes between these two versions.",
   },
 
-  commentPlaceholder: {
-    heading: "Comments are coming soon",
-    body: "This document doesn't support in-line comments yet. You can still sign, decline, or read the full text.",
-    back: "Back to the document",
+  commentMode: {
+    backToDocument: "Back to document",
+    commentButton: "Comment",
+    composerAdd: "Add",
+    composerCancel: "Cancel",
+    generalLabel: "Anything about the document as a whole",
+    generalPlaceholder: "Add a general note about the whole document (optional)",
+    deleteComment: "Delete",
+    editingHeading: "Edit comment",
+    unplacedBadge: (version: number) => `written on v${version} · passage changed`,
+    itemState: {
+      saved: "Saved",
+      saving: "Saving…",
+      retrying: "Not saved, retrying",
+      restored: "Restored from this device",
+      error: "Not saved, retrying",
+    },
+    trayHeading: (version: number) => `Your submission on v${version}`,
+    traySummary: (n: number) => `${n} comment${n === 1 ? "" : "s"} saved, not yet sent`,
+    trayEmpty: "Nothing saved yet — select text in the document or write a general note.",
+    quoteExpand: "Show more",
+    quoteCollapse: "Show less",
+    judgement: {
+      legend: "Where do you stand?",
+      notSigned: {
+        sign: "Sign — add my name",
+        sign_conditional: "Sign conditionally — add my name; I want to see my comments addressed",
+        comment: "Comment without signing",
+        decline: "Decline — I won't be signing",
+      },
+      currentlySigned: {
+        sign: "Keep my signature",
+        sign_conditional: "Make my signature conditional on my comments",
+        comment: "Comment without signing",
+        decline: "Remove my signature",
+      },
+      explanation: {
+        sign: "Adds your name to the signatory list right away.",
+        sign_conditional:
+          "Adds your name now; you'll be asked to confirm or remove it once the final text is published.",
+        comment: "Sends your comments without changing your signature.",
+        decline: "Records that you won't be signing this document.",
+      },
+      conditionalDisabledHint: "Add at least one comment to sign conditionally.",
+    },
+    submitButton: {
+      sign: "Sign and send comments",
+      sign_conditional: "Sign conditionally and send comments",
+      comment: "Send comments",
+      decline: "Send and decline",
+    },
+    submitDisabledReason: {
+      phaseClosed: "Comments are closed; you can't submit right now.",
+      noJudgement: "Choose where you stand before submitting.",
+      nothingChanged: "Nothing has changed since your last submission.",
+      unsaved: "Some comments are still saving — wait a moment before submitting.",
+      needsSignature: "Add your name to sign.",
+    },
+    confirmation: {
+      heading: "Sent.",
+      body(judgementLabel: string): string {
+        return `${judgementLabel} You'll hear back when a new version is published.`;
+      },
+      backToDocument: "Back to document",
+    },
+    mismatch: {
+      message: (draftVersion: number, currentVersion: number) =>
+        `You're commenting on v${draftVersion}; v${currentVersion} is now current.`,
+      keep: (draftVersion: number) => `Keep commenting on v${draftVersion}`,
+      move: (currentVersion: number) => `Move my comments to v${currentVersion}`,
+    },
+    phaseClosed: {
+      message: (absolute: string) =>
+        `Comments closed ${absolute}. Your unsent comments are kept here.`,
+    },
+    earlierSubmissions: {
+      heading: "Your earlier submissions",
+    },
+    navigationWarning: "You have unsaved comments. Leave anyway?",
+    signatureFieldsHeading: "Add your name",
   },
 
   prefsPlaceholder: {

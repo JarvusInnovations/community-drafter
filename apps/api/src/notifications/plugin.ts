@@ -102,7 +102,8 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
         });
         return;
       }
-      case "decline": {
+      case "decline":
+      case "submit": {
         await deliverReviewReceipt(fastify, dispatcher, event.document, event.person);
         return;
       }
@@ -220,11 +221,13 @@ declare module "fastify" {
 
 /**
  * `specs/behaviors/notifications.md` § Messages: `review-receipt-<ts>`, "a
- * review submitted" → the author. `comment-mode` (still `planned`) hasn't
- * built the general submit endpoint yet, so today the only submitted
- * submissions are `decline`s — this reads the person's current position
- * (`ReadModel.getPosition`, already "the latest `submitted` record") rather
- * than threading a submission id through the `decline` event.
+ * review submitted" → the author. Fired for both the dedicated `decline`
+ * route and `comment-mode`'s general `submit` endpoint (`sign` /
+ * `sign_conditional` / `comment` / `decline`) — this reads the person's
+ * current position (`ReadModel.getPosition`, already "the latest
+ * `submitted` record") rather than threading a submission id through each
+ * event, since a person may submit more than once and the position is
+ * always the most recent one.
  */
 async function deliverReviewReceipt(
   fastify: FastifyInstance,

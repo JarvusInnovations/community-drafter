@@ -43,7 +43,9 @@ export type LifecycleAction =
   | "decline"
   | "change_prefs"
   | "admin_publish"
-  | "admin_invite";
+  | "admin_invite"
+  | "save_comment"
+  | "submit_with_comments";
 
 /** Which deadline a blocked action's `phase_closed` details should name. */
 const DEADLINE_KEY: Record<LifecycleAction, "comments_close_at" | "signing_closes_at"> = {
@@ -53,6 +55,8 @@ const DEADLINE_KEY: Record<LifecycleAction, "comments_close_at" | "signing_close
   change_prefs: "signing_closes_at",
   admin_publish: "signing_closes_at",
   admin_invite: "signing_closes_at",
+  save_comment: "comments_close_at",
+  submit_with_comments: "comments_close_at",
 };
 
 const ALLOWED: Record<LifecycleAction, ReadonlySet<Phase>> = {
@@ -62,6 +66,13 @@ const ALLOWED: Record<LifecycleAction, ReadonlySet<Phase>> = {
   change_prefs: new Set(["commenting", "signing", "closed", "withdrawn"]),
   admin_publish: new Set(["draft", "commenting", "signing"]),
   admin_invite: new Set(["draft", "commenting", "signing"]),
+  // `specs/behaviors/review-and-judgement.md`: comment saves and any
+  // submission that carries comments are commenting-phase only; a
+  // comment-less `decline` (or a plain `sign`) reuses the `decline`/`sign`
+  // rows above instead of this one (`routes/participant/submit.ts` picks
+  // which check applies).
+  save_comment: new Set(["commenting"]),
+  submit_with_comments: new Set(["commenting"]),
 };
 
 /**
@@ -97,5 +108,8 @@ function phaseClosedMessage(action: LifecycleAction, phase: Phase): string {
       return "This document is closed; reopen it to invite more people.";
     case "change_prefs":
       return "Preferences can no longer be changed.";
+    case "save_comment":
+    case "submit_with_comments":
+      return "Comments have closed for this document.";
   }
 }

@@ -32,6 +32,7 @@
       "name": "@community-drafter/web",
       "version": "0.0.0",
       "dependencies": {
+        "@community-drafter/shared": "workspace:*",
         "@tailwindcss/vite": "^4.3.3",
         "clsx": "^2.1.1",
         "react": "^19.2.8",
