@@ -26,7 +26,8 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "unified": "^11.0.5",
-    "vfile": "^6.0.3"
+    "vfile": "^6.0.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/hast": "^3.0.5",
