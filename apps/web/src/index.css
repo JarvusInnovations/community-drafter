@@ -6,10 +6,136 @@
   --color-muted: oklch(0.97 0 0);
   --color-muted-foreground: oklch(0.556 0 0);
   --color-border: oklch(0.922 0 0);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
+}
+
+/*
+ * `@theme` above both registers these as Tailwind utilities *and* emits
+ * them as real `:root` custom properties, so overriding the properties
+ * directly (not re-declaring `@theme`, which is a build-time registration
+ * step, not a runtime one) is what makes dark mode apply at paint time.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: oklch(0.145 0 0);
+    --color-foreground: oklch(0.985 0 0);
+    --color-muted: oklch(0.269 0 0);
+    --color-muted-foreground: oklch(0.708 0 0);
+    --color-border: oklch(0.269 0 0);
+    --color-destructive: oklch(0.704 0.191 22.216);
+    --color-destructive-foreground: oklch(0.985 0 0);
+    --color-accent: oklch(0.269 0 0);
+    --color-accent-foreground: oklch(0.985 0 0);
+  }
 }
 
 @layer base {
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/*
+ * `specs/screens/document.md` § Display Rules 5: "readable typography, max
+ * line length for prose, headings with anchor links." Hand-rolled rather
+ * than `@tailwindcss/typography` — no new build dependency for one class.
+ */
+@layer components {
+  .doc-body {
+    max-width: 65ch;
+    line-height: 1.7;
+  }
+
+  .doc-body > :first-child {
+    margin-top: 0;
+  }
+
+  .doc-body h1,
+  .doc-body h2,
+  .doc-body h3,
+  .doc-body h4 {
+    @apply font-semibold text-foreground;
+    margin-top: 1.75em;
+    margin-bottom: 0.5em;
+    position: relative;
+  }
+
+  .doc-body h1 {
+    font-size: 1.5em;
+  }
+  .doc-body h2 {
+    font-size: 1.25em;
+  }
+  .doc-body h3 {
+    font-size: 1.125em;
+  }
+
+  .doc-body p,
+  .doc-body ul,
+  .doc-body ol,
+  .doc-body blockquote {
+    margin-top: 0;
+    margin-bottom: 1em;
+  }
+
+  .doc-body ul,
+  .doc-body ol {
+    padding-left: 1.5em;
+  }
+  .doc-body ul {
+    list-style: disc;
+  }
+  .doc-body ol {
+    list-style: decimal;
+  }
+
+  .doc-body blockquote {
+    @apply border-l-2 border-border text-muted-foreground;
+    padding-left: 1em;
+  }
+
+  .doc-body a {
+    @apply text-foreground underline underline-offset-2;
+  }
+
+  .doc-heading-anchor {
+    @apply text-muted-foreground no-underline;
+    position: absolute;
+    left: -1.1em;
+    opacity: 0;
+  }
+  .doc-body h1:hover .doc-heading-anchor,
+  .doc-body h2:hover .doc-heading-anchor,
+  .doc-body h3:hover .doc-heading-anchor,
+  .doc-body h4:hover .doc-heading-anchor,
+  .doc-heading-anchor:focus-visible {
+    opacity: 1;
+  }
+
+  /*
+   * `specs/screens/version-history.md` § Display Rules "Compare": "deletions
+   * struck, insertions highlighted ... Color is never the only signal
+   * (strike-through and underline are used in addition to color)." Browsers
+   * already strike `<del>` and underline `<ins>` by default; this only adds
+   * color, plus a margin marker for whole added/removed blocks.
+   */
+  .doc-body del {
+    @apply text-destructive;
+    text-decoration: line-through;
+  }
+  .doc-body ins {
+    color: oklch(0.5 0.14 155);
+    text-decoration: underline;
+  }
+
+  .diff-block[data-status="added"] {
+    @apply border-l-2 pl-3;
+    border-color: oklch(0.5 0.14 155);
+  }
+  .diff-block[data-status="removed"] {
+    @apply border-destructive border-l-2 pl-3 opacity-70;
   }
 }

@@ -18,12 +18,20 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: true,
       },
-      // `notifications` plan: the preferences screen talks to the
-      // participant API directly by relative path (same-origin in
-      // production, per `specs/architecture.md` § Deployment). Scoped to
-      // `/i/<token>/api/*` specifically — a bare `/i` prefix would also
-      // swallow the SPA's own `/i/:token/prefs` page route.
-      "^/i/[^/]+/api": {
+      // JSON API calls only — `/i/:token` itself (no `/api` suffix) stays on
+      // Vite's dev server so it serves this SPA, not the API's built-`dist`
+      // fallback (`specs/architecture.md` § API server).
+      "^/i/.*/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      // `/d/*` has no separate `/api` suffix (`specs/api/conventions.md`):
+      // public pages, embeds and JSON all share the prefix.
+      "/d": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/admin/api": {
         target: "http://localhost:3001",
         changeOrigin: true,
       },

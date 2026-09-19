@@ -11,6 +11,16 @@
     "react/exhaustive-deps": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }],
     "react/react-in-jsx-scope": "off",
+    // This stack has no router loader or data-fetching library (`jarvus-react`
+    // doesn't mandate one, and adding one is out of scope for the bundle
+    // budget in `specs/architecture.md`), so every participant route's
+    // fetch-on-mount effect calls `setState` from inside its (async)
+    // callback — the standard, cleanup-guarded ("cancelled" flag) mitigation
+    // for exactly the race the rule is warning about. The rule flags that
+    // shape unconditionally regardless of the `await` boundary, which would
+    // otherwise mean disabling it per call site across every data-fetching
+    // component in `src/participant/`.
+    "react/set-state-in-effect": "off",
 
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "curly": ["warn", "all"],
