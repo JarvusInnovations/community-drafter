@@ -13,6 +13,7 @@ import renderingPlugin from "./rendering/cache.ts";
 import adminRoutes from "./routes/admin/index.ts";
 import healthRoutes from "./routes/health.ts";
 import participantRoutes from "./routes/participant/index.ts";
+import staticRoutes, { type StaticRoutesOptions } from "./routes/static.ts";
 import storagePlugin, { type StoragePluginOptions } from "./storage/plugin.ts";
 
 export interface AppOptions {
@@ -24,6 +25,8 @@ export interface AppOptions {
   disablePhaseObserver?: boolean;
   /** Test-only overrides for the notifications plugin's schedulers (`notifications/plugin.ts`). */
   notifications?: NotificationsPluginOptions;
+  /** Test-only override for where the built SPA lives (`routes/static.ts`). */
+  static?: StaticRoutesOptions;
 }
 
 declare module "fastify" {
@@ -89,6 +92,14 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   await fastify.register(healthRoutes, { prefix: "/_health" });
   await fastify.register(participantRoutes, { prefix: "/i/:token/api" });
   await fastify.register(adminRoutes, { prefix: "/admin/api" });
+
+  // 6.5. `participant-sign-flow`: the built SPA (`apps/web/dist`), served
+  // with an `/i/*` / `/d/*` / `/admin/*` fallback to `index.html`
+  // (`specs/architecture.md` § API server). Registered after the JSON
+  // routes above so this comment stays adjacent to them, though route
+  // precedence itself comes from find-my-way ranking a parametric-then-
+  // static route over a wildcard regardless of registration order.
+  await fastify.register(staticRoutes, opts.static ?? {});
 
   // 7. The lifecycle clock's scheduler (`specs/behaviors/document-lifecycle.md`
   //    § Closing / signing-opened; `events/phase-observer.ts`).
