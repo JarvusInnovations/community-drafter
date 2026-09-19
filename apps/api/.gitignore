@@ -1,3 +1,6 @@
 .env
 *.log
 dist/
+# Default local clone of the data repo (specs/architecture.md § Storage);
+# overridable via the storage plugin's `dataDir` option.
+data/

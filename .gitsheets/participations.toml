@@ -1,0 +1,128 @@
+# specs/data-model.md → `participations`. One record per person per
+# document, created by an invitation. `token` is the personal-link
+# credential — see CLAUDE.md Boundaries: never printed past 4 chars.
+# Sign/revoke/resign dates are not fields: they're the dates of the `sign` /
+# `revoke` / `resign` / `admin-revoke` commits touching this record.
+
+[gitsheet]
+root = 'participations'
+path = '${{ document }}/${{ person }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['document', 'person', 'token', 'source']
+additionalProperties = false
+
+[gitsheet.schema.properties.document]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.person]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.token]
+type = 'string'
+pattern = '^[A-Za-z0-9]{16,}$'
+
+[gitsheet.schema.properties.source]
+type = 'string'
+enum = ['crm', 'admin', 'public']
+
+[gitsheet.schema.properties.suggested_capacity]
+type = 'string'
+enum = ['personal', 'official']
+
+[gitsheet.schema.properties.link_revoked]
+type = 'boolean'
+default = false
+
+[gitsheet.schema.properties.expires_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.sent_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.first_opened_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.last_seen_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.opens]
+type = 'integer'
+minimum = 0
+default = 0
+
+# --- notify: per-participation notification preferences ---
+[gitsheet.schema.properties.notify]
+type = 'object'
+additionalProperties = false
+
+[gitsheet.schema.properties.notify.properties.channel]
+type = 'string'
+
+[gitsheet.schema.properties.notify.properties.every_revision]
+type = 'boolean'
+
+[gitsheet.schema.properties.notify.properties.daily_digest]
+type = 'boolean'
+
+[gitsheet.schema.properties.notify.properties.phase_changes]
+type = 'boolean'
+
+[gitsheet.schema.properties.notify.properties.my_comments_addressed]
+type = 'boolean'
+
+[gitsheet.schema.properties.notify.properties.reminders]
+type = 'boolean'
+
+# --- notified: event → timestamp idempotency table; dynamic keys ---
+[gitsheet.schema.properties.notified]
+type = 'object'
+additionalProperties = true
+
+# --- signature: absent = never signed ---
+[gitsheet.schema.properties.signature]
+type = 'object'
+required = ['capacity', 'display_name', 'authorized']
+additionalProperties = false
+
+[gitsheet.schema.properties.signature.properties.capacity]
+type = 'string'
+enum = ['personal', 'official']
+
+[gitsheet.schema.properties.signature.properties.display_name]
+type = 'string'
+
+[gitsheet.schema.properties.signature.properties.descriptor]
+type = 'string'
+
+[gitsheet.schema.properties.signature.properties.org]
+type = 'string'
+
+[gitsheet.schema.properties.signature.properties.title]
+type = 'string'
+
+[gitsheet.schema.properties.signature.properties.authorized]
+type = 'boolean'
+
+[gitsheet.schema.properties.signature.properties.conditional]
+type = 'boolean'
+
+[gitsheet.schema.properties.signature.properties.listed]
+type = 'boolean'
+default = true
+
+[gitsheet.schema.properties.signature.properties.display_approved]
+type = 'boolean'
+
+[gitsheet.schema.properties.signature.properties.signed_on_version]
+type = 'integer'
+
+[gitsheet.schema.properties.signature.properties.revoked]
+type = 'boolean'

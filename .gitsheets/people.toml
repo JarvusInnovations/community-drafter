@@ -1,0 +1,42 @@
+# specs/data-model.md → `people`. Never rendered on any participant or
+# public surface (see CLAUDE.md Boundaries).
+
+[gitsheet]
+root = 'people'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'name', 'email', 'source']
+additionalProperties = false
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.name]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.email]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.phone]
+type = 'string'
+
+[gitsheet.schema.properties.org]
+type = 'string'
+
+[gitsheet.schema.properties.role]
+type = 'string'
+
+[gitsheet.schema.properties.descriptor]
+type = 'string'
+
+[gitsheet.schema.properties.source]
+type = 'string'
+enum = ['crm', 'public', 'admin']
+
+[gitsheet.schema.properties.external_id]
+type = 'string'

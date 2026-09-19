@@ -1,0 +1,109 @@
+# specs/data-model.md → `submissions`. The submission is the unit of
+# meaning: one record is one person's set of comments against one version.
+# Comments are never records of their own. Anchor shape is
+# specs/behaviors/inline-comments.md § Anchor shape.
+
+[gitsheet]
+root = 'submissions'
+path = '${{ document }}/${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['document', 'id', 'person', 'version', 'state', 'comments']
+additionalProperties = false
+
+[gitsheet.schema.properties.document]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}-[A-Za-z0-9]{4}$'
+
+[gitsheet.schema.properties.person]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.version]
+type = 'integer'
+minimum = 1
+
+[gitsheet.schema.properties.state]
+type = 'string'
+enum = ['draft', 'submitted']
+
+[gitsheet.schema.properties.judgement]
+type = 'string'
+enum = ['sign', 'sign_conditional', 'comment', 'decline']
+
+[gitsheet.schema.properties.reason]
+type = 'string'
+
+[gitsheet.schema.properties.comments]
+type = 'array'
+default = []
+
+[gitsheet.schema.properties.comments.items]
+type = 'object'
+required = ['id', 'body']
+additionalProperties = false
+
+[gitsheet.schema.properties.comments.items.properties.id]
+type = 'string'
+pattern = '^c[0-9]+$'
+
+[gitsheet.schema.properties.comments.items.properties.body]
+type = 'string'
+
+[gitsheet.schema.properties.comments.items.properties.disposition]
+type = 'string'
+enum = ['accepted', 'partial', 'declined', 'noted']
+
+[gitsheet.schema.properties.comments.items.properties.disposition_note]
+type = 'string'
+
+[gitsheet.schema.properties.comments.items.properties.disposition_version]
+type = 'integer'
+
+# --- anchor: absent for a general comment. Required fields match
+# packages/shared/src/anchor/types.ts's `Anchor` interface exactly (the
+# render-and-diff plan's canonical shape for this same concept). ---
+[gitsheet.schema.properties.comments.items.properties.anchor]
+type = 'object'
+required = ['version', 'commit', 'block', 'heading_path', 'quote', 'prefix', 'suffix', 'start']
+additionalProperties = false
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.version]
+type = 'integer'
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.commit]
+type = 'string'
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.block]
+type = 'string'
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.heading_path]
+type = 'array'
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.heading_path.items]
+type = 'string'
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.quote]
+type = 'string'
+minLength = 3
+maxLength = 1000
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.prefix]
+type = 'string'
+maxLength = 40
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.suffix]
+type = 'string'
+maxLength = 40
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.start]
+type = 'integer'
+minimum = 0
+
+[gitsheet.schema.properties.comments.items.properties.anchor.properties.spans_blocks]
+type = 'boolean'

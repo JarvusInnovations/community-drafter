@@ -1,0 +1,30 @@
+import {
+  DocumentRecordSchema,
+  ParticipationRecordSchema,
+  PersonRecordSchema,
+  SubmissionRecordSchema,
+} from "@community-drafter/shared";
+import type { Store } from "gitsheets";
+
+/**
+ * The validator map passed to `openStore`. One entry per `specs/data-model.md`
+ * sheet; keys must match the `.gitsheets/<name>.toml` sheet names exactly.
+ */
+export const validators = {
+  documents: DocumentRecordSchema,
+  people: PersonRecordSchema,
+  participations: ParticipationRecordSchema,
+  submissions: SubmissionRecordSchema,
+} as const;
+
+export type DataStore = Store<typeof validators>;
+
+/** `<root>` + storage extension per sheet, for building git-relative file paths. */
+export const SHEET_LOCATIONS = {
+  documents: { root: "documents", ext: "md" },
+  people: { root: "people", ext: "toml" },
+  participations: { root: "participations", ext: "toml" },
+  submissions: { root: "submissions", ext: "toml" },
+} as const;
+
+export type SheetName = keyof typeof validators;
