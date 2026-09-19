@@ -13,3 +13,6 @@ export const SHARED_PACKAGE_NAME = "@community-drafter/shared";
 export * from "./render/index.ts";
 export * from "./diff/index.ts";
 export * from "./anchor/index.ts";
+
+// storage-foundation
+export * from "./records/index.ts";
