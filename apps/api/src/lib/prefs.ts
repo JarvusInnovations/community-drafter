@@ -37,14 +37,22 @@ export function forcedKeys(entry: ParticipationEntry): string[] {
 }
 
 export function buildPrefsView(entry: ParticipationEntry, email?: string): PrefsView {
+  const forced = forcedKeys(entry);
+  const forcedSet = new Set(forced);
+  // `specs/screens/preferences.md` § Display Rules: "'Milestones' is shown
+  // on and disabled" for a current signer — a forced key always displays
+  // (and behaves) as on, regardless of what was stored before the person
+  // became a forced signer (e.g. turned off, then signed).
+  const on = (key: "phase_changes"): boolean => forcedSet.has(key) || prefOn(entry, key);
+
   return {
     channel: entry.record.notify?.channel ?? "email",
     every_revision: prefOn(entry, "every_revision"),
     daily_digest: prefOn(entry, "daily_digest"),
-    phase_changes: prefOn(entry, "phase_changes"),
+    phase_changes: on("phase_changes"),
     my_comments_addressed: prefOn(entry, "my_comments_addressed"),
     reminders: prefOn(entry, "reminders"),
-    forced: forcedKeys(entry),
+    forced,
     email_masked: email ? maskEmail(email) : undefined,
   };
 }
