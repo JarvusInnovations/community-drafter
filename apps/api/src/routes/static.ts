@@ -36,13 +36,47 @@ const PUBLIC_ROOT_FILES = ["favicon.svg", "icons.svg"];
 /** Route families whose paths are client-side routes inside the one SPA shell. */
 const SPA_SHELL_PREFIXES = ["/i/*", "/d/*", "/admin/*"];
 
-export interface StaticRoutesOptions {
-  /** Test-only override for where the built SPA lives; defaults to `apps/web/dist`. */
-  root?: string | URL;
+/**
+ * `specs/screens/public-and-embed.md`: `/d/<slug>/embed` and
+ * `/d/<slug>/signatories` are "frameable by any origin"; every other HTML
+ * response — every other `/d/*` page and all of `/i/*`/`/admin/*` — is not.
+ * Matched against the path only (no query string), so `?foo=bar` on either
+ * route doesn't change the outcome.
+ */
+const FRAMEABLE_PUBLIC_PATH = /^\/d\/[^/]+\/(embed|signatories)\/?$/u;
+
+function isFrameablePublicPath(path: string): boolean {
+  return FRAMEABLE_PUBLIC_PATH.test(path);
+}
+
+/**
+ * `plans/public-and-embed.md` § "Frameability headers": `frame-ancestors *`
+ * with no `X-Frame-Options` on the two embeddable public pages; `DENY` +
+ * `frame-ancestors 'none'` on every other HTML response the SPA shell
+ * serves, including every `/i/*` participant page (personal links are
+ * never embeddable — `specs/behaviors/access-and-identity.md` § Public
+ * links: "framing a personal link on a public page would leak a
+ * credential").
+ */
+function setFrameHeaders(
+  reply: { header: (name: string, value: string) => unknown },
+  path: string,
+): void {
+  if (isFrameablePublicPath(path)) {
+    reply.header("content-security-policy", "frame-ancestors *");
+    return;
+  }
+  reply.header("content-security-policy", "frame-ancestors 'none'");
+  reply.header("x-frame-options", "DENY");
 }
 
 function notFound(reply: { code: (n: number) => { send: (body: unknown) => unknown } }): unknown {
   return reply.code(404).send({ error: "not_found", message: "Not found.", details: {} });
+}
+
+export interface StaticRoutesOptions {
+  /** Test-only override for where the built SPA lives; defaults to `apps/web/dist`. */
+  root?: string | URL;
 }
 
 const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, opts) => {
@@ -82,9 +116,10 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
   }
 
   for (const prefix of [...SPA_SHELL_PREFIXES, "/"]) {
-    fastify.get(prefix, { config: PUBLIC_ROUTE }, (_request, reply) => {
+    fastify.get(prefix, { config: PUBLIC_ROUTE }, (request, reply) => {
       const found = safeFile("index.html");
       if (!found) return notFound(reply);
+      setFrameHeaders(reply, request.url.split("?")[0] ?? request.url);
       return reply.sendFile(found);
     });
   }

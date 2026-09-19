@@ -13,6 +13,7 @@ import renderingPlugin from "./rendering/cache.ts";
 import adminRoutes from "./routes/admin/index.ts";
 import healthRoutes from "./routes/health.ts";
 import participantRoutes from "./routes/participant/index.ts";
+import { publicApiRoutes, publicAssetRoutes } from "./routes/public/index.ts";
 import staticRoutes, { type StaticRoutesOptions } from "./routes/static.ts";
 import storagePlugin, { type StoragePluginOptions } from "./storage/plugin.ts";
 
@@ -92,6 +93,15 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   await fastify.register(healthRoutes, { prefix: "/_health" });
   await fastify.register(participantRoutes, { prefix: "/i/:token/api" });
   await fastify.register(adminRoutes, { prefix: "/admin/api" });
+  // `public-and-embed`: the anonymous `/d/:slug/*` family
+  // (`specs/api/conventions.md`). Two prefixes share the one `:slug`
+  // segment — see `routes/public/index.ts`'s doc comment — and both must
+  // register ahead of `staticRoutes`'s `/d/*` SPA-shell wildcard below.
+  await fastify.register(publicApiRoutes, { prefix: "/d/:slug/api" });
+  // `root` mirrors `staticRoutes`' override below — both serve out of the
+  // same built `apps/web/dist` directory, so a test pointing one at a
+  // fixture points the other at it too.
+  await fastify.register(publicAssetRoutes, { prefix: "/d/:slug", root: opts.static?.root });
 
   // 6.5. `participant-sign-flow`: the built SPA (`apps/web/dist`), served
   // with an `/i/*` / `/d/*` / `/admin/*` fallback to `index.html`

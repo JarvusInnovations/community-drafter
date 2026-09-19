@@ -1,6 +1,11 @@
 import Fastify, { type FastifyInstance } from "fastify";
 
-import type { Capacity, DocumentState, ShowSignatories } from "@community-drafter/shared";
+import type {
+  Capacity,
+  DocumentState,
+  PublicAccess,
+  ShowSignatories,
+} from "@community-drafter/shared";
 
 import { app } from "../app.ts";
 import { FakeMailer, type Mailer } from "../lib/mailer/index.ts";
@@ -55,6 +60,9 @@ export interface SeedDocumentOptions {
   capacities?: Capacity[];
   revocation_window_hours?: number;
   show_signatories?: ShowSignatories;
+  public_access?: PublicAccess;
+  reply_to?: string;
+  sender_name?: string;
 }
 
 export async function seedDocument(
@@ -75,6 +83,9 @@ export async function seedDocument(
         capacities: opts.capacities,
         revocation_window_hours: opts.revocation_window_hours,
         show_signatories: opts.show_signatories,
+        public_access: opts.public_access,
+        reply_to: opts.reply_to,
+        sender_name: opts.sender_name,
       });
     },
   );
