@@ -8,14 +8,21 @@ This is the **primary admin interface** of the system, and it ships as a **skill
 
 ## Configuration
 
-`DRAFTER_URL` and `DRAFTER_ADMIN_TOKEN` from the environment (or `~/.config/drafter/<profile>.toml`); `--actor <label>` sets the `X-Actor` header (default: `cli:<os user>`).
+`DRAFTER_URL` from the environment or `~/.config/drafter/<profile>.toml`. The credential is an operator token obtained by `drafter-axi login` (device-code flow, `api/auth.md`) and stored in that profile file with mode 600; `DRAFTER_TOKEN` in the environment overrides it for CI and bots. There is no actor label: every write is attributed to the signed-in operator.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
-| `drafter-axi` | home: documents with phase, next deadline, invited/opened/signed counts, failures |
-| `docs create <slug> --title … --owner … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create |
+| `drafter-axi` | home: the signed-in operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login` |
+| `login <email>` | device-code sign-in: sends the magic link, prints the user code, waits for approval, stores the 90-day token |
+| `logout` / `whoami` | forget the token / show operator and expiry |
+| `operators list` | every operator |
+| `operators add <email> --name … [--kind person\|bot] [--title …] [--org …]` | create |
+| `operators update <email> [--name …] [--active true\|false] [--title …] [--org …] [--notes …]` | update or deactivate |
+| `operators remove <email>` | remove |
+| `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
+| `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
 | `docs show <slug>` | dashboard numbers, versions, schedule |
 | `docs open <slug> --comments-close <iso> --signing-closes <iso>` | open and send invitations |
 | `docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` | extension |

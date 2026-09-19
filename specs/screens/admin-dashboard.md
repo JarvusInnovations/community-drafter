@@ -4,7 +4,7 @@ The team's view of one document's progress. Read-mostly in phase 1; mutations ha
 
 ## Routes
 
-`/admin` (document list, the only list in the system), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/submissions`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`.
+`/admin/login` (magic-link request), `/auth/device` (device approval page), `/admin` (the caller's document list), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/submissions`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`, `/admin/operators`.
 
 ## Data Requirements
 
@@ -12,10 +12,17 @@ Everything: document, versions (from body-changing commits), participations with
 
 ## Display Rules
 
-**Document list**: title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI.
+**Sign-in** (`/admin/login`): one email field and a button; after submit, always "If that address belongs to an operator, a sign-in link is on its way" (`behaviors/operators.md`). No other text, no link to anything else.
+
+**Device approval** (`/auth/device?code=…`): shows the 8-character user code, the operator it will be bound to (the signed-in one), and "Approve this device" / "Not me"; after approval, "You can close this page; the command line will finish signing in."
+
+**Document list** (`/admin`): only documents the signed-in operator is on: title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI. Header shows the operator's email and a sign-out link.
+
+**Operators** (`/admin/operators`): every operator (name, email, kind, active, title, org) with add / edit / deactivate / remove, each requiring a confirmation and showing the resulting commit subject. The signed-in operator cannot deactivate or remove themself here.
 
 **Dashboard** (`/admin/d/<slug>`):
 - Header with title, state, phase, both deadlines, and buttons: "Extend deadline…", "Copy public link" (if enabled), "Export feedback" (downloads the bundle from `behaviors/review-and-judgement.md`), "Export links" (CSV; recorded).
+- **Operators of this document**: the list with add (choose from active operators) and remove (refused for the last one), per `behaviors/operators.md`.
 - **Funnel**: invited → sent → opened → acted (commented, signed, declined) as counts and a bar; signed split into organizations and individuals; conditional signers count; revoked count.
 - **Versions**: table (number, date, summary, publisher, dispositions count, final) with "publish a new version" pointing at the CLI and showing the exact command.
 - **Recent activity**: the last 50 commits on this document, rendered from their trailers (`Action`, `Person`, `Version`, `Judgement`, `Reason`), which is the record's own event log.
@@ -44,7 +51,7 @@ Publishing, creating documents, importing invitees and sending are CLI/API only 
 
 ## Navigation
 
-`/admin` ↔ dashboards ↔ sub-pages. Sign-in via Google when no session.
+`/admin` ↔ dashboards ↔ sub-pages. Any admin route without a session redirects to `/admin/login` with a return path.
 
 ## Principles
 

@@ -18,7 +18,8 @@ specs/
 ├── data-model.md                 sheets, records, fields, relationships
 ├── behaviors/
 │   ├── document-lifecycle.md     phases, the clock, transitions
-│   ├── access-and-identity.md    personal links, tokens, public links, admin auth
+│   ├── access-and-identity.md    personal links, tokens, public links
+│   ├── operators.md              operators, magic-link sign-in, sessions, device-code CLI auth, refresh webhook
 │   ├── versioning.md             versions, changelog, diffs, rendering
 │   ├── inline-comments.md        anchoring comments to text across versions
 │   ├── review-and-judgement.md   drafts, submission, judgements, dispositions
@@ -33,6 +34,7 @@ specs/
 │   └── admin-dashboard.md        per-document progress view
 └── api/
     ├── conventions.md            URL scheme, auth, errors, content types
+    ├── auth.md                   magic link, session, device code, refresh, logout
     ├── participant.md            endpoints behind a personal link
     ├── admin.md                  endpoints behind the admin token
     └── admin-cli.md              the agent-facing CLI over the admin API

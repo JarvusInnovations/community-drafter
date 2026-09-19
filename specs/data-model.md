@@ -12,8 +12,9 @@ Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifi
 | `people` | `${{ id }}` | TOML | person known to the instance |
 | `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, signature |
 | `submissions` | `${{ document }}/${{ id }}` | TOML | one person's set of comments against one version, from first save through submission and disposition |
+| `operators` | `${{ id }}` | TOML | one person or bot allowed to run documents |
 
-Four sheets. Cross-references are by slug so records read sensibly in a file browser.
+Five sheets. Cross-references are by slug so records read sensibly in a file browser.
 
 ## Commits are the events
 
@@ -21,10 +22,10 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove` | every commit |
 | `Document` | slug | every commit about a document |
 | `Person` | slug | every commit about a person's action |
-| `Actor` | admin email, `cli:<label>`, or `participant` | every commit |
+| `Actor` | an operator's email, `participant`, or `system` (bootstrap) | every commit |
 | `Version` | integer | `publish` (the number this commit becomes), `submit`, `comment`, `sign` (the version seen) |
 | `Summary` | 1–200 chars | `publish` (the one-line changelog) |
 | `Final` | `true` | `publish` when declared final |
@@ -53,7 +54,9 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `capacities` | array of `personal` \| `official`, default both | |
 | `public_access` | enum `none` \| `read` \| `participate`, default `none` | `participate` is **[phase 2]** |
 | `show_signatories` | enum `list` \| `count` \| `none`, default `list` | |
-| `owner`, `sender_name`, `reply_to` | string | |
+| `created_by` | email | the operator who created the document; always also in `operators` |
+| `operators` | array of email | current operators of this document; never empty |
+| `sender_name`, `reply_to` | string | |
 | `withdraw_reason`, `withdraw_public` | string?, boolean | |
 | `tags` | array of string | |
 | `body` | markdown | the text |
@@ -76,6 +79,22 @@ A **version** is a commit in the record's history **in which the body changed**.
 | `body` | the record's body at that commit |
 
 Numbering is stable because the branch forbids force-pushes. The read model walks `git log --first-parent` over the record at boot, compares body content between adjacent commits, indexes the versions, and appends on publish. A publish commit may also change settings (a publish during the signing phase extends `signing_closes_at` in the same commit) and may set dispositions on submissions (`Disposed` trailer), so the commit that *is* the version carries the answers it gave.
+
+## `operators`
+
+One record per person or bot allowed to run documents (`behaviors/operators.md`). Managed only through the admin API and CLI, so the service stays the single writer.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | slug | derived from the email's local part, disambiguated on creation; the path |
+| `email` | string, email | merge key, lowercase; indexed |
+| `name` | string | |
+| `kind` | enum `person` \| `bot` | bots are unattended agents with their own mailbox |
+| `active` | boolean | false = no access anywhere, at the next request |
+| `title`, `org` | string? | |
+| `notes` | string? | team-facing |
+
+Who added or deactivated an operator and when is the history of the record (`operator-add`, `operator-update`, `operator-remove` commits with the acting operator's email as `Actor`).
 
 ## `people`
 
@@ -170,6 +189,6 @@ documents 1 ─── n versions      (body-changing commits of the document rec
 
 ## What is deliberately not here
 
-- No `content`, `versions`, `reviews`, `drafts`, `comments`, `dispositions`, `signatures` or `notifications` sheets. Each is a field on one of the four records above or a set of commits.
+- No `content`, `versions`, `reviews`, `drafts`, `comments`, `dispositions`, `signatures`, `notifications` or `sessions` sheets. Each is a field on one of the five records above, a set of commits, or (sessions) a signed token whose authority is the `operators` record.
 - No `created_at` / `updated_at` fields anywhere; the history has them.
 - No status or time in any path.
