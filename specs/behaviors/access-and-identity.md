@@ -1,0 +1,60 @@
+# Behavior: Access and Identity
+
+## Rule
+
+Access to a document is granted by links, not accounts. A **personal link** binds one person to one document and is the only credential an invited participant ever needs. A **public link** exposes a document read-only to anyone who has it, and **[phase 2]** lets a visitor mint their own personal link by verifying an email address.
+
+## Applies To
+
+All participant routes, public routes, the admin API's invitation and link-export actions, invitation emails.
+
+## Personal links
+
+- URL shape: `<PUBLIC_URL>/i/<token>`. The token is the only variable part so links stay short enough for SMS and never disclose the document slug.
+- Token: at least 96 bits of randomness encoded base62 (16+ chars), minted server-side when the participation is created, unique across the instance, stored on the `participations` record, indexed for lookup, compared in constant time.
+- Resolution: unknown, `link_revoked`, or `expires_at` passed all render the same "This link isn't available" page (HTTP 404) with a generic contact line. Existence is never disclosed.
+- A resolved link is **both** identity and authorization for every participant action on that document: read, sign, revoke, draft, submit, preferences. Sub-routes carry the token in the path (`/i/<token>/history`, `/i/<token>/prefs`, `/i/<token>/api/…`). No cookie is required or set for participants in phase 1.
+- Every participant page shows who the link is bound to ("You're here as **Jane Doe**") with a "Not you?" affordance that explains the link was personal and how to ask the team for their own. It does not let the visitor rename themself.
+- Every signature and revocation triggers a confirmation email to the bound person's address (see `notifications.md`). This is the detection and correction path for a forwarded link.
+- Tracking: first open sets `first_opened_at`; each page view updates `last_seen_at` and increments `opens` (batched writes, see `architecture.md`). Opens are not shown to participants.
+- Revocation: admin revokes a link (e.g. reported forwarded) and may mint a replacement; a replacement is the same participation record with a new `token`, so signature, comments and preferences are untouched.
+
+## Why a share table, not a signed token
+
+Personal links are fields on a record, not self-contained signed payloads (JWT), because:
+
+- they must be **revocable** individually without rotating a secret;
+- they must be **tracked** (opened, acted) and that needs a row per link anyway;
+- they must be **short** for SMS and email clients;
+- the identity they bind changes over time (a corrected name, an added org) and must not be frozen into the URL.
+
+A signed token adds nothing the record does not already provide.
+
+## Public links
+
+- URL shape: `<PUBLIC_URL>/d/<slug>` when `public_access` is `read` or `participate`; 404 otherwise.
+- Renders the current version, the clock, the version history and the signatory list (per `show_signatories`), with no sign or comment controls in phase 1. A "want to sign? ask the team for your link" line is shown, with the document's `reply_to`.
+- Embeddable variants live under `/d/<slug>/…` (see `screens/public-and-embed.md`). Personal links are never embeddable: framing a personal link on a public page would leak a credential.
+- **[phase 2] participate.** The public page offers "Sign or comment": the visitor enters name and email, receives a magic link, and following it mints a `people` record (if new by email) and a participation with `source = public`, then redirects to that personal link. Magic links expire in 30 minutes and are single-use. Signatures from `public` invitations start with `display_approved = false` and appear in counts and lists only after an admin approves them.
+
+## Admin access
+
+- **Dashboard (human):** Google OAuth with an allowlist of emails and/or domains, HMAC-signed session cookie, 24-hour lifetime. This is the `auth.ts` module from proposal-renderer, unchanged in behavior.
+- **API (agent/CLI):** `Authorization: Bearer <ADMIN_TOKEN>`, constant-time compared. One token for the instance in phase 1.
+- Admin identity (email or the label `cli:<name>` supplied by the CLI) is recorded as the author of every admin-originated commit.
+- Admins may open any participant page **as** a participant only through an explicit "view as" action that renders the page read-only with a banner; admins never act on a participant's behalf through the participant UI. Administrative fixes (e.g. revoke a signature at the person's emailed request) go through the admin API and are attributed to the admin.
+
+## Details
+
+- Rate limiting: token resolution failures are limited per source address (e.g. 30/min) to blunt enumeration; success paths are not limited.
+- Tokens are never logged in full; logs show the first 4 characters.
+- The admin "links export" action is the only way to read tokens back after creation, and it is recorded as an admin event with the count exported.
+
+## Principles
+
+**Inherited**
+- [The link is the identity](../principles.md#the-link-is-the-identity): no login for invited people; forwarded-link risk handled by visibility and confirmation email, not by authentication.
+- [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): a token reveals nothing about other documents; there is no route that lists documents outside admin.
+
+**Local**
+- **Identity is the person, not the link.** Everything a participant does is keyed by `person`, so tokens can be revoked and reissued without losing anything. An implementer tempted to key a signature or draft by token instead should not.
