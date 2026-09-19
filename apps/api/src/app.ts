@@ -1,6 +1,8 @@
 import type { FastifyError, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
+import authPlugin, { type AuthPluginOptions } from "./auth/plugin.ts";
+import authRoutes from "./auth/routes.ts";
 import { ApiError } from "./errors.ts";
 import eventsPlugin from "./events/bus.ts";
 import { PhaseObserver } from "./events/phase-observer.ts";
@@ -29,6 +31,8 @@ export interface AppOptions {
   notifications?: NotificationsPluginOptions;
   /** Test-only override for where the built SPA lives (`routes/static.ts`). */
   static?: StaticRoutesOptions;
+  /** Test-only overrides for admin OAuth (`auth/plugin.ts`) — e.g. a fake Google verifier. */
+  auth?: AuthPluginOptions;
 }
 
 declare module "fastify" {
@@ -60,9 +64,15 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   //     `fastify.notifications`, so this must land before routes register.
   await fastify.register(notificationsPlugin, opts.notifications ?? {});
 
+  // 3c. Admin OAuth sessions (`admin-dashboard`): the in-memory session
+  //     store + cookie helpers. Must land before the gateway below — its
+  //     cookie-resolution branch reads `fastify.auth`.
+  await fastify.register(authPlugin, opts.auth ?? {});
+
   // 4. The deny-by-default gateway. Must come after storage/config (token
-  //    resolution and the admin bearer compare both read them) and before
-  //    every route registration below.
+  //    resolution and the admin bearer compare both read them) and after
+  //    `authPlugin` (the cookie-session branch reads `fastify.auth`), and
+  //    before every route registration below.
   await fastify.register(gatewayPlugin);
 
   // 5. The JSON error envelope (`specs/api/conventions.md` § Responses).
@@ -93,6 +103,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
 
   // 6. Routes.
   await fastify.register(healthRoutes, { prefix: "/_health" });
+  await fastify.register(authRoutes, { prefix: "/auth" });
   await fastify.register(participantRoutes, { prefix: "/i/:token/api" });
   await fastify.register(adminRoutes, { prefix: "/admin/api" });
   // `public-and-embed`: the anonymous `/d/:slug/*` family

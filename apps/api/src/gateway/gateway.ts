@@ -30,28 +30,60 @@ function actorLabelFromHeader(request: FastifyRequest): string {
 }
 
 /**
+ * `specs/api/conventions.md` § Admin API: "cookie authenticated writes"
+ * require this custom header — only same-origin JS can set it, so a
+ * cross-site form POST can't forge one. Bearer traffic is exempt (checked
+ * only on the cookie branch below), and reads never need it.
+ */
+function hasCsrfHeader(request: FastifyRequest): boolean {
+  const header = request.headers["x-requested-with"];
+  const value = Array.isArray(header) ? header[0] : header;
+  return value?.trim().toLowerCase() === "drafter";
+}
+
+/**
  * `specs/api/conventions.md`: "Bearer and cookie are never mixed on one
  * request; a present `Authorization` header is decisive." A present header
- * resolves via bearer or fails outright — there is deliberately no fallback
- * branch here for a cookie transport. `admin-dashboard` adds one (Google
- * OAuth session + CSRF header); this is the hook point that plan extends,
- * reached only when `request.headers.authorization` is absent.
+ * resolves via bearer or fails outright — there is no fallback to the
+ * cookie transport below. When the header is absent, `admin-dashboard`'s
+ * cookie-session transport (Google OAuth via `auth/plugin.ts`) is tried
+ * instead: cookie-authenticated writes additionally require the CSRF
+ * header (`hasCsrfHeader` above).
  */
 function resolveAdmin(request: FastifyRequest, fastify: FastifyInstance): void {
   const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw new ApiError("unauthenticated", "An admin bearer token is required.");
+  if (authHeader) {
+    if (!authHeader.startsWith("Bearer ")) {
+      throw new ApiError("unauthenticated", "An admin bearer token is required.");
+    }
+
+    const provided = authHeader.slice("Bearer ".length).trim();
+    const expected = fastify.config.ADMIN_TOKEN;
+    if (!expected || !constantTimeEquals(provided, expected)) {
+      throw new ApiError("unauthenticated", "The admin bearer token is invalid.");
+    }
+
+    request.principal = {
+      kind: "admin",
+      actor: { kind: "cli", label: actorLabelFromHeader(request) },
+    };
+    return;
   }
 
-  const provided = authHeader.slice("Bearer ".length).trim();
-  const expected = fastify.config.ADMIN_TOKEN;
-  if (!expected || !constantTimeEquals(provided, expected)) {
-    throw new ApiError("unauthenticated", "The admin bearer token is invalid.");
+  const session = fastify.auth.resolveSession(request.headers.cookie);
+  if (!session) {
+    throw new ApiError("unauthenticated", "An admin session or bearer token is required.");
+  }
+  if (WRITE_METHODS.has(request.method) && !hasCsrfHeader(request)) {
+    throw new ApiError(
+      "csrf_required",
+      "Cookie-authenticated writes require the X-Requested-With: drafter header.",
+    );
   }
 
   request.principal = {
     kind: "admin",
-    actor: { kind: "cli", label: actorLabelFromHeader(request) },
+    actor: { kind: "admin", email: session.email },
   };
 }
 

@@ -33,8 +33,15 @@ const WEB_DIST = new URL("../../../web/dist", import.meta.url);
 /** Files Vite copies from `apps/web/public/` to the dist root (not `dist/assets/`). */
 const PUBLIC_ROOT_FILES = ["favicon.svg", "icons.svg"];
 
-/** Route families whose paths are client-side routes inside the one SPA shell. */
-const SPA_SHELL_PREFIXES = ["/i/*", "/d/*", "/admin/*"];
+/**
+ * Route families whose paths are client-side routes inside the one SPA
+ * shell. `/admin` (bare, no trailing segment) is included alongside
+ * `/admin/*` — unlike `/i/*`/`/d/*`, which only ever appear with a token or
+ * slug segment, `admin-dashboard`'s document list lives at exactly
+ * `/admin`, and a `/admin/*` wildcard alone does not match that bare path
+ * (it fell through to the gateway's default-deny 403 before this fix).
+ */
+const SPA_SHELL_PREFIXES = ["/i/*", "/d/*", "/admin", "/admin/*"];
 
 /**
  * `specs/screens/public-and-embed.md`: `/d/<slug>/embed` and

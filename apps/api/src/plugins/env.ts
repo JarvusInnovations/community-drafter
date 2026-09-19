@@ -45,6 +45,10 @@ const schema = {
     COOKIE_SECRET: { type: "string" },
     OAUTH_ALLOWED_EMAILS: { type: "string" },
     OAUTH_ALLOWED_DOMAINS: { type: "string" },
+    // `admin-dashboard`: bypasses Google entirely for local dev/tests. Only
+    // honored when NODE_ENV !== "production" (`auth/plugin.ts`) — a value
+    // left set in a deployed environment is ignored, not a foothold.
+    DEV_ADMIN_EMAIL: { type: "string" },
 
     // --- Outbound messaging (specs/architecture.md § Outbound messaging) ---
     MAILER: {
@@ -93,6 +97,7 @@ declare module "fastify" {
       COOKIE_SECRET?: string;
       OAUTH_ALLOWED_EMAILS?: string;
       OAUTH_ALLOWED_DOMAINS?: string;
+      DEV_ADMIN_EMAIL?: string;
 
       MAILER: "postmark" | "smtp" | "export";
       POSTMARK_API_KEY?: string;

@@ -17,6 +17,7 @@ export function VersionLabel({
   summary,
   isCurrent,
   currentNumber,
+  readOnly = false,
 }: {
   token: string;
   number: number;
@@ -24,32 +25,42 @@ export function VersionLabel({
   summary: string;
   isCurrent: boolean;
   currentNumber: number;
+  /** Admin "view as" has no `/i/:token` route to link into — render plain text instead. */
+  readOnly?: boolean;
 }): JSX.Element {
   return (
     <div className="mt-3 flex flex-col gap-1 text-sm">
       {!isCurrent ? (
         <p className="rounded border border-border bg-muted p-2 text-muted-foreground">
           {copy.olderVersionBanner.reading(number)}{" "}
-          <Link to={`/i/${token}`} className="font-semibold underline">
-            {copy.olderVersionBanner.readCurrent(currentNumber)}
-          </Link>
+          {readOnly ? (
+            copy.olderVersionBanner.readCurrent(currentNumber)
+          ) : (
+            <Link to={`/i/${token}`} className="font-semibold underline">
+              {copy.olderVersionBanner.readCurrent(currentNumber)}
+            </Link>
+          )}
         </p>
       ) : null}
       <p className="text-muted-foreground">
         {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)}
-        {number > 1 ? (
+        {readOnly ? null : (
           <>
-            {" "}
+            {number > 1 ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link to={`/i/${token}/history/compare?to=${number}`} className="underline">
+                  {copy.versionLabel.seeWhatChanged}
+                </Link>
+              </>
+            ) : null}{" "}
             ·{" "}
-            <Link to={`/i/${token}/history/compare?to=${number}`} className="underline">
-              {copy.versionLabel.seeWhatChanged}
+            <Link to={`/i/${token}/history`} className="underline">
+              {copy.versionLabel.allVersions}
             </Link>
           </>
-        ) : null}{" "}
-        ·{" "}
-        <Link to={`/i/${token}/history`} className="underline">
-          {copy.versionLabel.allVersions}
-        </Link>
+        )}
       </p>
     </div>
   );
