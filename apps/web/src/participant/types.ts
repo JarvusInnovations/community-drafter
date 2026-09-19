@@ -15,6 +15,14 @@ export type ShowSignatories = "list" | "count" | "none";
 export type DocumentState = "draft" | "open" | "closed" | "withdrawn";
 export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
 export type Judgement = "sign" | "sign_conditional" | "decline" | string;
+/**
+ * The strict, closed form (`specs/behaviors/review-and-judgement.md` §
+ * Submission table) — used where a value is always one the client itself
+ * constructs (the judgement picker, `POST submit`'s body), as opposed to
+ * `Judgement` above, which stays open for defensively displaying whatever a
+ * past submission record happens to carry.
+ */
+export type SubmissionJudgement = "sign" | "sign_conditional" | "comment" | "decline";
 export type Disposition = "accepted" | "partial" | "declined" | "noted";
 export type BlockStatus = "same" | "changed" | "added" | "removed";
 
@@ -178,4 +186,31 @@ export interface ApiErrorBody {
   error: string;
   message: string;
   details?: Record<string, unknown>;
+}
+
+/** `specs/api/participant.md` § Draft submission endpoints. */
+export interface DraftCommentCreateResult {
+  submission: string;
+  id: string;
+  saved_at: string;
+}
+
+export interface DraftCommentSaveResult {
+  saved_at: string;
+}
+
+export interface RebasePlacement {
+  id: string;
+  placed: boolean;
+}
+
+export interface RebaseResult {
+  submission: string;
+  version: number;
+  comments: RebasePlacement[];
+}
+
+export interface SubmitResult {
+  submission: SubmissionView | null;
+  signature: SignatureView | null;
 }

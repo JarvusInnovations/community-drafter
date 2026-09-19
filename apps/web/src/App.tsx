@@ -20,8 +20,10 @@ const HistoryScreen = lazy(() =>
 const CompareScreen = lazy(() =>
   import("./participant/CompareScreen.tsx").then((m) => ({ default: m.CompareScreen })),
 );
-const CommentPlaceholder = lazy(() =>
-  import("./participant/CommentPlaceholder.tsx").then((m) => ({ default: m.CommentPlaceholder })),
+const CommentModeScreen = lazy(() =>
+  import("./participant/comment/CommentModeScreen.tsx").then((m) => ({
+    default: m.CommentModeScreen,
+  })),
 );
 
 // `public-and-embed`: the whole `/d/:slug/*` family is code-split too — a
@@ -95,7 +97,7 @@ function App(): JSX.Element {
           path="comment"
           element={
             <Suspense fallback={<LazyFallback />}>
-              <CommentPlaceholder />
+              <CommentModeScreen />
             </Suspense>
           }
         />

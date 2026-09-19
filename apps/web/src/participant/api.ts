@@ -2,7 +2,13 @@ import {
   type Bundle,
   type Capacity,
   type CompareResult,
+  type DraftCommentCreateResult,
+  type DraftCommentSaveResult,
+  type RebaseResult,
   type SignatureView,
+  type SubmissionJudgement,
+  type SubmissionView,
+  type SubmitResult,
   type VersionDetail,
 } from "./types.ts";
 
@@ -126,5 +132,85 @@ export function postDecline(token: string, reason?: string): Promise<{ declined_
   return request<{ declined_at: string }>(`${base(token)}/decline`, {
     method: "POST",
     body: JSON.stringify({ reason }),
+  });
+}
+
+/** `specs/api/participant.md` § Draft submission endpoints. */
+export function getDraft(token: string): Promise<SubmissionView | null> {
+  return request<SubmissionView | null>(`${base(token)}/draft`);
+}
+
+export interface DraftCommentInput {
+  version: number;
+  anchor?: unknown;
+  body: string;
+  client_id: string;
+}
+
+export function postDraftComment(
+  token: string,
+  body: DraftCommentInput,
+): Promise<DraftCommentCreateResult> {
+  return request<DraftCommentCreateResult>(`${base(token)}/draft/comments`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export interface DraftCommentPatchInput {
+  body: string;
+  anchor?: unknown;
+  base_saved_at?: string;
+}
+
+export function putDraftComment(
+  token: string,
+  id: string,
+  body: DraftCommentPatchInput,
+): Promise<DraftCommentSaveResult> {
+  return request<DraftCommentSaveResult>(
+    `${base(token)}/draft/comments/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+      idempotent: true,
+    },
+  );
+}
+
+export function deleteDraftComment(token: string, id: string): Promise<void> {
+  return request<void>(`${base(token)}/draft/comments/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function postRebase(token: string, toVersion: number): Promise<RebaseResult> {
+  return request<RebaseResult>(`${base(token)}/draft/rebase`, {
+    method: "POST",
+    body: JSON.stringify({ to_version: toVersion }),
+  });
+}
+
+export interface SubmitInput {
+  version: number;
+  judgement: SubmissionJudgement;
+  pending: number;
+  reason?: string;
+  signature?: {
+    capacity: Capacity;
+    display_name: string;
+    descriptor?: string;
+    org?: string;
+    title?: string;
+    authorized?: boolean;
+    listed?: boolean;
+  };
+}
+
+export function postSubmit(token: string, body: SubmitInput): Promise<SubmitResult> {
+  return request<SubmitResult>(`${base(token)}/submit`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    idempotent: true,
   });
 }
