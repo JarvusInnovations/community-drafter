@@ -8,6 +8,8 @@ import type {
 } from "@community-drafter/shared";
 
 import { app } from "../app.ts";
+import type { AuthPluginOptions } from "../auth/plugin.ts";
+import type { GoogleAuth, GoogleIdentity } from "../auth/google.ts";
 import { FakeMailer, type Mailer } from "../lib/mailer/index.ts";
 import type { Actor } from "../storage/actor.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
@@ -21,11 +23,19 @@ export interface BuildTestServerOptions {
   mailer?: Mailer;
   /** Test-only override for the digest/closing-soon schedulers' poll interval. */
   schedulerIntervalMs?: number;
+  /** Test-only overrides for admin OAuth (`auth/plugin.ts`) — e.g. `googleAuth: fakeGoogleAuth(...)`. */
+  auth?: AuthPluginOptions;
+  /** Set `COOKIE_SECRET`/`GOOGLE_CLIENT_ID`/etc. before boot; defaults keep prior test behavior. */
+  env?: Record<string, string | undefined>;
 }
 
 export async function buildTestServer(opts: BuildTestServerOptions = {}) {
   process.env.NODE_ENV = "test";
   process.env.ADMIN_TOKEN = TEST_ADMIN_TOKEN;
+  for (const [key, value] of Object.entries(opts.env ?? {})) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
   const { dataDir, cleanup } = await createTestDataRepo();
 
   const mailer = opts.mailer ?? new FakeMailer();
@@ -38,10 +48,20 @@ export async function buildTestServer(opts: BuildTestServerOptions = {}) {
       mailer,
       schedulerIntervalMs: opts.schedulerIntervalMs,
     },
+    auth: opts.auth,
   });
   await server.ready();
 
   return { server, dataDir, cleanup, mailer };
+}
+
+/** A `GoogleAuth` stub — `exchangeCode` always returns `identity` (or `null` to simulate failure). */
+export function fakeGoogleAuth(identity: GoogleIdentity | null): GoogleAuth {
+  return {
+    authUrl: (redirectUri, state) =>
+      `https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`,
+    exchangeCode: async () => identity,
+  };
 }
 
 export function adminHeaders(actorLabel?: string): Record<string, string> {
