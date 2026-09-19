@@ -241,6 +241,40 @@ describe("cookie-authenticated writes require the CSRF header", () => {
 
     await server.close();
   });
+
+  /**
+   * `specs/api/conventions.md`: "a present `Authorization` header is
+   * decisive" — a request presenting both a bearer token and a session
+   * cookie resolves via bearer only, never falling back to (or even
+   * consulting) the cookie. Proven here by presenting a *valid* cookie
+   * alongside an *invalid* bearer token: if the cookie were consulted at
+   * all, this would 200 (the CSRF header is also present); it must 401
+   * instead, exactly as a bearer-only request with a bad token would.
+   */
+  it("a request presenting both a session cookie and a bearer header resolves via bearer only", async () => {
+    const { server, cleanup } = await buildTestServer({
+      env: { DEV_ADMIN_EMAIL: "dev@example.org", COOKIE_SECRET: "g".repeat(32) },
+    });
+    cleanups.push(cleanup);
+    const cookie = await signedInCookie(server);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents",
+      headers: { cookie, "x-requested-with": "drafter", authorization: "Bearer wrong-token" },
+      payload: {
+        slug: "doc-both-transports",
+        title: "Doc Both Transports",
+        owner: "team",
+        sender_name: "Team",
+        reply_to: "team@example.org",
+      },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error).toBe("unauthenticated");
+
+    await server.close();
+  });
 });
 
 describe("POST /auth/logout", () => {
