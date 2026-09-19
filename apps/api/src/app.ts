@@ -7,6 +7,7 @@ import { PhaseObserver } from "./events/phase-observer.ts";
 import gatewayPlugin from "./gateway/gateway.ts";
 import idempotencyPlugin from "./lib/idempotency.ts";
 import requestContextPlugin from "./lib/request-context.ts";
+import notificationsPlugin, { type NotificationsPluginOptions } from "./notifications/plugin.ts";
 import envPlugin from "./plugins/env.ts";
 import renderingPlugin from "./rendering/cache.ts";
 import adminRoutes from "./routes/admin/index.ts";
@@ -21,6 +22,8 @@ export interface AppOptions {
   phaseObserverIntervalMs?: number;
   /** Test-only: skip starting the phase observer's timer (tests drive `tick()` directly). */
   disablePhaseObserver?: boolean;
+  /** Test-only overrides for the notifications plugin's schedulers (`notifications/plugin.ts`). */
+  notifications?: NotificationsPluginOptions;
 }
 
 declare module "fastify" {
@@ -44,6 +47,12 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
 
   // 3. Storage: the data repo, read model, tracker, push daemon.
   await fastify.register(storagePlugin, opts.storage ?? {});
+
+  // 3b. The mailer + dispatcher + digest/closing-soon schedulers
+  //     (`notifications` plan). Needs storage + events + config; every
+  //     route below (`versions.ts`'s publish handler in particular) calls
+  //     `fastify.notifications`, so this must land before routes register.
+  await fastify.register(notificationsPlugin, opts.notifications ?? {});
 
   // 4. The deny-by-default gateway. Must come after storage/config (token
   //    resolution and the admin bearer compare both read them) and before

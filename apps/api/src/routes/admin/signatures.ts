@@ -79,7 +79,7 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "revoke",
         document: slug,
         person,

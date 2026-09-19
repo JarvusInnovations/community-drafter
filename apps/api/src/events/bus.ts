@@ -26,13 +26,22 @@ export type DrafterEvent =
   | { type: "signing-opened"; document: string }
   | { type: "closed"; document: string };
 
-export type DrafterEventListener = (event: DrafterEvent) => void;
+export type DrafterEventListener = (event: DrafterEvent) => void | Promise<void>;
 
 export class EventBus {
   private readonly listeners = new Set<DrafterEventListener>();
 
-  publish(event: DrafterEvent): void {
-    for (const listener of this.listeners) listener(event);
+  /**
+   * `async` (rather than fire-and-forget) so a caller that needs its
+   * side effects to have landed before it responds — the `notifications`
+   * plan's dispatcher listener, in particular — can `await` it; every
+   * existing call site that doesn't need that still works unchanged
+   * (an un-awaited call just doesn't wait, same as before).
+   */
+  async publish(event: DrafterEvent): Promise<void> {
+    for (const listener of this.listeners) {
+      await listener(event);
+    }
   }
 
   on(listener: DrafterEventListener): () => void {

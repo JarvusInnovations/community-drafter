@@ -294,7 +294,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         commitHash = result.commitHash;
       }
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "send",
         document: slug,
         people: candidates.map((entry) => entry.record.person),
@@ -520,7 +520,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         commitHash = result.commitHash;
       }
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "remind",
         document: slug,
         people: candidates.map((entry) => entry.record.person),

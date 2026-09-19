@@ -7,6 +7,7 @@ All routes are under `/i/:token/api`. The token resolves to an invitation; the p
 Everything the document screen needs in one call.
 
 Response:
+
 ```
 {
   instance: { name },
@@ -27,6 +28,7 @@ Response:
   notify:   { channel, every_revision, daily_digest, phase_changes, my_comments_addressed, reminders, forced: [..] }
 }
 ```
+
 Side effect: records an open (batched).
 
 ## `POST /i/:token/api/signature`
@@ -75,7 +77,7 @@ Response: `{ from, to, summary: { changed, added, removed }, blocks: [{ status: 
 
 ## `GET /i/:token/api/prefs` / `PUT /i/:token/api/prefs`
 
-Body/response: the `notify` table plus `forced` (list of keys the server keeps on). `PUT` ignores attempts to turn off forced keys and reports them.
+Body/response: the `notify` table plus `forced` (list of keys the server keeps on) and `email_masked` (`j***@example.org` — `screens/preferences.md`'s masked email display; no other endpoint exposes a participant's own contact address). `PUT` ignores attempts to turn off forced keys and reports them (as `ignored`).
 
 ## `POST /i/:token/api/prefs/stop-optional`
 
@@ -84,5 +86,6 @@ Sets every non-forced optional preference off. Used by the one-click email link 
 ## Principles
 
 **Inherited**
+
 - [The link is the identity](../principles.md#the-link-is-the-identity): no other credential appears in this API.
 - [Nothing pending is lost; pending is labeled](../principles.md#nothing-pending-is-lost-pending-is-labeled): item-level saves acknowledged only when durable; submission refuses to drop unsaved items.

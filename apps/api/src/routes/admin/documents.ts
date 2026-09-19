@@ -238,7 +238,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "invite",
         document: slug,
         people: toInvite.map((p) => p.record.person),
@@ -316,7 +316,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "schedule-changed",
         document: slug,
         commit: result.commitHash ?? "",
@@ -355,7 +355,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({ type: "closed", document: slug });
+      await fastify.events.publish({ type: "closed", document: slug });
       return documentSummary(
         fastify,
         fastify.storage.readModel.getDocument(slug)!,
@@ -406,7 +406,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({
+      await fastify.events.publish({
         type: "schedule-changed",
         document: slug,
         commit: result.commitHash ?? "",

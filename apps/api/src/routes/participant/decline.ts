@@ -74,7 +74,7 @@ const declineRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      fastify.events.publish({ type: "decline", document: slug, person, commit: "", reason });
+      await fastify.events.publish({ type: "decline", document: slug, person, commit: "", reason });
 
       const submission = fastify.storage.readModel.getSubmission(slug, id);
       return { declined_at: submission?.timing.submittedAt ?? new Date().toISOString() };

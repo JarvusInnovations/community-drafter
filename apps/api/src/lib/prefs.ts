@@ -9,6 +9,17 @@ export interface PrefsView {
   my_comments_addressed: boolean;
   reminders: boolean;
   forced: string[];
+  /** `specs/screens/preferences.md` § Data Requirements: "email shown masked, e.g. `j***@example.org`." */
+  email_masked?: string;
+}
+
+/** `j***@example.org` — the local part's first character, the rest starred, domain untouched. */
+export function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at <= 0) return email;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  return `${local.slice(0, 1)}${"*".repeat(Math.max(local.length - 1, 1))}@${domain}`;
 }
 
 /**
@@ -25,7 +36,7 @@ export function forcedKeys(entry: ParticipationEntry): string[] {
   return isCurrentSigner(entry) ? ["phase_changes"] : [];
 }
 
-export function buildPrefsView(entry: ParticipationEntry): PrefsView {
+export function buildPrefsView(entry: ParticipationEntry, email?: string): PrefsView {
   return {
     channel: entry.record.notify?.channel ?? "email",
     every_revision: prefOn(entry, "every_revision"),
@@ -34,5 +45,6 @@ export function buildPrefsView(entry: ParticipationEntry): PrefsView {
     my_comments_addressed: prefOn(entry, "my_comments_addressed"),
     reminders: prefOn(entry, "reminders"),
     forced: forcedKeys(entry),
+    email_masked: email ? maskEmail(email) : undefined,
   };
 }

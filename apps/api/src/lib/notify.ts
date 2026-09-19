@@ -36,16 +36,48 @@ export interface PublishNotifyCounts {
   signers: number;
 }
 
+export interface PublishDispositionRecipient {
+  person: string;
+  outcomes: Array<{ outcome: string; note?: string }>;
+}
+
+export interface PublishFinalRecipient {
+  person: string;
+  conditional: boolean;
+}
+
 /**
- * `specs/api/admin.md` § Versions → `POST .../versions` response:
+ * Who this publish just marked, grouped by event key -- handed to
+ * `notifications`'s dispatcher (`notifications/dispatcher.ts`) so it can
+ * render and send `v<n>` / `disposition-v<n>` / `final-published` without
+ * re-deriving the recipient set (`plans/notifications.md` Approach: "reuse
+ * `lib/notify.ts`'s recipient computation rather than re-deriving it").
+ * `final_published` covers only current signers -- `notifications.md`'s
+ * behavior table also sends `final-published` to commenters with
+ * `phase_changes`, which this function doesn't compute (comment-mode isn't
+ * built yet); the dispatcher's caller documents that gap.
+ */
+export interface PublishNotifyRecipients {
+  every_revision: string[];
+  dispositions: PublishDispositionRecipient[];
+  final_published: PublishFinalRecipient[];
+}
+
+export interface PublishNotifyResult {
+  counts: PublishNotifyCounts;
+  recipients: PublishNotifyRecipients;
+}
+
+/**
+ * `specs/api/admin.md` Versions -> `POST .../versions` response:
  * `{ notified: { every_revision, dispositions, signers } }`. Computes
  * recipients from live preferences + `notified` idempotency and marks them
  * in **one** follow-up `Action: send` commit
  * (`specs/behaviors/notifications.md`: "recorded in one commit ... never
- * one commit per recipient"). Rendering and actually delivering the
- * message is the `notifications` plan's job — this plan's contract is the
- * counts and the idempotency marks they must be backed by, so a later
- * `retry` or digest run doesn't double-send.
+ * one commit per recipient") -- synchronously, so the idempotency mark
+ * always lands even if the `notifications` plan's dispatcher (which
+ * actually renders and delivers these, using `recipients` below) is slow or
+ * fails outright.
  */
 export async function dispatchPublishNotifications(opts: {
   fastify: FastifyInstance;
@@ -55,7 +87,7 @@ export async function dispatchPublishNotifications(opts: {
   dispositionedPersons: readonly string[];
   actor: Actor;
   requestId: string | undefined;
-}): Promise<PublishNotifyCounts> {
+}): Promise<PublishNotifyResult> {
   const { fastify, document, version, final, dispositionedPersons, actor, requestId } = opts;
   const participations = fastify.storage.readModel.listParticipationsForDocument(document);
 
@@ -65,9 +97,9 @@ export async function dispatchPublishNotifications(opts: {
   const now = new Date().toISOString();
 
   const marks = new Map<string, Record<string, string>>();
-  let everyRevision = 0;
-  let dispositions = 0;
-  let signers = 0;
+  const everyRevisionRecipients: string[] = [];
+  const dispositionRecipients: PublishDispositionRecipient[] = [];
+  const finalRecipients: PublishFinalRecipient[] = [];
 
   for (const entry of participations) {
     if (entry.record.link_revoked) continue;
@@ -76,7 +108,7 @@ export async function dispatchPublishNotifications(opts: {
 
     if (prefOn(entry, "every_revision") && entry.record.notified?.[versionKey] === undefined) {
       patch[versionKey] = now;
-      everyRevision += 1;
+      everyRevisionRecipients.push(person);
     }
     if (
       dispositionedSet.has(person) &&
@@ -84,7 +116,10 @@ export async function dispatchPublishNotifications(opts: {
       entry.record.notified?.[dispositionKey] === undefined
     ) {
       patch[dispositionKey] = now;
-      dispositions += 1;
+      dispositionRecipients.push({
+        person,
+        outcomes: personDispositionOutcomes(fastify, document, person, version),
+      });
     }
     if (
       final &&
@@ -92,7 +127,7 @@ export async function dispatchPublishNotifications(opts: {
       entry.record.notified?.["final-published"] === undefined
     ) {
       patch["final-published"] = now;
-      signers += 1;
+      finalRecipients.push({ person, conditional: entry.record.signature?.conditional === true });
     }
 
     if (Object.keys(patch).length > 0) marks.set(person, patch);
@@ -121,5 +156,35 @@ export async function dispatchPublishNotifications(opts: {
     );
   }
 
-  return { every_revision: everyRevision, dispositions, signers };
+  return {
+    counts: {
+      every_revision: everyRevisionRecipients.length,
+      dispositions: dispositionRecipients.length,
+      signers: finalRecipients.length,
+    },
+    recipients: {
+      every_revision: everyRevisionRecipients,
+      dispositions: dispositionRecipients,
+      final_published: finalRecipients,
+    },
+  };
+}
+
+/** This one person's own comment dispositions set by this publish -- never another person's. */
+function personDispositionOutcomes(
+  fastify: FastifyInstance,
+  document: string,
+  person: string,
+  version: number,
+): Array<{ outcome: string; note?: string }> {
+  const outcomes: Array<{ outcome: string; note?: string }> = [];
+  for (const entry of fastify.storage.readModel.listSubmissionsForDocument(document)) {
+    if (entry.record.person !== person) continue;
+    for (const comment of entry.record.comments ?? []) {
+      if (comment.disposition_version === version && comment.disposition) {
+        outcomes.push({ outcome: comment.disposition, note: comment.disposition_note });
+      }
+    }
+  }
+  return outcomes;
 }
