@@ -134,7 +134,7 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             },
           );
 
-          fastify.events.publish({
+          await fastify.events.publish({
             type: action,
             document: slug,
             person,
@@ -244,7 +244,7 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             },
           );
 
-          fastify.events.publish({
+          await fastify.events.publish({
             type: "revoke",
             document: slug,
             person,

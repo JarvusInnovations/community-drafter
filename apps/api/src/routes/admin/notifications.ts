@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { dispatchPublishNotifications } from "../../lib/notify.ts";
 import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
@@ -14,12 +13,14 @@ interface RetryBody {
 }
 
 /**
- * `specs/api/admin.md` § Notifications. `pending`/`failed` come "from the
- * dispatcher's memory" per spec — this plan's dispatcher is a synchronous
- * stub with no queue of its own (see `lib/notify.ts`), so both are always
- * `0` here; a real async dispatcher with retries is the `notifications`
- * plan's addition. `sent` is real: it's a live tally of every
- * `participations.notified` key on the document.
+ * `specs/api/admin.md` § Notifications. `sent` is a live tally of every
+ * `participations.notified` key on the document (works for every event
+ * kind, including the pre-marked ones `lib/notify.ts`/`invitations.ts`
+ * write synchronously); `pending` stays `0` — sends aren't queued, the
+ * dispatcher renders and delivers them inline (with its own retry/backoff)
+ * as soon as the triggering commit lands, so nothing is ever "waiting to
+ * start"; `failed` is `notifications.failedCount`, the dispatcher's
+ * in-memory bucket of sends that exhausted their retries.
  */
 const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams }>(
@@ -38,7 +39,7 @@ const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      return { sent, pending: 0, failed: 0 };
+      return { sent, pending: 0, failed: fastify.notifications.failedCount(document.record.slug) };
     },
   );
 
@@ -48,20 +49,16 @@ const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
-      const latest = document.versions[document.versions.length - 1];
-      if (!latest) return { retried: 0 };
 
-      const notified = await dispatchPublishNotifications({
-        fastify,
-        document: document.record.slug,
-        version: latest.number,
-        final: latest.final,
-        dispositionedPersons: [],
-        actor: adminActor(request),
-        requestId: request.requestId,
-      });
+      const { event, person } = request.body ?? {};
+      const result = await fastify.notifications.retry(
+        document.record.slug,
+        { event, person },
+        adminActor(request),
+        request.requestId,
+      );
 
-      return { retried: notified.every_revision + notified.dispositions + notified.signers };
+      return result;
     },
   );
 };

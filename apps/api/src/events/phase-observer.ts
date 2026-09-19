@@ -49,7 +49,7 @@ export class PhaseObserver {
       const previous = this.lastPhase.get(record.slug);
 
       if (phase === "signing" && previous === "commenting") {
-        this.fastify.events.publish({ type: "signing-opened", document: record.slug });
+        await this.fastify.events.publish({ type: "signing-opened", document: record.slug });
       }
 
       if (phase === "closed") {
@@ -64,7 +64,7 @@ export class PhaseObserver {
             await tx.documents.patch({ slug: record.slug }, { state: "closed" });
           },
         );
-        this.fastify.events.publish({ type: "closed", document: record.slug });
+        await this.fastify.events.publish({ type: "closed", document: record.slug });
       }
 
       this.lastPhase.set(record.slug, phase);

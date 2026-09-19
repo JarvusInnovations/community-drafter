@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { buildPrefsView, forcedKeys } from "../../lib/prefs.ts";
@@ -22,10 +22,14 @@ const OPTIONAL_KEYS = [
   "reminders",
 ] as const;
 
+function emailFor(fastify: FastifyInstance, person: string): string | undefined {
+  return fastify.storage.readModel.getPerson(person)?.email;
+}
+
 const prefsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/prefs", { config: PARTICIPANT_ROUTE }, async (request) => {
     const { participation } = loadParticipantContext(fastify, request);
-    return buildPrefsView(participation);
+    return buildPrefsView(participation, emailFor(fastify, participation.record.person));
   });
 
   fastify.put<{ Body: PrefsPutBody }>("/prefs", { config: PARTICIPANT_ROUTE }, async (request) => {
@@ -66,7 +70,7 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
     );
 
     const updated = fastify.storage.readModel.getParticipation(slug, person);
-    return { ...buildPrefsView(updated!), ignored };
+    return { ...buildPrefsView(updated!, emailFor(fastify, person)), ignored };
   });
 
   fastify.post("/prefs/stop-optional", { config: PARTICIPANT_ROUTE }, async (request) => {
@@ -99,7 +103,7 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
     );
 
     const updated = fastify.storage.readModel.getParticipation(slug, person);
-    return buildPrefsView(updated!);
+    return buildPrefsView(updated!, emailFor(fastify, person));
   });
 };
 

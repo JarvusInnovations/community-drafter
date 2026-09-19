@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Capacity, DocumentState, ShowSignatories } from "@community-drafter/shared";
 
 import { app } from "../app.ts";
+import { FakeMailer, type Mailer } from "../lib/mailer/index.ts";
 import type { Actor } from "../storage/actor.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 
@@ -10,19 +11,32 @@ export const TEST_ACTOR: Actor = { kind: "admin", email: "team@example.org" };
 
 export const TEST_ADMIN_TOKEN = "s3cr3t-admin-token";
 
-export async function buildTestServer() {
+export interface BuildTestServerOptions {
+  /** Defaults to a fresh `FakeMailer` — pass one in to assert on `.sent`/force failures. */
+  mailer?: Mailer;
+  /** Test-only override for the digest/closing-soon schedulers' poll interval. */
+  schedulerIntervalMs?: number;
+}
+
+export async function buildTestServer(opts: BuildTestServerOptions = {}) {
   process.env.NODE_ENV = "test";
   process.env.ADMIN_TOKEN = TEST_ADMIN_TOKEN;
   const { dataDir, cleanup } = await createTestDataRepo();
 
+  const mailer = opts.mailer ?? new FakeMailer();
   const server = Fastify();
   await server.register(app, {
     storage: { dataDir, trackerIntervalMs: 3_600_000 },
     disablePhaseObserver: true,
+    notifications: {
+      disableSchedulers: true,
+      mailer,
+      schedulerIntervalMs: opts.schedulerIntervalMs,
+    },
   });
   await server.ready();
 
-  return { server, dataDir, cleanup };
+  return { server, dataDir, cleanup, mailer };
 }
 
 export function adminHeaders(actorLabel?: string): Record<string, string> {
@@ -72,6 +86,14 @@ export interface SeedParticipantOptions {
   token: string;
   email?: string;
   name?: string;
+  notify?: {
+    channel?: string;
+    every_revision?: boolean;
+    daily_digest?: boolean;
+    phase_changes?: boolean;
+    my_comments_addressed?: boolean;
+    reminders?: boolean;
+  };
 }
 
 export async function seedParticipant(
@@ -97,6 +119,7 @@ export async function seedParticipant(
         person: opts.person,
         token: opts.token,
         source: "admin",
+        notify: opts.notify,
       });
     },
   );

@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 15
 depends: [api-core]
 specs:
   - specs/behaviors/notifications.md
@@ -28,16 +29,16 @@ The mailer adapters (Postmark, SMTP, export), message templates, the dispatcher 
 
 ## Validation
 
-- [ ] Publishing v3 sends exactly one `v3` message to each participation with `every_revision` and none to others; re-running dispatch sends nothing (idempotent via `notified`).
-- [ ] A signer with all optional preferences off still receives `signing-opened`, `final-published` and `closing-soon`.
-- [ ] A person with both `every_revision` and `daily_digest` receives v3 once; the digest omits it.
-- [ ] Signature and revocation confirmations are sent regardless of preferences and contain the personal link.
-- [ ] With `MAILER=export`, `people send` produces a CSV with `name,email,subject,link` rows and marks `notified.invitation`.
-- [ ] A failed Postmark call retries 3 times, then appears in `GET notifications` as failed; `retry` re-dispatches it.
-- [ ] Preferences page shows forced toggles disabled for a signer with the specified explanation; stop-optional turns off exactly the non-forced keys.
-- [ ] No message body contains another participant's name, email or comment text (template test over fixtures).
-- [ ] `.env.example` and the `@fastify/env` schema's mailer-provider variable names match what `Mailer` actually consumes (deferred from `workspace-bootstrap`).
-- [ ] The `forced` key `api-core`'s `lib/prefs.ts` reports for a current signer (currently just `phase_changes`, a documented interpretation of `specs/behaviors/notifications.md`'s "forced on" language for `signing-opened`/`final-published`/`closing-soon`) is confirmed correct or corrected once this plan implements those three sends for real (deferred from `api-core`, PR #10).
+- [x] Publishing v3 sends exactly one `v3` message to each participation with `every_revision` and none to others; re-running dispatch sends nothing (idempotent via `notified`).
+- [x] A signer with all optional preferences off still receives `signing-opened`, `final-published` and `closing-soon`.
+- [x] A person with both `every_revision` and `daily_digest` receives v3 once; the digest omits it.
+- [x] Signature and revocation confirmations are sent regardless of preferences and contain the personal link.
+- [x] With `MAILER=export`, `people send` produces a CSV with `name,email,subject,link` rows and marks `notified.invitation`.
+- [x] A failed Postmark call retries 3 times, then appears in `GET notifications` as failed; `retry` re-dispatches it. (Verified with a `FakeMailer` forced-failure stand-in for the retry/failure *mechanism* — the real Postmark adapter's live behavior is unverified; see Notes.)
+- [x] Preferences page shows forced toggles disabled for a signer with the specified explanation; stop-optional turns off exactly the non-forced keys. (Verified two ways: an HTTP test, and a manual check with a real browser against a running dev server — see Notes.)
+- [x] No message body contains another participant's name, email or comment text (template test over fixtures).
+- [x] `.env.example` and the `@fastify/env` schema's mailer-provider variable names match what `Mailer` actually consumes (deferred from `workspace-bootstrap`).
+- [x] The `forced` key `api-core`'s `lib/prefs.ts` reports for a current signer (currently just `phase_changes`, a documented interpretation of `specs/behaviors/notifications.md`'s "forced on" language for `signing-opened`/`final-published`/`closing-soon`) is confirmed correct or corrected once this plan implements those three sends for real (deferred from `api-core`, PR #10).
 
 ## Risks / unknowns
 
@@ -45,8 +46,15 @@ The mailer adapters (Postmark, SMTP, export), message templates, the dispatcher 
 
 ## Notes
 
-(closeout)
+- **Real Postmark/SMTP delivery is unverified.** No live credentials exist in the dev/CI environment. Both adapters were exercised structurally (construction, request/message shaping) and the SMTP adapter was confirmed to construct and hold a `nodemailer` transport under Bun with no native bindings — neither was exercised against a real inbox. The retry-then-fail-then-`retry`-succeeds *mechanism* is fully covered with a `FakeMailer` standing in for any provider.
+- **A real bug the test suite missed, caught only by a manual browser check**: `buildPrefsView` originally returned a forced key's *raw stored* preference value rather than overriding it to `true`. A signer whose `phase_changes` had been off *before* they signed would see "Milestones" render unchecked-and-disabled instead of the spec's "shown on and disabled." No HTTP/unit test exercised this specific stored-then-forced sequence; a manual pass with `chrome-devtools-axi` against a running dev server (seeded via a throwaway boot script, since deleted) surfaced it immediately. Fixed in `lib/prefs.ts`; a regression test would need either a DOM test runner (this repo has none yet) or an API-level test that signs a participant who previously had `phase_changes: false` and asserts the response value — worth adding once `participant-sign-flow`'s route shell lands and a first DOM test harness exists.
+- **`EventBus.publish` is now `async`.** Every existing call site was updated to `await` it so the dispatcher's bus-driven sends (`signing-opened`/`closed`/`schedule-changed`, `sign`/`resign`/`revoke`/`decline`, `invite`/`send`/`remind`) complete before the triggering HTTP response returns — this is what makes the dispatcher's behavior deterministically testable over `server.inject`, and it's a backward-compatible change (an un-awaited `publish()` still just doesn't wait, same as before).
+- **`final-published`'s recipient set is split across two code paths on purpose**: current signers are computed and pre-marked synchronously by `lib/notify.ts` (unchanged from `api-core`) and delivered with `markNotified: false`; commenters (`notifications/triggers.ts`'s `finalPublishedCommenterRecipients`) are derived live and delivered with `markNotified: true`. The two sets are disjoint (`!isCurrentSigner`), so there's no double-send risk.
+- **"Commenter" is read broadly** (`triggers.ts`): "has a submitted submission", which today only means `decline` submissions — `comment-mode`'s general submit endpoint isn't built yet. See Follow-ups.
+- The `.env.example`/`env.ts` variable names `workspace-bootstrap` guessed (`POSTMARK_API_KEY`, `SMTP_HOST`/`PORT`/`USER`/`PASSWORD`) turned out to already match what the real adapters need; only `EXPORT_CSV_PATH` and `INSTANCE_DIGEST_HOUR` were net-new additions.
+- `apps/api/src/routes/smoke.test.ts`'s idempotency-replay test previously asserted exactly 1 commit per signature POST; a real execution now makes 2 (the `sign` commit plus the signature-confirmation's `notified` mark), so the assertion was updated to `toBe(2)` — what it actually guards (a replay adds zero more) is unchanged.
 
 ## Follow-ups
 
-(closeout)
+- Deferred to [`comment-mode`](comment-mode.md) — wire `review-receipt-<ts>` onto the general submit endpoint's own event (today it only fires for `decline`, which is the only submitted-submission path that exists yet), and confirm/refine `finalPublishedCommenterRecipients`'s "commenter = has a submitted submission" reading once non-decline submissions exist.
+- Tracked as: real Postmark/SMTP delivery is unverified in this environment (no live credentials) — first live document should include a smoke send before going out to real invitees, and the Postmark sender/domain must be verified first (see Risks).
