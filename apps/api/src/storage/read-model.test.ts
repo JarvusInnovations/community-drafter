@@ -118,6 +118,59 @@ describe("ReadModel — version derivation", () => {
     // are for normies" display than the raw subject).
     expect(doc?.versions[0]?.summary).toBe("publish: doc-a v1");
   });
+
+  it("includes sign/comment/submit commits in a document's activity, not just body/settings commits", async () => {
+    // specs/screens/admin-dashboard.md: recent activity is "the last 50
+    // commits on this document" — every commit carrying its Document
+    // trailer, not only commits that touched documents/<slug>.md.
+    const { dataDir, cleanup } = await createTestDataRepo();
+    cleanups.push(cleanup);
+    const { store } = await openDataRepo({ dataDir });
+    const actor = { kind: "admin" as const, email: "team@example.org" };
+
+    await commit(
+      store,
+      "create",
+      { actor, subject: "create: doc-c", document: "doc-c" },
+      async (tx) => {
+        await tx.documents.upsert({ slug: "doc-c", title: "Doc C", state: "open", body: "text" });
+      },
+    );
+
+    await commit(
+      store,
+      "sign",
+      {
+        actor: { kind: "participant" },
+        subject: "sign: jane-doe on doc-c",
+        document: "doc-c",
+        person: "jane-doe",
+        version: 1,
+      },
+      async (tx) => {
+        await tx.people.upsert({
+          id: "jane-doe",
+          name: "Jane",
+          email: "jane@x.org",
+          source: "admin",
+        });
+        await tx.participations.upsert({
+          document: "doc-c",
+          person: "jane-doe",
+          token: "f".repeat(20),
+          source: "admin",
+          signature: { capacity: "personal", display_name: "Jane", authorized: true, listed: true },
+        });
+      },
+    );
+
+    const readModel = new ReadModel(store, dataDir);
+    await readModel.build();
+
+    const activityActions = readModel.getDocument("doc-c")?.activity.map((entry) => entry.action);
+    // Newest first: sign, then create.
+    expect(activityActions).toEqual(["sign", "create"]);
+  });
 });
 
 describe("ReadModel — participations, positions, token index", () => {

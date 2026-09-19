@@ -8,7 +8,13 @@ import type {
   Trailers,
 } from "@community-drafter/shared";
 
-import { logWithTrailers, readFileAtCommit, splitFrontmatter } from "./git-log.ts";
+import {
+  type CommitLogEntry,
+  logWithTrailers,
+  readFileAtCommit,
+  splitFrontmatter,
+} from "./git-log.ts";
+import { SHEET_LOCATIONS } from "./schemas.ts";
 import type { DataStore } from "./schemas.ts";
 
 /** Actions that write the `documents` record itself (settings and/or body). */
@@ -39,6 +45,9 @@ const PARTICIPATION_ACTIONS = new Set<Action>([
 
 const SUBMISSION_ACTIONS = new Set<Action>(["comment", "submit"]);
 
+/** `specs/screens/admin-dashboard.md` § Recent activity: "the last 50 commits on this document". */
+const ACTIVITY_LIMIT = 50;
+
 export interface DocumentVersion {
   number: number;
   commit: string;
@@ -62,7 +71,13 @@ export interface ActivityEntry {
 export interface DocumentEntry {
   record: DocumentRecord;
   versions: DocumentVersion[];
-  /** Commits touching the document record itself, newest first. */
+  /**
+   * Every commit carrying this document's `Document` trailer — publishes,
+   * settings changes, invites, signs, comments, submits — newest first,
+   * capped at `ACTIVITY_LIMIT`. "The record's own event log"
+   * (`specs/screens/admin-dashboard.md`), not just commits that touched the
+   * document's own file.
+   */
   activity: ActivityEntry[];
 }
 
@@ -110,13 +125,7 @@ function submissionKey(document: string, id: string): string {
   return `${document}/${id}`;
 }
 
-function toActivityEntry(entry: {
-  hash: string;
-  committerDate: string;
-  authorName: string;
-  subject: string;
-  trailers: Record<string, string>;
-}): ActivityEntry {
+function toActivityEntry(entry: CommitLogEntry): ActivityEntry {
   const action = (entry.trailers.Action ?? "unknown") as Action;
   return {
     commit: entry.hash,
@@ -129,11 +138,20 @@ function toActivityEntry(entry: {
 }
 
 /**
- * The in-memory read model built at boot from the four sheets plus one
- * `git log --first-parent` pass per record over that record's own path
- * (`specs/architecture.md` § Storage). Rebuilt whole at boot via `build()`;
- * updated one entity at a time via the `refresh*` methods after every commit
- * the service makes (wired by `apps/api/src/storage/plugin.ts`).
+ * The in-memory read model built at boot from the four sheets plus **one**
+ * `git log --first-parent` pass over the whole repo (`specs/architecture.md`
+ * § Storage), bucketed by the `Document` / `Person` / `Submission` trailers
+ * rather than by file path — a `sign`/`comment`/`submit` commit carries its
+ * document's `Document` trailer but never touches `documents/<slug>.md`, and
+ * the dashboard's "recent activity" is specified as every commit naming the
+ * document (`specs/screens/admin-dashboard.md`), not just body/settings
+ * commits. Resolved commit bodies are cached by `<hash>:<path>` (git history
+ * is immutable, so this cache never needs invalidating) — a repeated log
+ * refresh after every write commit only pays for bodies it hasn't seen.
+ *
+ * Rebuilt whole at boot via `build()`; updated via the `refresh*` methods
+ * after every commit the service makes (wired by
+ * `apps/api/src/storage/plugin.ts`'s `applyCommit`).
  */
 export class ReadModel {
   private readonly documents = new Map<string, DocumentEntry>();
@@ -143,6 +161,9 @@ export class ReadModel {
   private readonly submissions = new Map<string, SubmissionEntry>();
   private readonly positions = new Map<string, Position>();
 
+  private fullLog: CommitLogEntry[] = [];
+  private readonly bodyCache = new Map<string, string>();
+
   constructor(
     private readonly store: DataStore,
     private readonly dataDir: string,
@@ -150,24 +171,28 @@ export class ReadModel {
 
   async build(): Promise<void> {
     await this.refreshPeople();
+    await this.refreshLog();
 
-    const participations = await this.store.participations.queryAll();
     this.participations.clear();
     this.participationsByToken.clear();
-    await Promise.all(
-      participations.map((record) => this.indexParticipation(record.document, record.person)),
-    );
+    const participations = await this.store.participations.queryAll();
+    for (const record of participations) this.setParticipationRecord(record);
+    for (const record of participations) {
+      this.computeSignatureEvents(record.document, record.person);
+    }
 
-    const submissions = await this.store.submissions.queryAll();
     this.submissions.clear();
-    this.positions.clear();
-    await Promise.all(
-      submissions.map((record) => this.indexSubmission(record.document, record.id)),
-    );
+    const submissions = await this.store.submissions.queryAll();
+    for (const record of submissions) this.setSubmissionRecord(record);
+    for (const record of submissions) this.computeSubmissionTiming(record.document, record.id);
+    this.recomputeAllPositions();
 
-    const documents = await this.store.documents.queryAll({}, { withBody: false });
     this.documents.clear();
-    await Promise.all(documents.map((record) => this.indexDocument(record.slug)));
+    const documents = await this.store.documents.queryAll({}, { withBody: false });
+    for (const record of documents) {
+      const hydrated = await this.store.documents.loadBody(record);
+      await this.computeDocumentEntry(record.slug, hydrated);
+    }
   }
 
   async refreshPeople(): Promise<void> {
@@ -177,51 +202,57 @@ export class ReadModel {
   }
 
   async refreshDocument(slug: string): Promise<void> {
-    await this.indexDocument(slug);
+    await this.refreshLog();
+    await this.reloadDocument(slug);
   }
 
   async refreshParticipation(document: string, person: string): Promise<void> {
-    await this.indexParticipation(document, person);
+    await this.refreshLog();
+    await this.reloadParticipation(document, person);
   }
 
   async refreshSubmission(document: string, id: string): Promise<void> {
-    await this.indexSubmission(document, id);
+    await this.refreshLog();
+    await this.reloadSubmission(document, id);
   }
 
-  /** Refresh every participation on a document — used after a bulk `invite` commit. */
+  /** Refresh every participation on a document — used after a bulk `invite`/`send` commit. */
   async refreshParticipationsForDocument(document: string): Promise<void> {
-    const records = await this.store.participations.queryAll({ document });
-    await Promise.all(records.map((r) => this.indexParticipation(r.document, r.person)));
+    await this.refreshLog();
+    await this.reloadParticipationsForDocument(document);
   }
 
   /**
    * Update the read model for one commit the service just made, without a
    * full rebuild — `specs/architecture.md`: "updated on every write."
    * Dispatches on the trailer set rather than requiring every call site to
-   * know which parts of the model its action affects.
+   * know which parts of the model its action affects. Refreshes the log
+   * once, then reloads only the sheet record(s) the commit's trailers name.
    */
   async applyCommit(trailers: Trailers): Promise<void> {
     const { Action: action, Document: document, Person: person, Submission: submission } = trailers;
+    await this.refreshLog();
 
     if (action === "invite") {
       await this.refreshPeople();
-      if (document) await this.refreshParticipationsForDocument(document);
+      if (document) await this.reloadParticipationsForDocument(document);
     }
 
     if (action === "send" && document) {
-      await this.refreshParticipationsForDocument(document);
+      await this.reloadParticipationsForDocument(document);
     }
 
-    if (document && DOCUMENT_MUTATING_ACTIONS.has(action)) {
-      await this.refreshDocument(document);
-    }
+    // Any commit naming this document updates its activity feed, whether or
+    // not it touched the document record itself (a sign/comment/submit
+    // commit never does, but still belongs in "the record's own event log").
+    if (document) await this.reloadDocument(document);
 
     if (document && person && PARTICIPATION_ACTIONS.has(action)) {
-      await this.refreshParticipation(document, person);
+      await this.reloadParticipation(document, person);
     }
 
     if (document && submission && SUBMISSION_ACTIONS.has(action)) {
-      await this.refreshSubmission(document, submission);
+      await this.reloadSubmission(document, submission);
     }
 
     // A publish may set dispositions on submissions from an earlier version
@@ -232,35 +263,37 @@ export class ReadModel {
           .map((ref) => ref.trim().split(":")[0])
           .filter((id): id is string => Boolean(id)),
       );
-      for (const id of ids) await this.refreshSubmission(document, id);
+      for (const id of ids) await this.reloadSubmission(document, id);
     }
   }
 
-  private async indexDocument(slug: string): Promise<void> {
+  private async refreshLog(): Promise<void> {
+    this.fullLog = await logWithTrailers(this.dataDir);
+  }
+
+  private async reloadDocument(slug: string): Promise<void> {
     const record = await this.store.documents.queryFirst({ slug });
     if (!record) {
       this.documents.delete(slug);
       return;
     }
     const hydrated = await this.store.documents.loadBody(record);
+    await this.computeDocumentEntry(slug, hydrated);
+  }
 
-    const relPath = `documents/${await this.store.documents.pathForRecord(record)}.md`;
-    const log = await logWithTrailers(this.dataDir, relPath);
+  private async computeDocumentEntry(slug: string, hydrated: DocumentRecord): Promise<void> {
+    const relPath = `${SHEET_LOCATIONS.documents.root}/${slug}.${SHEET_LOCATIONS.documents.ext}`;
+    const relevant = this.fullLog.filter((entry) => entry.trailers.Document === slug);
 
-    const activity: ActivityEntry[] = [];
     const versions: DocumentVersion[] = [];
     let previousBody: string | undefined;
 
-    for (const entry of log) {
-      activity.push(toActivityEntry(entry));
-
+    for (const entry of relevant) {
       const action = entry.trailers.Action as Action | undefined;
       if (!action || !DOCUMENT_MUTATING_ACTIONS.has(action)) continue;
 
-      const raw = await readFileAtCommit(this.dataDir, entry.hash, relPath);
-      if (raw === null) continue;
-      const { body } = splitFrontmatter(raw);
-
+      const body = await this.getBodyAtCommit(entry.hash, relPath);
+      if (body === null) continue;
       if (body === previousBody) continue;
       previousBody = body;
 
@@ -276,11 +309,26 @@ export class ReadModel {
       });
     }
 
-    activity.reverse(); // newest first for display
+    // `relevant` is oldest-first (from `fullLog`); activity displays newest-first, capped.
+    const activity = relevant.map(toActivityEntry).reverse().slice(0, ACTIVITY_LIMIT);
+
     this.documents.set(slug, { record: hydrated, versions, activity });
   }
 
-  private async indexParticipation(document: string, person: string): Promise<void> {
+  private async getBodyAtCommit(hash: string, relPath: string): Promise<string | null> {
+    const key = `${hash}:${relPath}`;
+    const cached = this.bodyCache.get(key);
+    if (cached !== undefined) return cached;
+
+    const raw = await readFileAtCommit(this.dataDir, hash, relPath);
+    if (raw === null) return null;
+
+    const { body } = splitFrontmatter(raw);
+    this.bodyCache.set(key, body);
+    return body;
+  }
+
+  private async reloadParticipation(document: string, person: string): Promise<void> {
     const record = await this.store.participations.queryFirst({ document, person });
     const key = participationKey(document, person);
     if (!record) {
@@ -289,52 +337,79 @@ export class ReadModel {
       this.participations.delete(key);
       return;
     }
+    this.setParticipationRecord(record);
+    this.computeSignatureEvents(document, person);
+  }
 
-    const relPath = `participations/${await this.store.participations.pathForRecord(record)}.toml`;
-    const log = await logWithTrailers(this.dataDir, relPath);
+  private async reloadParticipationsForDocument(document: string): Promise<void> {
+    const records = await this.store.participations.queryAll({ document });
+    for (const record of records) this.setParticipationRecord(record);
+    for (const record of records) this.computeSignatureEvents(record.document, record.person);
+  }
 
-    const signatureEvents: SignatureEvent[] = [];
-    for (const entry of log) {
-      const action = entry.trailers.Action as Action | undefined;
-      if (!action || !SIGNATURE_ACTIONS.has(action)) continue;
-      signatureEvents.push({
-        action: action as SignatureEvent["action"],
-        at: entry.committerDate,
-        actor: entry.trailers.Actor ?? entry.authorName,
-        commit: entry.hash,
-        reason: entry.trailers.Reason,
-      });
-    }
-
+  private setParticipationRecord(record: ParticipationRecord): void {
+    const key = participationKey(record.document, record.person);
     const existing = this.participations.get(key);
     if (existing && existing.record.token !== record.token) {
       this.participationsByToken.delete(existing.record.token);
     }
-    this.participations.set(key, { record, signatureEvents });
+    this.participations.set(key, { record, signatureEvents: existing?.signatureEvents ?? [] });
     this.participationsByToken.set(record.token, key);
   }
 
-  private async indexSubmission(document: string, id: string): Promise<void> {
+  private computeSignatureEvents(document: string, person: string): void {
+    const key = participationKey(document, person);
+    const entry = this.participations.get(key);
+    if (!entry) return;
+
+    const events: SignatureEvent[] = [];
+    for (const logEntry of this.fullLog) {
+      if (logEntry.trailers.Document !== document || logEntry.trailers.Person !== person) continue;
+      const action = logEntry.trailers.Action as Action | undefined;
+      if (!action || !SIGNATURE_ACTIONS.has(action)) continue;
+      events.push({
+        action: action as SignatureEvent["action"],
+        at: logEntry.committerDate,
+        actor: logEntry.trailers.Actor ?? logEntry.authorName,
+        commit: logEntry.hash,
+        reason: logEntry.trailers.Reason,
+      });
+    }
+    entry.signatureEvents = events;
+  }
+
+  private async reloadSubmission(document: string, id: string): Promise<void> {
     const record = await this.store.submissions.queryFirst({ document, id });
     const key = submissionKey(document, id);
     if (!record) {
       this.submissions.delete(key);
       return;
     }
+    this.setSubmissionRecord(record);
+    this.computeSubmissionTiming(document, id);
+    this.recomputePosition(document, record.person);
+  }
 
-    const relPath = `submissions/${await this.store.submissions.pathForRecord(record)}.toml`;
-    const log = await logWithTrailers(this.dataDir, relPath);
+  private setSubmissionRecord(record: SubmissionRecord): void {
+    const key = submissionKey(record.document, record.id);
+    const existing = this.submissions.get(key);
+    this.submissions.set(key, { record, timing: existing?.timing ?? { savedAt: [] } });
+  }
+
+  private computeSubmissionTiming(document: string, id: string): void {
+    const key = submissionKey(document, id);
+    const entry = this.submissions.get(key);
+    if (!entry) return;
 
     const timing: SubmissionTiming = { savedAt: [] };
-    for (const entry of log) {
-      const action = entry.trailers.Action as Action | undefined;
-      if (timing.startedAt === undefined) timing.startedAt = entry.committerDate;
-      if (action === "comment") timing.savedAt.push(entry.committerDate);
-      if (action === "submit") timing.submittedAt = entry.committerDate;
+    for (const logEntry of this.fullLog) {
+      if (logEntry.trailers.Document !== document || logEntry.trailers.Submission !== id) continue;
+      const action = logEntry.trailers.Action as Action | undefined;
+      if (timing.startedAt === undefined) timing.startedAt = logEntry.committerDate;
+      if (action === "comment") timing.savedAt.push(logEntry.committerDate);
+      if (action === "submit") timing.submittedAt = logEntry.committerDate;
     }
-
-    this.submissions.set(key, { record, timing });
-    this.recomputePosition(document, record.person);
+    entry.timing = timing;
   }
 
   private recomputePosition(document: string, person: string): void {
@@ -359,6 +434,13 @@ export class ReadModel {
 
     if (best) this.positions.set(key, best);
     else this.positions.delete(key);
+  }
+
+  private recomputeAllPositions(): void {
+    this.positions.clear();
+    for (const entry of this.submissions.values()) {
+      this.recomputePosition(entry.record.document, entry.record.person);
+    }
   }
 
   // --- Accessors ---
