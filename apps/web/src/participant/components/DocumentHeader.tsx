@@ -6,15 +6,17 @@ import { type DocumentInfo, type PersonInfo } from "../types.ts";
 export function DocumentHeader({
   document,
   person,
+  readOnly = false,
 }: {
   document: DocumentInfo;
   person: PersonInfo;
+  readOnly?: boolean;
 }): JSX.Element {
   return (
     <header className="px-4 pt-4">
       <h1 className="text-2xl font-bold text-foreground">{document.title}</h1>
       <PhaseLine document={document} />
-      <IdentityLine name={person.name} />
+      <IdentityLine name={person.name} readOnly={readOnly} />
     </header>
   );
 }

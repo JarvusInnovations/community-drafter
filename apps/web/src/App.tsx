@@ -26,6 +26,35 @@ const CommentModeScreen = lazy(() =>
   })),
 );
 
+// `admin-dashboard`: the whole `/admin/*` family is code-split too — a
+// participant opening `/i/:token` never touches this tree, and vice versa
+// (`specs/architecture.md`'s 120 KB gzipped budget only covers the eager
+// participant entry; every admin screen is lazy so it never counts against it).
+const AdminLayout = lazy(() =>
+  import("./admin/AdminLayout.tsx").then((m) => ({ default: m.AdminLayout })),
+);
+const DocumentListScreen = lazy(() =>
+  import("./admin/DocumentListScreen.tsx").then((m) => ({ default: m.DocumentListScreen })),
+);
+const DocumentLayout = lazy(() =>
+  import("./admin/DocumentLayout.tsx").then((m) => ({ default: m.DocumentLayout })),
+);
+const DashboardScreen = lazy(() =>
+  import("./admin/DashboardScreen.tsx").then((m) => ({ default: m.DashboardScreen })),
+);
+const PeopleScreen = lazy(() =>
+  import("./admin/PeopleScreen.tsx").then((m) => ({ default: m.PeopleScreen })),
+);
+const SubmissionsScreen = lazy(() =>
+  import("./admin/SubmissionsScreen.tsx").then((m) => ({ default: m.SubmissionsScreen })),
+);
+const VersionsScreen = lazy(() =>
+  import("./admin/VersionsScreen.tsx").then((m) => ({ default: m.VersionsScreen })),
+);
+const ViewAsScreen = lazy(() =>
+  import("./admin/ViewAsScreen.tsx").then((m) => ({ default: m.ViewAsScreen })),
+);
+
 // `public-and-embed`: the whole `/d/:slug/*` family is code-split too — a
 // participant opening `/i/:token` never touches this tree, and vice versa.
 const PublicLayout = lazy(() =>
@@ -167,6 +196,75 @@ function App(): JSX.Element {
           }
         />
         <Route path="*" element={<NotFoundScreen />} />
+      </Route>
+
+      {/* `admin-dashboard`: the read-mostly `/admin/*` family — grouped here as
+          its own block, same convention as `/d/:slug/*` above. */}
+      <Route
+        path="/admin"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <AdminLayout />
+          </Suspense>
+        }
+      >
+        <Route
+          index
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <DocumentListScreen />
+            </Suspense>
+          }
+        />
+        <Route
+          path="d/:slug"
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <DocumentLayout />
+            </Suspense>
+          }
+        >
+          <Route
+            index
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <DashboardScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="people"
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <PeopleScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="submissions"
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <SubmissionsScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="versions"
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <VersionsScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="view-as/:person"
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <ViewAsScreen />
+              </Suspense>
+            }
+          />
+        </Route>
       </Route>
     </Routes>
   );
