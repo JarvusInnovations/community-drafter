@@ -8,14 +8,14 @@ This is the **primary admin interface** of the system, and it ships as a **skill
 
 ## Configuration
 
-`DRAFTER_URL` from the environment or `~/.config/drafter/<profile>.toml`. The credential is an operator token obtained by `drafter-axi login` (device-code flow, `api/auth.md`) and stored in that profile file with mode 600; `DRAFTER_TOKEN` in the environment overrides it for CI and bots. There is no actor label: every write is attributed to the signed-in operator.
+The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. `--profile <name>` selects a profile; the default is `default`. There is no actor label: every write is attributed to the signed-in operator.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `drafter-axi` | home: the signed-in operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login` |
-| `login <email>` | device-code sign-in: sends the magic link, prints the user code, waits for approval, stores the 90-day token |
+| `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `DRAFTER_URL`; refused if neither is given): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
 | `logout` / `whoami` | forget the token / show operator and expiry |
 | `operators list` | every operator |
 | `operators add <email> --name … [--kind person\|bot] [--title …] [--org …]` | create |
