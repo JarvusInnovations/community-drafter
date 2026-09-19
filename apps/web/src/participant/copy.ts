@@ -56,6 +56,29 @@ export const copy = {
     withdrawnLine: "This document was withdrawn.",
   },
 
+  timeline: {
+    ariaLabel: "Timeline: when comments close and when signatures are due",
+    opened: "Opened",
+    commentsClose: "Comments close",
+    commentsClosed: "Comments closed",
+    signaturesDue: "Signatures due",
+    signingClosed: "Signing closed",
+    notOpen: "Not yet open",
+    inLabel: (relative: string) => (relative ? `in ${relative}` : "now"),
+    nowSr(phase: Phase): string {
+      switch (phase) {
+        case "commenting":
+          return "Right now: the comment period.";
+        case "signing":
+          return "Right now: the signing period.";
+        case "closed":
+          return "Right now: closed.";
+        default:
+          return "";
+      }
+    },
+  },
+
   signForm: {
     heading: "Add your name",
     /** `specs/screens/document.md` § Actions: "Remove my name → ... card switches to *Not signed* with 'You removed your name on Sep 21'." */
