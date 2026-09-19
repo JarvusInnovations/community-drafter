@@ -8,7 +8,7 @@ The page a participant lands on from their personal link. It is the whole produc
 
 ## Data Requirements
 
-The participation (person, preferences, position, signature), the document (title, state, phase, deadlines, settings), the current version (or the requested one), the person's comments (submitted and unsubmitted), and signatory counts and list per `show_signatories`.
+The participation (person, preferences, signature), the person's position and submissions (submitted and draft), the document (title, state, phase, deadlines, settings), the current version (or the requested one), and signatory counts and list per `show_signatories`.
 
 ## Display Rules
 
@@ -24,7 +24,7 @@ Top to bottom:
    - *Draft exists*: a slim line "You have unsent comments on v2 · Continue" in every state where a draft exists.
 4. **Version label**: "Version 3 · published Sep 20 at 9:14 AM EDT · *Tightened term 2; added the collections-care ask* · See what changed · All versions". If viewing an older version: banner "You're reading version 2. **Read the current version (3)**".
 5. **The document**: rendered markdown, readable typography, max line length for prose, headings with anchor links. No highlights in this view.
-6. **Your comments**: if the person has submitted comments, a collapsed section grouped by submission (version, date, judgement) with disposition badges per comment.
+6. **Your submissions**: if the person has submitted, a collapsed section listing each submission whole (version, date, judgement, its comments with disposition badges).
 7. **Signatories**: per `show_signatories`: counts line, then organizations, then individuals. Collapsed beyond 20 entries with "show all". Updates on each load.
 8. **Footer**: the document's reply-to address as "Questions? Email the team", "Manage how we contact you" (preferences), and a one-line explanation of what this page is ("This is a private link made for you by *sender_name*.").
 

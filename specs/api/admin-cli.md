@@ -31,7 +31,7 @@ This is the **primary admin interface** of the system, and it ships as a **skill
 | `people revoke-link|reissue-link <slug> <person>` | link management |
 | `signatures list <slug> [--include-revoked] [--conditional]` | signatures |
 | `signatures revoke <slug> <person> --reason "…"` | admin revocation |
-| `comments list <slug> [--pending] [--version n] [--group-by heading] [--include-unsubmitted]` | comments; unsubmitted ones only on request and always in a labeled group |
+| `submissions list <slug> [--pending] [--version n] [--person p] [--include-drafts]` | whole submissions, each with its comments; drafts only on request and always labeled |
 | `feedback export <slug> [--format json\|md] [--out …]` | the LLM-round bundle |
 | `notifications list <slug> --status failed` / `notifications retry <slug>` | health |
 | `init-data-repo` | first-boot helper |

@@ -4,11 +4,11 @@ The team's view of one document's progress. Read-mostly in phase 1; mutations ha
 
 ## Routes
 
-`/admin` (document list, the only list in the system), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/comments`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`.
+`/admin` (document list, the only list in the system), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/submissions`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`.
 
 ## Data Requirements
 
-Everything: document, versions (from content history), participations with derived statuses, comments (submitted and unsubmitted, labeled) with dispositions, signatures including revoked and conditional, the `notified` tables, and the dispatcher's in-memory failure list.
+Everything: document, versions (from body-changing commits), participations with derived statuses, submissions (submitted and draft, labeled) with dispositions, signatures including revoked and conditional, the `notified` tables, and the dispatcher's in-memory failure list.
 
 ## Display Rules
 
@@ -21,9 +21,9 @@ Everything: document, versions (from content history), participations with deriv
 - **Recent activity**: the last 50 commits on this document, rendered from their trailers (`Action`, `Person`, `Version`, `Judgement`, `Reason`), which is the record's own event log.
 - **Notification health**: sent counts per event from `notified`; queued and failed from the dispatcher (in memory since last start), with a note when the process restarted recently.
 
-**People** (`/admin/d/<slug>/people`): one row per participation: name, org, source, status (`unopened`, `opened`, `drafting`, `commented`, `signed`, `signed (conditional)`, `declined`, `revoked`), first opened, last seen, opens, signature capacity/display, preferences summary, and actions: copy personal link (recorded), revoke link, reissue link, view as, revoke signature (with reason), approve display (**[phase 2]**). Filter by status and source; search by name/org; put filters in the URL. A `drafting` row expands to show the person's unsubmitted comments under an "Unsubmitted" label.
+**People** (`/admin/d/<slug>/people`): one row per participation: name, org, source, status (`unopened`, `opened`, `drafting`, `commented`, `signed`, `signed (conditional)`, `declined`, `revoked`), first opened, last seen, opens, signature capacity/display, preferences summary, and actions: copy personal link (recorded), revoke link, reissue link, view as, revoke signature (with reason), approve display (**[phase 2]**). Filter by status and source; search by name/org; put filters in the URL. A `drafting` row expands to show the person's draft submission whole under an "Unsubmitted" label.
 
-**Comments** (`/admin/d/<slug>/comments`): every comment: version, author, capacity/org, judgement of the review (or the badge **unsubmitted**), heading path and quote, body, disposition (or `pending` / `unanswered`). Unsubmitted comments are a separate group by default and never sort among submitted ones. Filter by disposition, version and submitted/unsubmitted; group by heading. Bulk actions are not offered here; dispositions are set through publish.
+**Submissions** (`/admin/d/<slug>/submissions`): every submission whole: author, capacity/org, version, judgement (or the badge **unsubmitted**), then its comments in document order, each with heading path and quote, body, and disposition (or `pending` / `unanswered`). Drafts are a separate group by default and never sort among submitted ones. Filter by disposition state, version, judgement and person. A secondary "by passage" view lists comments under the heading they target, but each entry links back to and previews its whole submission. Bulk actions are not offered here; dispositions are set through publish.
 
 **Versions** (`/admin/d/<slug>/versions`): as the participant history plus publisher identity, notes, raw markdown download, dispositions list per version.
 

@@ -20,9 +20,9 @@ All routes under `/admin/api`. Auth: `Authorization: Bearer <ADMIN_TOKEN>` (CLI/
 - `POST /documents/:slug/versions`
   ```
   { body, summary, notes?, final?: boolean,
-    dispositions?: [{ comment, outcome, note? }] }
+    dispositions?: [{ submission, comment, outcome, note? }] }
   ```
-  One transaction, one commit: content record, dispositions, and the `signing_closes_at` extension if in signing phase; notifications queued from it. Errors: `validation_failed` (summary length, unknown comment id, `declined` without note), `no_change` (text identical to current), `phase_closed` when `state` is `closed` or `withdrawn`. Response: the version (number, summary, commit) and `{ notified: { every_revision: n, dispositions: n, signers: n } }`.
+  One transaction, one commit: the document body, disposition fields on the affected submissions (`Disposed` trailer), and the `signing_closes_at` extension if in signing phase; notifications queued from it. Errors: `validation_failed` (summary length, unknown comment id, `declined` without note), `no_change` (text identical to current), `phase_closed` when `state` is `closed` or `withdrawn`. Response: the version (number, summary, commit) and `{ notified: { every_revision: n, dispositions: n, signers: n } }`.
 - `GET /documents/:slug/compare?from=&to=` → same shape as the participant compare.
 
 ## People and invitations
@@ -42,8 +42,8 @@ All routes under `/admin/api`. Auth: `Authorization: Bearer <ADMIN_TOKEN>` (CLI/
 
 ## Reviews and comments
 
-- `GET /documents/:slug/comments?submitted=true|false|all&disposition=pending|answered|unanswered&version=` → comments with author, judgement, anchor, disposition, `saved_at`, `submitted_at`. Default `submitted=true`; unsubmitted comments are returned only on request and each carries `submitted: false` so consumers label them.
-- `GET /documents/:slug/feedback-export` → the bundle defined in `behaviors/review-and-judgement.md` as JSON; `?format=md` renders the same as markdown for pasting into a prompt.
+- `GET /documents/:slug/submissions?state=submitted|draft|all&disposition=pending|answered|unanswered&version=&person=` → whole submissions (author, version, state, judgement, reason, `started_at`, `submitted_at`, comments with anchors and dispositions). Default `state=submitted`; drafts come only on request and carry `state: draft` so consumers label them. **There is no endpoint that returns a comment without its submission.**
+- `GET /documents/:slug/feedback-export` → the bundle defined in `behaviors/review-and-judgement.md` as JSON, organized by submission; `?format=md` renders the same as markdown for pasting into a prompt.
 
 ## Notifications
 

@@ -1,6 +1,6 @@
 # Data Model
 
-All durable state is a set of **gitsheets** sheets in the data repository, and **git is the data model**: a record holds the *current* state of one thing, and everything about *when* and *why* it changed lives in the commit history. The tree is flat and semantic: paths name things (a document, a person, a comment), never moments, statuses or versions. There are no history tables, no version tables, no event logs. To answer a time question, read `git log`.
+All durable state is a set of **gitsheets** sheets in the data repository, and **git is the data model**: a record holds the *current* state of one thing, and everything about *when* and *why* it changed lives in the commit history. The tree is flat and semantic: paths name things (a document, a person, a submission), never moments, statuses or versions. There are no history tables, no version tables, no event logs. To answer a time question, read `git log`.
 
 Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifiers are lowercase slugs unless stated.
 
@@ -8,21 +8,20 @@ Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifi
 
 | Sheet | Path template | Format | One record per |
 | --- | --- | --- | --- |
-| `documents` | `${{ slug }}` | TOML | document (settings and schedule) |
-| `content` | `${{ document }}` | markdown | the document's text; its history is the version history |
+| `documents` | `${{ slug }}` | markdown | document: settings in frontmatter, **the text as the body**; the body's history is the version history |
 | `people` | `${{ id }}` | TOML | person known to the instance |
-| `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, latest position, signature |
-| `comments` | `${{ document }}/${{ id }}` | TOML | one comment, from first save through submission and disposition |
+| `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, signature |
+| `submissions` | `${{ document }}/${{ id }}` | TOML | one person's set of comments against one version, from first save through submission and disposition |
 
-Five sheets. Cross-references are by slug so records read sensibly in a file browser.
+Four sheets. Cross-references are by slug so records read sensibly in a file browser.
 
 ## Commits are the events
 
-Every mutation is one `repo.transact` commit. The subject is a human sentence; the **trailers carry the structured data** an agent or a dashboard reads back. Trailers used across the record:
+Every mutation is one `repo.transact` commit. The subject is a human sentence; the **trailers carry the structured data** an agent or a dashboard reads back.
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `decline`, `comment`, `submit`, `dispose`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue` | every commit |
 | `Document` | slug | every commit about a document |
 | `Person` | slug | every commit about a person's action |
 | `Actor` | admin email, `cli:<label>`, or `participant` | every commit |
@@ -30,25 +29,26 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Summary` | 1–200 chars | `publish` (the one-line changelog) |
 | `Final` | `true` | `publish` when declared final |
 | `Notes` | text | `publish` (team-facing) |
+| `Submission` | submission id | `comment`, `submit` |
 | `Judgement` | `sign` \| `sign_conditional` \| `comment` \| `decline` | `submit` |
-| `Comments` | comma-separated comment ids | `submit`, `dispose` |
-| `Reason` | text | `revoke`, `decline`, `withdraw`, `admin-revoke` |
+| `Disposed` | comma-separated `<submission>:<comment>` refs | `publish` |
+| `Reason` | text | `revoke`, `withdraw`, `admin-revoke`, and `submit` with `decline` |
 | `Request-Id` | id | every commit from a request |
 
-Examples of subjects: `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (c-8fk2qa)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
+Subjects look like `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (jane-doe-k7q2)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
 
-The dashboard's "recent activity", a person's history, the list of versions, and "how was this statement approved" are all `git log` queries filtered by trailer. Nothing duplicates them into records.
+The dashboard's recent activity, a person's history, the version list and "how was this statement approved" are all `git log` queries filtered by trailer. Nothing duplicates them into records.
 
 ## `documents`
+
+One markdown record per document. Frontmatter is the settings; the body is the current text.
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `slug` | string, `^[a-z0-9][a-z0-9-]{1,60}$` | identity; never changes |
-| `title` | string | |
+| `title` | string | display title (independent of any heading in the body) |
 | `state` | enum `draft` \| `open` \| `closed` \| `withdrawn` | phases within `open` derive from the clock (`behaviors/document-lifecycle.md`) |
-| `opened_at` | timestamp? | |
-| `comments_close_at` | timestamp? | |
-| `signing_closes_at` | timestamp? | |
+| `opened_at`, `comments_close_at`, `signing_closes_at` | timestamp? | |
 | `revocation_window_hours` | integer, default 72 | |
 | `capacities` | array of `personal` \| `official`, default both | |
 | `public_access` | enum `none` \| `read` \| `participate`, default `none` | `participate` is **[phase 2]** |
@@ -56,25 +56,26 @@ The dashboard's "recent activity", a person's history, the list of versions, and
 | `owner`, `sender_name`, `reply_to` | string | |
 | `withdraw_reason`, `withdraw_public` | string?, boolean | |
 | `tags` | array of string | |
+| `body` | markdown | the text |
 
-No `current_version`, no `created_at`, no `updated_at`: the first commit of the record is creation, the last is the update, and the version count is the content history.
+The sheet's format sets `body = 'body'` and does not set `title`, so the body may or may not begin with a heading; `title` is a plain setting.
 
-## `content` and versions
+### Versions
 
-One markdown record per document: frontmatter `document`, body = the current text. Nothing else touches this record, so **every commit that changes it is a version**.
+A **version** is a commit in the record's history **in which the body changed**. Settings-only commits (`Action: settings`, `extend`, `open` …) are not versions. Nothing about a version is stored; all of it derives:
 
 | Version attribute | Derived from |
 | --- | --- |
-| `number` | position of the commit in the first-parent history of the record, oldest = 1 |
+| `number` | position among body-changing commits, oldest = 1 |
 | `commit` | the hash (internal; never shown to participants) |
 | `summary` | the `Summary` trailer, else the subject with any `publish: <slug> v<n>` prefix removed |
 | `published_at` | committer date |
 | `published_by` | `Actor` trailer, else author name |
 | `final` | `Final: true` |
 | `notes` | `Notes` trailer |
-| `body` | the record at that commit |
+| `body` | the record's body at that commit |
 
-Numbering is stable because the branch forbids force-pushes. The read model indexes versions from `git log` at boot and appends on publish. A publish commit also writes the disposition fields on the comments it answers, so the commit that *is* the version carries the answers it gave (`Comments` trailer lists them).
+Numbering is stable because the branch forbids force-pushes. The read model walks `git log --first-parent` over the record at boot, compares body content between adjacent commits, indexes the versions, and appends on publish. A publish commit may also change settings (a publish during the signing phase extends `signing_closes_at` in the same commit) and may set dispositions on submissions (`Disposed` trailer), so the commit that *is* the version carries the answers it gave.
 
 ## `people`
 
@@ -92,7 +93,7 @@ Never rendered on any participant or public surface.
 
 ## `participations`
 
-One record per person per document. It is created by an invitation and then accumulates everything that person does on that document. Current state only; the story is in `git log --grep` on `Person`/`Document` trailers.
+One record per person per document, created by an invitation. Current state only; the story is in `git log` on the `Person` and `Document` trailers.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -105,10 +106,7 @@ One record per person per document. It is created by an invitation and then accu
 | `sent_at` | timestamp? | invitation message sent or exported |
 | `first_opened_at`, `last_seen_at`, `opens` | | batched writes (`Action: track`) |
 | `notify` | table | `channel`, `every_revision`, `daily_digest`, `phase_changes`, `my_comments_addressed`, `reminders` |
-| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified.reminder = 2`; failures live in logs, not the record |
-| `judgement` | enum? `sign` \| `sign_conditional` \| `comment` \| `decline` | the person's latest submitted position |
-| `judgement_version` | integer? | version that position was taken on |
-| `declined_reason` | string? | |
+| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified.reminder = 2` |
 | `signature` | table? | absent = never signed; see below |
 
 `signature` table:
@@ -124,29 +122,39 @@ One record per person per document. It is created by an invitation and then accu
 | `signed_on_version` | integer | |
 | `revoked` | boolean | current signatory = present, `revoked = false`, `display_approved = true` |
 
-Signed-at, revoked-at, reaffirmed-at and the revoke reason are not fields: they are the dates and `Reason` trailers of the `sign`, `revoke`, `resign` and `admin-revoke` commits touching this record. The read model caches them from `git log` for display ("You signed on Sep 19").
+Signed-at, revoked-at, re-signed-at and the revoke reason are not fields: they are the dates and `Reason` trailers of the `sign`, `revoke`, `resign` and `admin-revoke` commits touching this record.
 
-Derived participant status for the dashboard: `unopened` → `opened` → `drafting` (has unsubmitted comments) → `commented` / `signed` / `signed (conditional)` / `declined`.
+A person's **position** (latest judgement) is not a field either: it is the latest `submitted` record in `submissions` for this person and document. The read model caches it.
 
-## `comments`
+Derived participant status for the dashboard: `unopened` → `opened` → `drafting` (has a `draft` submission) → `commented` / `signed` / `signed (conditional)` / `declined`.
 
-One record per comment, inline or general, created the moment a participant saves it and patched through submission and disposition. Flat: the status is a field, the path is the id. A **general comment** is simply a comment with no `anchor`. A **submission** is not a record: it is the `submit` commit whose `Comments` trailer lists the ids sent together.
+## `submissions`
+
+**The submission is the unit of meaning.** People spread a single line of thought across inline comments and a general note however it falls; those pieces only interpret correctly read together, by one author, against one version, with one judgement. So one record is one submission: an array of comments that share an author, a target version, a state and (once submitted) a judgement. Comments are never records of their own.
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `document` | slug | |
-| `id` | `c-<6 base62>` | unique within the document |
+| `id` | `<person>-<4 base62>`, e.g. `jane-doe-k7q2` | identity; readable in a file browser |
 | `person` | slug | author |
-| `version` | integer | version the comment was written against |
-| `anchor` | table? | absent for a general comment; otherwise see `behaviors/inline-comments.md` (`version`, `commit`, `block`, `heading_path`, `quote`, `prefix`, `suffix`, `start`, `spans_blocks`) |
+| `version` | integer | version the comments were written against (may be rebased while `draft`) |
+| `state` | enum `draft` \| `submitted` | at most one `draft` per person per document |
+| `judgement` | enum? `sign` \| `sign_conditional` \| `comment` \| `decline` | set by the `submit` commit; absent while `draft` |
+| `reason` | string? | optional note carried with a `decline` |
+| `comments` | array of table | see below; may be empty for a comment-less `decline` |
+
+Each `comments[]` entry:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `c<n>`, unique within the submission | referenced as `<submission>:<id>` in trailers |
+| `anchor` | table? | absent for a general comment; otherwise per `behaviors/inline-comments.md` |
 | `body` | string | |
-| `submitted` | boolean | false = saved, not yet sent (readable by the team under an *unsubmitted* label) |
-| `judgement` | enum? | copied from the submitting position so the comment reads alone |
 | `disposition` | enum? `accepted` \| `partial` \| `declined` \| `noted` | absent = pending |
 | `disposition_note` | string? | |
 | `disposition_version` | integer? | version whose publish commit set it |
 
-`saved_at` and `submitted_at` are the dates of the `comment` and `submit` commits touching the record; the API surfaces them from the read model. A deleted comment is a deleted record (its existence stays in history).
+Timing comes from commits: the submission's first commit is when its author started, each `Action: comment` commit is a save, the `Action: submit` commit is the submission time. A `draft` record is readable by the team, always labeled *unsubmitted* and always whole. It is deleted (history keeps it) if its author removes every comment. Nothing is retained outside the record and nothing is cleaned out of it.
 
 ## Import from a CRM
 
@@ -155,13 +163,13 @@ The admin CLI imports invitees from NDJSON/CSV with columns matching `people` fi
 ## Relationships
 
 ```
-documents 1 ─── 1 content            (version history = content's git history)
 documents 1 ─── n participations n ─── 1 people
-participations 1 ─── n comments      (same document + person)
+documents 1 ─── n submissions   (each by one person; at most one draft per person per document)
+documents 1 ─── n versions      (body-changing commits of the document record)
 ```
 
 ## What is deliberately not here
 
-- No `versions`, `reviews`, `drafts`, `dispositions`, `signatures`, `notifications` or `events` sheets. Each of those is either a field on one of the five records above or a set of commits.
+- No `content`, `versions`, `reviews`, `drafts`, `comments`, `dispositions`, `signatures` or `notifications` sheets. Each is a field on one of the four records above or a set of commits.
 - No `created_at` / `updated_at` fields anywhere; the history has them.
 - No status or time in any path.

@@ -6,7 +6,7 @@
 
 ## Data Requirements
 
-All versions derived from the content record's git history (number, date, summary, publisher label, disposition count, `final`), the current version number, and for comparison the server-computed block-aligned diff between two versions (`behaviors/versioning.md`).
+All versions derived from the document record's body-changing commits (number, date, summary, publisher label, disposition count, `final`), the current version number, and for comparison the server-computed block-aligned diff between two versions (`behaviors/versioning.md`).
 
 ## Display Rules
 

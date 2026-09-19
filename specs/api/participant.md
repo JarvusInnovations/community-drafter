@@ -17,9 +17,10 @@ Response:
   versions: [{ number, summary, published_at, final, dispositions }],
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
                       signed_on_version, revoked, signed_at, revoked_at, resigned_at },   // dates from history
-  position:  null | { judgement, version, at },                                         // latest submission
-  comments:  [{ id, version, anchor | null, body, submitted, saved_at, submitted_at, judgement,
-                disposition: null | { outcome, note, version } }],                       // the person's own only
+  position:  null | { judgement, version, at, submission },                             // from the latest submitted submission
+  submissions: [{ id, version, state, judgement, reason, started_at, submitted_at,       // the person's own only
+                  comments: [{ id, anchor | null, body, saved_at,
+                               disposition: null | { outcome, note, version } }] }],
   signatories: { organizations: n, individuals: n, unlisted: n,
                  list: [{ display_name, capacity, descriptor, org, title }] } | { organizations, individuals, unlisted } | null,
   prefill: { name, org, role, descriptor, suggested_capacity },
@@ -45,25 +46,28 @@ Body: `{ reason? }`. Revokes. Errors: `phase_closed`, `not_found`. Response: the
 
 Body: `{ reason? }`. Records decline; revokes a signature if one exists (client must have confirmed). Allowed in commenting and signing phases. Response: `{ declined_at }`.
 
-## Comment endpoints
+## Draft submission endpoints
+
+A participant has at most one `draft` submission per document; the first saved comment creates it. Every comment save is its own commit (`Action: comment`, `Submission` trailer).
 
 Granular saves so each finished comment is durable on its own. Every one of these responds **only after the write is committed to the record**; the response carries `saved_at`, which the client uses to clear its browser buffer and for conflict resolution. All are allowed only in the commenting phase (409 `phase_closed` otherwise; the client keeps its buffered copy and shows "Not saved").
 
-- `POST /i/:token/api/comments` `{ version, anchor?, body, client_id }` → `{ id, saved_at }` (`Action: comment` commit). Omit `anchor` for a general comment. `client_id` makes the create idempotent across retries.
-- `PUT /i/:token/api/comments/:id` `{ body, anchor?, base_saved_at }` → `{ saved_at }`; 409 `stale_edit` with the server copy when `base_saved_at` is older than the stored `saved_at`. Only unsubmitted comments are editable.
-- `DELETE /i/:token/api/comments/:id` → 204 (unsubmitted only).
-- `POST /i/:token/api/comments/rebase` `{ to_version }` → re-anchors the person's unsubmitted comments; response lists per-comment `placed`.
+- `GET /i/:token/api/draft` → the draft submission or `null`.
+- `POST /i/:token/api/draft/comments` `{ version, anchor?, body, client_id }` → `{ submission, id, saved_at }`. Creates the draft if none. Omit `anchor` for a general comment. `client_id` makes the create idempotent across retries.
+- `PUT /i/:token/api/draft/comments/:id` `{ body, anchor?, base_saved_at }` → `{ saved_at }`; 409 `stale_edit` with the server copy when `base_saved_at` is older than the stored `saved_at`.
+- `DELETE /i/:token/api/draft/comments/:id` → 204; deleting the last comment deletes the draft.
+- `POST /i/:token/api/draft/rebase` `{ to_version }` → re-anchors the draft's comments and updates its `version`; response lists per-comment `placed`.
 
 The provisional judgement selection is client-side state until submission.
 
 ## `POST /i/:token/api/submit`
 
-Body: `{ version, judgement, pending: n, signature?: {...} }` where `pending` is the count of buffered-but-unsaved items the client still holds; 409 `unsaved_items` when it is not zero, so a submission never silently omits a comment. The server submits exactly the saved, unsubmitted comments (`Action: submit`).
-Effects per `behaviors/review-and-judgement.md`. Errors: `phase_closed` (except `decline` with no comments), `judgement_requires_comments`, `attestation_required` (when `sign`/`sign_conditional` with official capacity fields present but unattested). Response: `{ position, signature, comments }`.
+Body: `{ version, judgement, pending: n, signature?: {...} }` where `pending` is the count of buffered-but-unsaved items the client still holds; 409 `unsaved_items` when it is not zero, so a submission never silently omits a comment. The server flips the draft submission to `submitted` with the judgement (`Action: submit`, `Submission`, `Judgement`, `Version` trailers); a `decline` with no draft creates an empty submitted submission.
+Effects per `behaviors/review-and-judgement.md`. Errors: `phase_closed` (except `decline` with no comments), `judgement_requires_comments`, `attestation_required` (when `sign`/`sign_conditional` with official capacity fields present but unattested). Response: `{ submission, signature }`.
 
 ## `GET /i/:token/api/versions/:n`
 
-Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (derived from the content record's history).
+Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (derived from the document record's body history).
 
 ## `GET /i/:token/api/compare?from=&to=`
 

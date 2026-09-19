@@ -20,12 +20,12 @@ Layout: the document occupies the main column; a **review tray** is a side panel
 - Clicking a highlight focuses that comment in the tray.
 
 **Review tray**
-- Header: "Your review of v3" and a summary line "3 comments saved, not yet sent". Each item carries its own state: "Saved", "Saving…", "Not saved, retrying", or "Restored from this device" (recovered from the browser buffer and not yet saved), per `behaviors/review-and-judgement.md`. The composer warns before navigation only when something is neither saved nor buffered.
+- Header: "Your submission on v3" and a summary line "3 comments saved, not yet sent". Each item carries its own state: "Saved", "Saving…", "Not saved, retrying", or "Restored from this device" (recovered from the browser buffer and not yet saved), per `behaviors/review-and-judgement.md`. The composer warns before navigation only when something is neither saved nor buffered.
 - **Inline comments** list in document order: each shows the quoted passage (truncated to two lines, expandable), the heading it sits under, the body (editable in place), and delete. Comments whose anchor could not be placed (draft written on an older version) show the badge "written on v2 · passage changed" and still render.
 - **General comment**: a labeled text area, "Anything about the document as a whole".
 - **Judgement**: radio group whose options depend on signature status (table in `behaviors/review-and-judgement.md`), with one-line explanations. Conditional options are disabled with a hint when there are no comments.
 - **Submit** button labeled by the judgement ("Sign and send comments", "Send comments", "Send and decline"). Disabled with reason when the phase is not commenting, when no judgement is selected, or when nothing has changed and the judgement is `comment`.
-- Beneath the tray: "Your earlier comments" (collapsed), listing submitted reviews with disposition badges per comment.
+- Beneath the tray: "Your earlier submissions" (collapsed), each shown whole (version, date, judgement, its comments with disposition badges).
 
 **Phase not commenting**: the tray shows the draft read-only with "Comments closed Sep 23 at 5:00 PM EDT. Your unsent comments are kept here." and the sign/revoke actions still available if the phase is signing.
 

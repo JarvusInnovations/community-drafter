@@ -52,7 +52,7 @@ An anchored passage is wrapped in a highlight element carrying the comment id(s)
 
 ## What the record keeps
 
-The anchor is stored verbatim on the `comments` record. Re-anchoring results are never written back; they are computed per render. The original quote is therefore always available to a human reading the record without the app.
+The anchor is stored verbatim on the comment's entry in its submission record. Re-anchoring results are never written back; they are computed per render. The original quote is therefore always available to a human reading the record without the app.
 
 ## Principles
 
