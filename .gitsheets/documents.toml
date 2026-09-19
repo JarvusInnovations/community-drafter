@@ -1,0 +1,91 @@
+# specs/data-model.md → `documents`. Copied into the data repo by
+# `initDataRepo()` (apps/api/src/storage/init.ts). One markdown record per
+# document: settings in frontmatter, the text as the body. The body's
+# history (body-changing commits) is the version history.
+
+[gitsheet]
+root = 'documents'
+path = '${{ slug }}'
+
+[gitsheet.format]
+type = 'markdown'
+body = 'body'
+
+[gitsheet.schema]
+type = 'object'
+required = ['slug', 'title', 'state', 'body']
+additionalProperties = false
+
+[gitsheet.schema.properties.slug]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.title]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.state]
+type = 'string'
+enum = ['draft', 'open', 'closed', 'withdrawn']
+
+[gitsheet.schema.properties.opened_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.comments_close_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.signing_closes_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.revocation_window_hours]
+type = 'integer'
+default = 72
+
+[gitsheet.schema.properties.capacities]
+type = 'array'
+default = ['personal', 'official']
+
+[gitsheet.schema.properties.capacities.items]
+type = 'string'
+enum = ['personal', 'official']
+
+[gitsheet.schema.properties.public_access]
+type = 'string'
+enum = ['none', 'read', 'participate']
+default = 'none'
+
+[gitsheet.schema.properties.show_signatories]
+type = 'string'
+enum = ['list', 'count', 'none']
+default = 'list'
+
+[gitsheet.schema.properties.owner]
+type = 'string'
+
+[gitsheet.schema.properties.sender_name]
+type = 'string'
+
+[gitsheet.schema.properties.reply_to]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.withdraw_reason]
+type = 'string'
+
+[gitsheet.schema.properties.withdraw_public]
+type = 'boolean'
+
+[gitsheet.schema.properties.tags]
+type = 'array'
+
+[gitsheet.schema.properties.tags.items]
+type = 'string'
+
+[gitsheet.schema.properties.body]
+type = 'string'
+
+[gitsheet.fields.tags]
+sort = true
