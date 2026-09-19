@@ -2,7 +2,7 @@
 
 ## Rule
 
-Commenting works like a pull-request review for one document. A participant accumulates unsubmitted **comments** (inline ones as `comments` records, the general note on their participation). Each is saved to the server the moment it is finished, durably, and the participant sees exactly what is saved and not yet sent. The team can read saved comments, always labeled *unsubmitted*. **Submitting** with a **judgement** states where the participant stands (their *position*, recorded on the participation) and marks the comments as sent. The team answers comments in bulk by publishing a new version that sets a **disposition** on each.
+Commenting works like a pull-request review for one document. A participant accumulates unsubmitted **comments**, each a `comments` record; a general comment is one with no anchor. Each is saved to the server the moment it is finished, durably, and the participant sees exactly what is saved and not yet sent. The team can read saved comments, always labeled *unsubmitted*. **Submitting** with a **judgement** states where the participant stands (their *position*, recorded on the participation) and marks the comments as sent. The team answers comments in bulk by publishing a new version that sets a **disposition** on each.
 
 ## Applies To
 
@@ -11,10 +11,10 @@ Commenting works like a pull-request review for one document. A participant accu
 ## Unsubmitted comments
 
 - Each comment records the version it was written against. If a new version is published while unsubmitted comments exist, they keep their `version`; the participant is told "you're commenting on v2; v3 is now current" with a choice to keep commenting on v2 (comments carry their version) or switch (the draft's inline anchors are re-anchored per `inline-comments.md`, unresolvable ones kept with their quotes).
-- **Three layers, no gaps.** (1) While typing, the composer's text is buffered in the browser (local storage when available, else memory) keyed by document, person and comment id, so a reload or crash restores it. (2) When the participant finishes a comment ("Add", or leaves the composer with text in it) or pauses 3 seconds in the general note, the client saves that item to the server. The server acknowledges **only after the write is durable in the record** (committed), never from memory. (3) On acknowledgement the client clears that item's browser buffer. If the save fails, the item stays buffered, the tray shows "Not saved, retrying" on that item, and retries continue with backoff; nothing is ever discarded on failure.
+- **Three layers, no gaps.** (1) While typing, the composer's text is buffered in the browser (local storage when available, else memory) keyed by document, person and comment id, so a reload or crash restores it. (2) When the participant finishes a comment ("Add", or leaves the composer with text in it) or pauses 3 seconds in the general comment's composer, the client saves that item to the server. The server acknowledges **only after the write is durable in the record** (committed), never from memory. (3) On acknowledgement the client clears that item's browser buffer. If the save fails, the item stays buffered, the tray shows "Not saved, retrying" on that item, and retries continue with backoff; nothing is ever discarded on failure.
 - **Conflict rule:** a server copy never overwrites a newer local edit; the client compares `saved_at` and keeps the newer text, and the tray says so when it happens.
 - A saved draft is readable by its author and by the team. Admin views, the comments list and the feedback export show unsubmitted comments in their own clearly labeled group, never mixed with submitted ones, and they carry no judgement. Notifications never quote them.
-- Deleting a comment deletes its record (history keeps it); clearing the general note empties the field.
+- Deleting a comment, inline or general, deletes its record (history keeps it).
 - Unsubmitted comments survive the comment period closing (readable, not submittable) and are retained; nothing is ever cleaned up out of the record.
 
 ## Submission
@@ -33,7 +33,7 @@ Constraints:
 - `sign_conditional` / "make conditional" requires at least one comment in the submission.
 - `decline` may be submitted with no comments at all, from comment mode or from the sign card's "I'd rather not sign" link; an optional reason is stored on the participation (`declined_reason`) and in the commit's `Reason` trailer, not shown to other participants. Decline revokes any current signature after confirmation and stops reminders. A later sign replaces the `decline` position.
 - `comment` never changes signature state.
-- Submission is one commit (`Action: submit`, trailers `Judgement`, `Version`, `Comments`): the participation's `judgement`/`judgement_version`/`general_submitted` and `signature` change if any, and `submitted = true` plus the `judgement` on each listed comment. The confirmation is triggered from it. A person may submit as many times as they like; each submission is its own commit and covers the comments unsubmitted at that moment.
+- Submission is one commit (`Action: submit`, trailers `Judgement`, `Version`, `Comments`): the participation's `judgement`/`judgement_version` and `signature` change if any, and `submitted = true` plus the `judgement` on each listed comment. The confirmation is triggered from it. A person may submit as many times as they like; each submission is its own commit and covers the comments unsubmitted at that moment.
 - After submission the participant sees their submitted comments grouped by submission ("v2, submitted Sep 19, signed conditionally") under the document, and may keep adding new ones.
 - Submission with comments is refused outside the commenting phase with the deadline that closed it; `decline` with no comments and signature-only changes follow the sign/revoke rules in `document-lifecycle.md`.
 

@@ -11,7 +11,7 @@ Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifi
 | `documents` | `${{ slug }}` | TOML | document (settings and schedule) |
 | `content` | `${{ document }}` | markdown | the document's text; its history is the version history |
 | `people` | `${{ id }}` | TOML | person known to the instance |
-| `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, position, signature |
+| `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, latest position, signature |
 | `comments` | `${{ document }}/${{ id }}` | TOML | one comment, from first save through submission and disposition |
 
 Five sheets. Cross-references are by slug so records read sensibly in a file browser.
@@ -108,8 +108,6 @@ One record per person per document. It is created by an invitation and then accu
 | `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified.reminder = 2`; failures live in logs, not the record |
 | `judgement` | enum? `sign` \| `sign_conditional` \| `comment` \| `decline` | the person's latest submitted position |
 | `judgement_version` | integer? | version that position was taken on |
-| `general_comment` | string? | the general note, saved as written (see `comments` for inline) |
-| `general_submitted` | boolean | whether the general note has been submitted with a judgement |
 | `declined_reason` | string? | |
 | `signature` | table? | absent = never signed; see below |
 
@@ -132,7 +130,7 @@ Derived participant status for the dashboard: `unopened` → `opened` → `draft
 
 ## `comments`
 
-One record per comment, created the moment a participant saves it and patched through submission and disposition. Flat: the status is a field, the path is the id.
+One record per comment, inline or general, created the moment a participant saves it and patched through submission and disposition. Flat: the status is a field, the path is the id. A **general comment** is simply a comment with no `anchor`. A **submission** is not a record: it is the `submit` commit whose `Comments` trailer lists the ids sent together.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -140,7 +138,7 @@ One record per comment, created the moment a participant saves it and patched th
 | `id` | `c-<6 base62>` | unique within the document |
 | `person` | slug | author |
 | `version` | integer | version the comment was written against |
-| `anchor` | table | see `behaviors/inline-comments.md` (`version`, `commit`, `block`, `heading_path`, `quote`, `prefix`, `suffix`, `start`, `spans_blocks`) |
+| `anchor` | table? | absent for a general comment; otherwise see `behaviors/inline-comments.md` (`version`, `commit`, `block`, `heading_path`, `quote`, `prefix`, `suffix`, `start`, `spans_blocks`) |
 | `body` | string | |
 | `submitted` | boolean | false = saved, not yet sent (readable by the team under an *unsubmitted* label) |
 | `judgement` | enum? | copied from the submitting position so the comment reads alone |

@@ -18,8 +18,7 @@ Response:
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
                       signed_on_version, revoked, signed_at, revoked_at, resigned_at },   // dates from history
   position:  null | { judgement, version, at },                                         // latest submission
-  general:   { text, submitted, saved_at },
-  comments:  [{ id, version, anchor, body, submitted, saved_at, submitted_at, judgement,
+  comments:  [{ id, version, anchor | null, body, submitted, saved_at, submitted_at, judgement,
                 disposition: null | { outcome, note, version } }],                       // the person's own only
   signatories: { organizations: n, individuals: n, unlisted: n,
                  list: [{ display_name, capacity, descriptor, org, title }] } | { organizations, individuals, unlisted } | null,
@@ -50,17 +49,16 @@ Body: `{ reason? }`. Records decline; revokes a signature if one exists (client 
 
 Granular saves so each finished comment is durable on its own. Every one of these responds **only after the write is committed to the record**; the response carries `saved_at`, which the client uses to clear its browser buffer and for conflict resolution. All are allowed only in the commenting phase (409 `phase_closed` otherwise; the client keeps its buffered copy and shows "Not saved").
 
-- `POST /i/:token/api/comments` `{ version, anchor, body, client_id }` → `{ id, saved_at }` (`Action: comment` commit). `client_id` makes the create idempotent across retries.
+- `POST /i/:token/api/comments` `{ version, anchor?, body, client_id }` → `{ id, saved_at }` (`Action: comment` commit). Omit `anchor` for a general comment. `client_id` makes the create idempotent across retries.
 - `PUT /i/:token/api/comments/:id` `{ body, anchor?, base_saved_at }` → `{ saved_at }`; 409 `stale_edit` with the server copy when `base_saved_at` is older than the stored `saved_at`. Only unsubmitted comments are editable.
 - `DELETE /i/:token/api/comments/:id` → 204 (unsubmitted only).
-- `PUT /i/:token/api/general` `{ version, text, base_saved_at? }` → `{ saved_at }`.
 - `POST /i/:token/api/comments/rebase` `{ to_version }` → re-anchors the person's unsubmitted comments; response lists per-comment `placed`.
 
 The provisional judgement selection is client-side state until submission.
 
 ## `POST /i/:token/api/submit`
 
-Body: `{ version, judgement, pending: n, signature?: {...} }` where `pending` is the count of buffered-but-unsaved items the client still holds; 409 `unsaved_items` when it is not zero, so a submission never silently omits a comment. The server submits exactly the saved, unsubmitted comments and general note (`Action: submit`).
+Body: `{ version, judgement, pending: n, signature?: {...} }` where `pending` is the count of buffered-but-unsaved items the client still holds; 409 `unsaved_items` when it is not zero, so a submission never silently omits a comment. The server submits exactly the saved, unsubmitted comments (`Action: submit`).
 Effects per `behaviors/review-and-judgement.md`. Errors: `phase_closed` (except `decline` with no comments), `judgement_requires_comments`, `attestation_required` (when `sign`/`sign_conditional` with official capacity fields present but unattested). Response: `{ position, signature, comments }`.
 
 ## `GET /i/:token/api/versions/:n`
