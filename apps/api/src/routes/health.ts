@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 
+import { PUBLIC_ROUTE } from "../gateway/gateway.ts";
+
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/", async (_request, _reply) => {
+  fastify.get("/", { config: PUBLIC_ROUTE }, async (_request, _reply) => {
     const { readModel, pushDaemon } = fastify.storage;
 
     return {

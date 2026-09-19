@@ -28,6 +28,13 @@ export const ACTIONS = [
   "admin-revoke",
   "link-revoke",
   "link-reissue",
+  // Additive (`api-core`): `specs/api/admin.md` names both a "links export"
+  // action ("recorded as an admin event with the count exported") and a
+  // per-invitation `expire` endpoint, but `specs/data-model.md`'s trailer
+  // table (predating this plan) only lists `link-revoke`/`link-reissue`.
+  // Follow-up: fold these two into that table.
+  "link-export",
+  "link-expire",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];

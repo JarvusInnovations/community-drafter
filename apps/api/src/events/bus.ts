@@ -1,0 +1,54 @@
+import fp from "fastify-plugin";
+import type { FastifyPluginAsync } from "fastify";
+
+/**
+ * `plans/api-core.md` § Approach 5-6: "notification hooks emit typed events
+ * onto an in-process bus that `notifications` consumes." This plan owns
+ * emitting the events at the right lifecycle points (sign/revoke/decline,
+ * publish, invite/send/remind, the phase clock) and — for the handful of
+ * cases its own endpoints must answer synchronously (invitation CSV export,
+ * publish's `notified` counts) — computing recipients and writing the
+ * `Action: send` idempotency commit itself (`lib/notify.ts`). The general
+ * async consumer that renders and sends every other subscription message
+ * (`v<n>`, `digest-<date>`, phase-change broadcasts, …) is the
+ * `notifications` plan's addition; this bus is where it attaches.
+ */
+export type DrafterEvent =
+  | { type: "sign"; document: string; person: string; commit: string }
+  | { type: "resign"; document: string; person: string; commit: string }
+  | { type: "revoke"; document: string; person: string; commit: string; reason?: string }
+  | { type: "decline"; document: string; person: string; commit: string; reason?: string }
+  | { type: "invite"; document: string; people: string[]; commit: string }
+  | { type: "send"; document: string; people: string[]; commit: string }
+  | { type: "remind"; document: string; people: string[]; commit: string }
+  | { type: "publish"; document: string; version: number; commit: string; final: boolean }
+  | { type: "schedule-changed"; document: string; commit: string }
+  | { type: "signing-opened"; document: string }
+  | { type: "closed"; document: string };
+
+export type DrafterEventListener = (event: DrafterEvent) => void;
+
+export class EventBus {
+  private readonly listeners = new Set<DrafterEventListener>();
+
+  publish(event: DrafterEvent): void {
+    for (const listener of this.listeners) listener(event);
+  }
+
+  on(listener: DrafterEventListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    events: EventBus;
+  }
+}
+
+const eventsPlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.decorate("events", new EventBus());
+};
+
+export default fp(eventsPlugin, "5.x");

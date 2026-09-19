@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { LogController } from "fastify";
 
 import { app } from "./app.ts";
 
@@ -13,7 +13,10 @@ const server = Fastify({
       },
     },
   },
-  disableRequestLogging: true,
+  // `disableRequestLogging` is deprecated in Fastify 5.12 (removed in 6) in
+  // favor of `logController` (`plans/api-core.md`, absorbed from
+  // `workspace-bootstrap`).
+  logController: new LogController({ disableRequestLogging: true }),
 });
 
 server.register(app);
