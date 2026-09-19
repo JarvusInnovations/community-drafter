@@ -320,8 +320,6 @@ describe("ReadModel — participations, positions, token index", () => {
 });
 
 describe("ReadModel — golden fixture", () => {
-  // 3 docs + 50 participations + 20 submissions (2 commits each) is ~95
-  // commits and ~75 boot-time git-log spawns; generous timeout for CI.
   it("matches a hand-derived summary for 3 documents / 50 participations / 20 submissions / 5 versions", async () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
@@ -450,5 +448,5 @@ describe("ReadModel — golden fixture", () => {
       const document = documentSlugs[i % documentSlugs.length] ?? "doc-one";
       expect(readModel.getPosition(document, person)?.judgement).toBe("comment");
     }
-  }, 30_000);
+  });
 });
