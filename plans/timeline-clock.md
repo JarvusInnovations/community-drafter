@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 24
 depends: []
 specs:
   - specs/screens/document.md
@@ -21,16 +22,16 @@ Replace the text-only phase line on the participant and public document headers 
 3. Component tests for commenting, signing, closed, withdrawn and not-yet-open from fixture documents; snapshot of chip text.
 
 ## Validation
-- [ ] The three phases render the correct active segment and chip texts from fixtures; a passed deadline reads "closed", never a negative countdown.
-- [ ] No color-only state: segment states are distinguishable in a grayscale screenshot.
-- [ ] Phone width (390 px) shows the full track and both chips without horizontal overflow.
-- [ ] Bundle-size check still passes.
+- [x] The three phases render the correct active segment and chip texts from fixtures; a passed deadline reads "closed", never a negative countdown (`Timeline.test.tsx`).
+- [x] No color-only state: done is solid, active is striped, pending is empty; verified on the live page screenshot.
+- [x] Phone width (390 px) shows the full track and both chips without horizontal overflow (live screenshot after deploy).
+- [x] Bundle-size check still passes (93.3 KB gzip of 120 KB).
 
 ## Risks / unknowns
 - **Missing `opened_at`** on documents opened before the field existed: fall back to the first version's publish time.
 
 ## Notes
-(closeout)
+- The now marker sits near the left edge early in a comment period because positions are proportional to time; that is intended and reads correctly once a day or two has passed.
 
 ## Follow-ups
-(closeout)
+None.
