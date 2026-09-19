@@ -36,10 +36,12 @@ The Fastify service: deny-by-default gateway with the three capabilities, partic
 5. Notification hooks emit typed events onto an in-process bus that `notifications` consumes; here the `export` mailer writes CSV rows.
 6. Error envelope, `X-Request-Id` middleware writing the trailer, `Idempotency-Key` cache (24 h, in memory), rate limits from `conventions.md`.
 7. While rewiring `apps/api/src/app.ts`/`index.ts` for the gateway, replace the bootstrap's deprecated `disableRequestLogging` Fastify server option (deprecated in Fastify 5.12, removed in 6) with `logController`/`isLogDisabled` (deferred from `workspace-bootstrap`).
+8. `init` (scope line above): `POST /init-data-repo` wraps the already-merged `apps/api/src/storage/init.ts`'s `initDataRepo` — writes and commits the four sheet configs into an empty data repo, refusing if any already exist. Until this lands, `docs/operations.md`'s "First boot: init-data-repo" runbook step calls `initDataRepo` directly against a manual clone (deferred from `deploy`, PR #9).
 
 ## Validation
 
 - [ ] An undeclared route returns 403 in a test, proving deny-by-default.
+- [ ] `POST /init-data-repo` against an empty data repo produces the one-commit result `initDataRepo` already returns; against a repo with existing sheet configs it refuses without committing (deferred from `deploy`).
 - [ ] `apps/api` no longer uses the deprecated `disableRequestLogging` option (deferred from `workspace-bootstrap`).
 - [ ] Unknown, revoked and expired tokens produce byte-identical 404 bodies.
 - [ ] Signing during `commenting` and `signing` succeeds; during `closed` returns `phase_closed` naming the deadline; official capacity without `authorized` returns `attestation_required`.
