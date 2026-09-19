@@ -65,6 +65,16 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (fastify, opts) 
     );
   }
 
+  if (
+    fastify.config.GOOGLE_CLIENT_ID &&
+    !fastify.config.OAUTH_ALLOWED_EMAILS &&
+    !fastify.config.OAUTH_ALLOWED_DOMAINS
+  ) {
+    fastify.log.warn(
+      "Google OAuth is configured but OAUTH_ALLOWED_EMAILS/OAUTH_ALLOWED_DOMAINS are empty; every sign-in will be refused.",
+    );
+  }
+
   const google: GoogleAuth | null =
     opts.googleAuth ??
     (fastify.config.GOOGLE_CLIENT_ID && fastify.config.GOOGLE_CLIENT_SECRET

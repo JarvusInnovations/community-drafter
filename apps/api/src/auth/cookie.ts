@@ -120,9 +120,10 @@ export function isSafeReturnPath(path: string): boolean {
  * `proposal-renderer/src/auth.ts`'s `emailAllowed`: exact matches,
  * `@domain`/`*@domain` wildcard entries in the emails list, and the
  * separate domains list. An unconfigured allowlist (both env vars empty)
- * admits everyone — that's a deployment misconfiguration to flag
- * operationally, not something this module should paper over by refusing
- * everyone.
+ * admits NOBODY: the instance is internet-facing and the gateway is
+ * deny-by-default (`specs/api/conventions.md`), so a missing allowlist
+ * must fail closed. Boot logs a warning when OAuth is configured without
+ * one (`plugin.ts`).
  */
 export function emailAllowed(
   email: string,
@@ -146,7 +147,7 @@ export function emailAllowed(
   }
   if (senderDomain && allowedDomains.some((d) => d.toLowerCase() === senderDomain)) return true;
 
-  return allowedEmails.length === 0 && allowedDomains.length === 0;
+  return false;
 }
 
 function splitCsv(value: string | undefined): string[] {
