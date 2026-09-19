@@ -16,14 +16,20 @@ function eligibleParticipations(fastify: FastifyInstance, document: string) {
     .filter((entry) => !entry.record.link_revoked);
 }
 
-function hasSubmittedSubmission(
-  fastify: FastifyInstance,
-  document: string,
-  person: string,
-): boolean {
-  return fastify.storage.readModel
-    .listSubmissionsForDocument(document)
-    .some((s) => s.record.person === person && s.record.state === "submitted");
+/**
+ * "Commenter", for `final-published`'s purposes, is narrower than "has a
+ * submitted submission": a decliner's position is `decline`, a distinct
+ * derived status from `commented` (`specs/data-model.md`'s "Derived
+ * participant status" line lists `commented` / `signed` / `signed
+ * (conditional)` / `declined` as siblings, not one subsuming another), so a
+ * decliner should not also count as a commenter here. Now that `comment-mode`
+ * has landed the general `submit` endpoint, the person's latest *position*
+ * (`ReadModel.getPosition`) is judgement-typed, so this checks that
+ * directly instead of the broader "submitted anything" test this function
+ * used before `comment`/`sign`/`sign_conditional` submissions existed.
+ */
+function isCommenter(fastify: FastifyInstance, document: string, person: string): boolean {
+  return fastify.storage.readModel.getPosition(document, person)?.judgement === "comment";
 }
 
 /** "all invitees with `phase_changes` who have opened the link, plus every current signer regardless". */
@@ -64,12 +70,10 @@ export function scheduleChangedRecipients(fastify: FastifyInstance, document: st
  * `phase_changes`" — the current signer half is computed and pre-marked
  * synchronously by `lib/notify.ts`'s `dispatchPublishNotifications`
  * alongside `v<n>`/`disposition-v<n>`; this is the complement so the
- * dispatcher's `final-published` delivery covers both. A "commenter" here
- * is read broadly as "has a submitted submission" (comment-mode's
- * comment-with-judgement flow isn't built yet — today the only submitted
- * submissions are `decline`s), matching this codebase's existing habit
- * (`lib/prefs.ts`) of documenting an interpretation inline rather than
- * leaving it silent.
+ * dispatcher's `final-published` delivery covers both. `isCommenter` reads
+ * this narrowly (judgement `comment` specifically) so a decliner isn't
+ * also told "the final version was published, every commenter" — they get
+ * `closed`/`schedule-changed` like any other invitee instead.
  */
 export function finalPublishedCommenterRecipients(
   fastify: FastifyInstance,
@@ -78,6 +82,6 @@ export function finalPublishedCommenterRecipients(
   return eligibleParticipations(fastify, document)
     .filter((entry) => !isCurrentSigner(entry))
     .filter((entry) => prefOn(entry, "phase_changes"))
-    .filter((entry) => hasSubmittedSubmission(fastify, document, entry.record.person))
+    .filter((entry) => isCommenter(fastify, document, entry.record.person))
     .map((entry) => entry.record.person);
 }

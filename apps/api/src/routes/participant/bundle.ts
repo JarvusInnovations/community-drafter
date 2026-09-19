@@ -4,6 +4,7 @@ import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { buildPrefsView } from "../../lib/prefs.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
+import { buildSubmissionView } from "../../lib/submission-view.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
 import { loadParticipantContext } from "./context.ts";
 
@@ -74,28 +75,7 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
               submission: position.submissionId,
             }
           : null,
-        submissions: submissions.map((entry) => ({
-          id: entry.record.id,
-          version: entry.record.version,
-          state: entry.record.state,
-          judgement: entry.record.judgement ?? null,
-          reason: entry.record.reason,
-          started_at: entry.timing.startedAt,
-          submitted_at: entry.timing.submittedAt,
-          comments: (entry.record.comments ?? []).map((comment) => ({
-            id: comment.id,
-            anchor: comment.anchor ?? null,
-            body: comment.body,
-            saved_at: entry.timing.submittedAt ?? entry.timing.startedAt,
-            disposition: comment.disposition
-              ? {
-                  outcome: comment.disposition,
-                  note: comment.disposition_note,
-                  version: comment.disposition_version,
-                }
-              : null,
-          })),
-        })),
+        submissions: submissions.map((entry) => buildSubmissionView(fastify, entry)),
         signatories,
         prefill: {
           name: person?.name,
