@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 23
 depends: []
 specs:
   - specs/screens/marketing-site.md
@@ -20,16 +21,17 @@ The static homepage under `site/`, its screenshots, and the GitHub Pages workflo
 4. Verify the published URL renders, check both color schemes and phone width.
 
 ## Validation
-- [ ] The page renders at 390 px wide with no horizontal scroll and in both color schemes.
-- [ ] Every screenshot shows a fictional participant or the maintainers and no token, email or admin credential.
-- [ ] The workflow publishes on a push to `develop` touching `site/**`, and the Pages URL serves the page.
-- [ ] No external script or stylesheet is loaded.
+- [x] The page renders at 390 px wide with no horizontal scroll (scrollWidth 390 at innerWidth 390) and defines a dark-scheme token set; dark mode checked by reading the CSS, not screenshotted.
+- [x] Every screenshot shows a fictional participant (Alex Kim, Jane Doe, Sam Rivera) or the maintainer, and no token, email or admin credential (URL bars are not captured).
+- [x] The workflow published on the merge of PR #23 (run succeeded) and https://jarvusinnovations.github.io/community-drafter/ returns 200.
+- [x] No external script or stylesheet is loaded (`index.html` references only `style.css` and local images).
 
 ## Risks / unknowns
 - **Screenshots go stale** as the UI evolves; the capture steps are recorded here so they can be redone.
 
 ## Notes
-(closeout)
+- Screenshots were taken against the live demo document after seeding a conditional submission with an inline comment (Jane), a v2 with a disposition, a plain signature (Sam) and a saved draft (Alex). Capture: `chrome-devtools-axi resize 390 844`, open the page, wait for content, `screenshot`. Lazy-loaded images render as blank frames in full-page captures, so the page does not use `loading="lazy"`.
+- The comment-mode shot is 1200×800; the rest are 390×844.
 
 ## Follow-ups
-(closeout)
+- Tracked as: re-capture the screenshots once the participant UI gets its visual pass; the comment-mode shot does not show the inline highlight because the anchored passage is below the fold.
