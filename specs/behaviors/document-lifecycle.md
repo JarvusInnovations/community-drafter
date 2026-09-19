@@ -43,7 +43,7 @@ An action attempted outside its allowed phase fails with a clear message naming 
 
 **Opening.** Admin sets `comments_close_at` and `signing_closes_at` (both required, `comments_close_at < signing_closes_at`) and at least one version must exist. Opening records `opened_at`, sets `state = open`, and queues invitation messages for every participation without `sent_at`.
 
-**The visible clock.** Every participant page shows the current phase and the next deadline as both an absolute time (participant's local time zone, with zone name) and a relative countdown ("closes in 2 days 4 hours"). Within the last 24 hours the countdown updates live. The planned later deadline is also shown ("signatures and removals until Sep 30").
+**The visible clock.** Every participant and public document page shows both deadlines at once as a **timeline** (`screens/document.md` § Header): where the document is between opening, comments closing and signatures being due, with a relative countdown to each deadline ("in 4 days 21 hours") and its absolute time in the reader's zone with the zone name. Countdowns refresh at least every minute and every second within the last 24 hours. A passed deadline is shown as such, never as a negative countdown. Secondary surfaces (comment mode's top bar, emails) may use the one-line form: "Comment period · closes Tue Sep 23, 5:00 PM EDT · in 2 days 4 hours".
 
 **Comments close on the clock.** At `comments_close_at`, comment submission stops. A participant mid-draft sees their draft preserved and a notice that comments closed at the deadline. The team is expected to publish the final version shortly after; nothing in the system waits for it.
 
