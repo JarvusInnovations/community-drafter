@@ -18,7 +18,7 @@ All versions derived from the document record's body-changing commits (number, d
 **Read a version**: the document screen layout in read-only form with the "you're reading an older version" banner (`screens/document.md`). Participants see their own comments made against that version.
 
 **Compare**
-- Header: "What changed from version 2 to version 3", the summary of the `to` version, the change summary line ("4 paragraphs changed, 1 added, 0 removed"), and two selectors to change `from` and `to`.
+- Header: "What changed from version 2 to version 3", the summary of the `to` version, the change summary line ("4 paragraphs changed, 1 added, 0 removed"), and two selectors to change `from` and `to`. When `from` and `to` are the same version (including a document with a single version), the page says there is nothing to compare yet instead of requesting a diff.
 - Body: the redline per `behaviors/versioning.md`: deletions struck, insertions highlighted; whole added/removed blocks marked in the margin. A toggle "Hide unchanged paragraphs" defaults on when the document exceeds 30 blocks, off otherwise.
 - A legend explains the two styles in one line. Color is never the only signal (strike-through and underline are used in addition to color).
 

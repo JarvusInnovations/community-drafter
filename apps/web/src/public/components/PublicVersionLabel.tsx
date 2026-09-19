@@ -25,10 +25,16 @@ export function PublicVersionLabel({
   return (
     <div className="mt-3 flex flex-col gap-1 text-sm">
       <p className="text-muted-foreground">
-        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)} ·{" "}
-        <Link to={`/d/${slug}/history/compare?to=${number}`} className="underline">
-          {copy.versionLabel.seeWhatChanged}
-        </Link>{" "}
+        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)}
+        {number > 1 ? (
+          <>
+            {" "}
+            ·{" "}
+            <Link to={`/d/${slug}/history/compare?to=${number}`} className="underline">
+              {copy.versionLabel.seeWhatChanged}
+            </Link>
+          </>
+        ) : null}{" "}
         ·{" "}
         <Link to={`/d/${slug}/history`} className="underline">
           {copy.versionLabel.allVersions}

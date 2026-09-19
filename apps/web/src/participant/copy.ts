@@ -218,6 +218,7 @@ export const copy = {
       return parts.join(", ");
     },
     legend: "Struck-through, colored text was removed; underlined, colored text was added.",
+    sameVersion: "This is the only version so far, so there is nothing to compare yet.",
     hideUnchanged: "Hide unchanged paragraphs",
     fromLabel: "From",
     toLabel: "To",
