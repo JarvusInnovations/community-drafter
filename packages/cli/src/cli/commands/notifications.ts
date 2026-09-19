@@ -1,0 +1,51 @@
+import { parseSubcommand, requirePositional, str, type FlagSpec } from "../flags.js";
+import { joinBlocks, renderHelp, renderObject } from "../output.js";
+import type { NotificationsRetryResult, NotificationsSummary } from "../types.js";
+import { clientFrom, render } from "./common.js";
+
+const NOTIFICATIONS_FLAGS: Record<string, FlagSpec> = {
+  list: { positionals: 1 },
+  retry: { positionals: 1, value: ["--event", "--person"] },
+};
+
+export const NOTIFICATIONS_HELP = `usage: drafter-axi notifications <list|retry> ...
+
+list <slug>
+retry <slug> [--event <name>] [--person <id>]`;
+
+export async function notificationsCommand(args: string[]): Promise<string> {
+  const { sub, parsed } = parseSubcommand("notifications", args, NOTIFICATIONS_FLAGS);
+  const client = clientFrom(parsed);
+
+  switch (sub) {
+    case "list": {
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications list <slug>");
+      const summary = await client.get<NotificationsSummary>(
+        `/documents/${encodeURIComponent(slug)}/notifications`,
+      );
+      return render(parsed, summary, () =>
+        joinBlocks(
+          renderObject({ sent: summary.sent, pending: summary.pending, failed: summary.failed }),
+          summary.failed > 0
+            ? renderHelp([`Run \`drafter-axi notifications retry ${slug}\` to re-dispatch`])
+            : "",
+        ),
+      );
+    }
+
+    case "retry": {
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications retry <slug>");
+      const result = await client.post<NotificationsRetryResult>(
+        `/documents/${encodeURIComponent(slug)}/notifications/retry`,
+        {
+          event: str(parsed, "--event"),
+          person: str(parsed, "--person"),
+        },
+      );
+      return render(parsed, result, () => renderObject(result));
+    }
+
+    default:
+      return sub; // unreachable
+  }
+}

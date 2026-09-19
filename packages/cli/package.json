@@ -9,10 +9,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "lint": "oxlint src",
-    "format": "oxfmt src",
-    "format:check": "oxfmt --check src",
+    "lint": "oxlint src scripts",
+    "format": "oxfmt src scripts",
+    "format:check": "oxfmt --check src scripts",
     "typecheck": "tsc -b",
+    "build:cli": "bun scripts/build-cli.ts",
+    "build:skill": "bun scripts/build-skill.ts",
+    "build": "bun run build:cli && bun run build:skill",
     "test": "bun test"
   },
   "devDependencies": {
