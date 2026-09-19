@@ -41,6 +41,12 @@ const PARTICIPATION_ACTIONS = new Set<Action>([
   "track",
   "link-revoke",
   "link-reissue",
+  "link-export",
+  "link-expire",
+  // A `submit` commit (e.g. `decline`, or a future `sign`/`sign_conditional`
+  // submission) may co-write the participation's `signature` table in the
+  // same commit as the submission record — see `routes/participant/decline.ts`.
+  "submit",
 ]);
 
 const SUBMISSION_ACTIONS = new Set<Action>(["comment", "submit"]);
@@ -238,7 +244,14 @@ export class ReadModel {
       if (document) await this.reloadParticipationsForDocument(document);
     }
 
-    if (action === "send" && document) {
+    // `send` (invitation blasts, reminders, revision notices), `open`
+    // (queues invitations for every pending participation) and
+    // `link-export` (`api-core`: marks each exported participation's
+    // `notified.links-exported`) all patch several participations in one
+    // commit without a per-record `Person` trailer, so the targeted
+    // single-record reload below can't find them — refresh the whole
+    // document's participations instead.
+    if ((action === "send" || action === "open" || action === "link-export") && document) {
       await this.reloadParticipationsForDocument(document);
     }
 
@@ -295,6 +308,17 @@ export class ReadModel {
       const body = await this.getBodyAtCommit(entry.hash, relPath);
       if (body === null) continue;
       if (body === previousBody) continue;
+      // `api-core`: a document is created with an empty body (`admin.md`'s
+      // `POST /documents` has no text field — the CLI's `docs create` takes
+      // none either; text arrives from the first `versions publish`). An
+      // empty body has no text that "changed" in any meaning
+      // `specs/behaviors/versioning.md` cares about, so it isn't counted as
+      // a version — the first *non-empty* body-changing commit becomes v1,
+      // with the real summary the spec expects v1 to carry.
+      if (previousBody === undefined && body === "") {
+        previousBody = body;
+        continue;
+      }
       previousBody = body;
 
       versions.push({
@@ -459,6 +483,11 @@ export class ReadModel {
 
   getParticipation(document: string, person: string): ParticipationEntry | undefined {
     return this.participations.get(participationKey(document, person));
+  }
+
+  /** Every participation for one document — invitations lists, signatures lists, notification fan-out. */
+  listParticipationsForDocument(document: string): ParticipationEntry[] {
+    return [...this.participations.values()].filter((entry) => entry.record.document === document);
   }
 
   /** Constant-time token → participation lookup (the personal-link credential). */
