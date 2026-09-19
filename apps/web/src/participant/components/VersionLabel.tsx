@@ -36,10 +36,16 @@ export function VersionLabel({
         </p>
       ) : null}
       <p className="text-muted-foreground">
-        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)} ·{" "}
-        <Link to={`/i/${token}/history/compare?to=${number}`} className="underline">
-          {copy.versionLabel.seeWhatChanged}
-        </Link>{" "}
+        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)}
+        {number > 1 ? (
+          <>
+            {" "}
+            ·{" "}
+            <Link to={`/i/${token}/history/compare?to=${number}`} className="underline">
+              {copy.versionLabel.seeWhatChanged}
+            </Link>
+          </>
+        ) : null}{" "}
         ·{" "}
         <Link to={`/i/${token}/history`} className="underline">
           {copy.versionLabel.allVersions}

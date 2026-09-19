@@ -22,7 +22,7 @@ Top to bottom:
    - *Declined*: "You told us you won't be signing. Changed your mind? **Sign as Jane Doe**".
    - *Closed*: "The signatory list closed Sep 30." plus the person's own outcome.
    - *Draft exists*: a slim line "You have unsent comments on v2 · Continue" in every state where a draft exists.
-4. **Version label**: "Version 3 · published Sep 20 at 9:14 AM EDT · *Tightened term 2; added the collections-care ask* · See what changed · All versions". If viewing an older version: banner "You're reading version 2. **Read the current version (3)**".
+4. **Version label**: "Version 3 · published Sep 20 at 9:14 AM EDT · *Tightened term 2; added the collections-care ask* · See what changed · All versions". "See what changed" appears only when an earlier version exists; on v1 the label ends with "All versions". If viewing an older version: banner "You're reading version 2. **Read the current version (3)**".
 5. **The document**: rendered markdown, readable typography, max line length for prose, headings with anchor links. No highlights in this view.
 6. **Your submissions**: if the person has submitted, a collapsed section listing each submission whole (version, date, judgement, its comments with disposition badges).
 7. **Signatories**: per `show_signatories`: counts line, then organizations, then individuals. Collapsed beyond 20 entries with "show all". Updates on each load.

@@ -24,11 +24,18 @@ export function CompareScreen(): JSX.Element {
   const [state, setState] = useState<
     | { status: "loading" }
     | { status: "error"; error: ApiError }
+    | { status: "same" }
     | { status: "ready"; result: CompareResult }
   >({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
+    if (from === to) {
+      setState({ status: "same" });
+      return () => {
+        cancelled = true;
+      };
+    }
     setState({ status: "loading" });
     getPublicCompare(slug, from, to)
       .then((result) => {
@@ -146,6 +153,8 @@ export function CompareScreen(): JSX.Element {
         </>
       ) : state.status === "loading" ? (
         <p className="mt-4 text-muted-foreground">{copy.loading}</p>
+      ) : state.status === "same" ? (
+        <p className="mt-4 text-muted-foreground">{copy.compare.sameVersion}</p>
       ) : (
         <p role="alert" className="mt-4 text-destructive">
           {copy.genericError}
