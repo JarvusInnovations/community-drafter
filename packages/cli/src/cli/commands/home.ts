@@ -1,0 +1,141 @@
+import { clientFrom } from "./common.js";
+import { isConfigured } from "../config.js";
+import { cliInvocation } from "../invocation.js";
+import { bool, parseFlags, type FlagSpec } from "../flags.js";
+import { computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
+import type { DocumentSummary, InvitationRow, NotificationsSummary } from "../types.js";
+
+const HOME_FLAGS: FlagSpec = { positionals: 0, boolean: ["--if-configured"] };
+
+/** How many open documents to drill into for invited/opened/signed + failure counts. */
+const DRILL_DOWN_LIMIT = 10;
+
+/**
+ * The no-args view (AXI §8) and, via `home --if-configured`, what the
+ * SessionStart hook prints (`specs/api/admin-cli.md` § Session hook).
+ *
+ * `GET /documents` (one call) gives every document's phase and aggregate
+ * counts. For open documents only — the ones with an actionable funnel — a
+ * bounded number of follow-up calls (invitations + notifications) resolve
+ * the finer invited/opened/signed/failure breakdown the spec asks for,
+ * capped at `DRILL_DOWN_LIMIT` so this stays a session-start-safe payload.
+ */
+export async function homeCommand(args: string[]): Promise<string> {
+  const parsed = parseFlags("home", args, HOME_FLAGS);
+  const ifConfigured = bool(parsed, "--if-configured");
+  const cli = cliInvocation();
+
+  if (!isConfigured()) {
+    if (ifConfigured) return ""; // hook: stay silent when unconfigured (spec: "when DRAFTER_URL is set")
+    return joinBlocks(
+      renderObject({ documents: "DRAFTER_URL is not set" }),
+      renderHelp([
+        "Set DRAFTER_URL and DRAFTER_ADMIN_TOKEN in the environment (or ~/.config/drafter/default.toml)",
+        `Run \`${cli} --help\` to see the full command list`,
+      ]),
+    );
+  }
+
+  let documents: DocumentSummary[];
+  try {
+    documents = await clientFrom(parsed).get<DocumentSummary[]>("/documents");
+  } catch (error) {
+    if (ifConfigured) {
+      // A hook must never error out a session (axi-skills: home/dashboard split).
+      const message = error instanceof Error ? error.message : String(error);
+      return renderObject({ documents: `could not reach the API: ${message}` });
+    }
+    throw error;
+  }
+
+  if (documents.length === 0) {
+    return joinBlocks(
+      renderObject({ documents: "0 documents found" }),
+      renderHelp([
+        `Run \`${cli} docs create <slug> --title "..." --owner <email> ...\` to start one`,
+      ]),
+    );
+  }
+
+  const client = clientFrom(parsed);
+  const openDocs = documents
+    .filter((d) => d.state === "open")
+    .sort((a, b) => nextDeadline(a).localeCompare(nextDeadline(b)))
+    .slice(0, DRILL_DOWN_LIMIT);
+
+  const drillDowns = new Map<
+    string,
+    { invited: number; opened: number; signed: number; failed: number }
+  >();
+  await Promise.all(
+    openDocs.map(async (doc) => {
+      try {
+        const [invitations, notifications] = await Promise.all([
+          client.get<InvitationRow[]>(`/documents/${encodeURIComponent(doc.slug)}/invitations`),
+          client.get<NotificationsSummary>(
+            `/documents/${encodeURIComponent(doc.slug)}/notifications`,
+          ),
+        ]);
+        drillDowns.set(doc.slug, {
+          invited: invitations.length,
+          opened: invitations.filter((i) => i.opened_at).length,
+          signed: invitations.filter((i) => i.signature && !i.signature.revoked).length,
+          failed: notifications.failed,
+        });
+      } catch {
+        // Best-effort drill-down — a single document's failure never blocks the rest.
+      }
+    }),
+  );
+
+  const rows = documents.map((doc) => {
+    const drill = drillDowns.get(doc.slug);
+    return {
+      slug: doc.slug,
+      phase: doc.phase,
+      next_deadline: nextDeadline(doc) || "",
+      invited: drill?.invited ?? doc.counts.participations,
+      opened: drill?.opened ?? "",
+      signed:
+        drill?.signed ??
+        doc.counts.signatures.organizations +
+          doc.counts.signatures.individuals +
+          doc.counts.signatures.unlisted,
+      failures: drill?.failed ?? "",
+    };
+  });
+
+  const totalFailures = [...drillDowns.values()].reduce((sum, d) => sum + d.failed, 0);
+  const suggestions = [
+    `Run \`${cli} docs show <slug>\` for a document's full dashboard`,
+    `Run \`${cli} feedback export <slug>\` to pull the pending-comment bundle for an LLM round`,
+  ];
+  if (totalFailures > 0)
+    suggestions.unshift(
+      `Run \`${cli} notifications retry <slug>\` — ${totalFailures} failed notification(s) across open documents`,
+    );
+  if (documents.length > DRILL_DOWN_LIMIT + openDocs.length) {
+    suggestions.push(
+      `Run \`${cli} docs show <slug>\` — only the ${DRILL_DOWN_LIMIT} nearest-deadline open documents got a full drill-down here`,
+    );
+  }
+
+  return joinBlocks(
+    renderList("documents", rows, [
+      computed("slug", (r) => r.slug),
+      computed("phase", (r) => r.phase),
+      computed("next_deadline", (r) => r.next_deadline),
+      computed("invited", (r) => r.invited),
+      computed("opened", (r) => r.opened),
+      computed("signed", (r) => r.signed),
+      computed("failures", (r) => r.failures),
+    ]),
+    renderHelp(suggestions),
+  );
+}
+
+function nextDeadline(doc: DocumentSummary): string {
+  if (doc.phase === "commenting") return doc.comments_close_at ?? "";
+  if (doc.phase === "signing") return doc.signing_closes_at ?? "";
+  return "";
+}

@@ -16,5 +16,10 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/**/*"],
+  // `src/e2e.test.ts` boots `apps/api` in-process by relative import, which
+  // would otherwise pull the composite project's inferred `rootDir` outside
+  // this package. `bun test` still runs it (it transpiles TS directly and
+  // ignores this file); only `tsc -b` skips it.
+  "exclude": ["src/e2e.test.ts"]
 }

@@ -88,7 +88,7 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
       });
 
       const updated = fastify.storage.readModel.getParticipation(slug, person);
-      return buildSignatureView(updated!);
+      return { ...buildSignatureView(updated!), commit: result.commitHash };
     },
   );
 };

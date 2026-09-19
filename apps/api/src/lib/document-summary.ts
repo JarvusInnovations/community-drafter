@@ -10,8 +10,17 @@ import type { DocumentEntry } from "../storage/read-model.ts";
  * `specs/behaviors/signatures.md`: "the admin dashboard always shows all"
  * regardless of `show_signatories`, so this always computes the `list`
  * shape rather than honoring the document's own participant-facing setting.
+ *
+ * `commit`, when passed, is the hash of the write that produced this view —
+ * `specs/api/admin-cli.md` § Output rules: "Every mutation prints the
+ * resulting record's key fields and the commit subject" (the CLI's own
+ * layer resolves the subject; this carries the hash it cites).
  */
-export function documentSummary(fastify: FastifyInstance, entry: DocumentEntry) {
+export function documentSummary(
+  fastify: FastifyInstance,
+  entry: DocumentEntry,
+  commit?: string | null,
+) {
   const phase = derivePhase(entry.record, new Date());
   const participations = fastify.storage.readModel.listParticipationsForDocument(entry.record.slug);
   const signatories = computeSignatories(participations, "list") ?? {
@@ -39,6 +48,7 @@ export function documentSummary(fastify: FastifyInstance, entry: DocumentEntry) 
     show_signatories: entry.record.show_signatories,
     revocation_window_hours: entry.record.revocation_window_hours,
     tags: entry.record.tags,
+    commit,
     counts: {
       versions: entry.versions.length,
       participations: participations.length,

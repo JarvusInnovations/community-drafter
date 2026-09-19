@@ -100,7 +100,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       let invitationsCreated = 0;
       let skippedExisting = 0;
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "invite",
         {
           actor: adminActor(request),
@@ -185,6 +185,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         people_updated: peopleUpdated,
         invitations_created: invitationsCreated,
         skipped_existing: skippedExisting,
+        commit: result.commitHash,
       };
     },
   );
@@ -266,8 +267,9 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         ]);
       }
 
+      let commitHash: string | null = null;
       if (candidates.length > 0) {
-        await fastify.storage.commit(
+        const result = await fastify.storage.commit(
           "send",
           {
             actor: adminActor(request),
@@ -289,16 +291,17 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
             }
           },
         );
+        commitHash = result.commitHash;
       }
 
       fastify.events.publish({
         type: "send",
         document: slug,
         people: candidates.map((entry) => entry.record.person),
-        commit: "",
+        commit: commitHash ?? "",
       });
 
-      const response: Record<string, unknown> = { queued: candidates.length };
+      const response: Record<string, unknown> = { queued: candidates.length, commit: commitHash };
       if (fastify.config.MAILER === "export") {
         response.csv = toCsv(["name", "email", "subject", "link"], rows);
       }
@@ -358,6 +361,10 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         );
       }
 
+      // CSV is this route's documented shape (`specs/api/admin.md`); the
+      // commit that recorded the export isn't retrievable from a CSV body,
+      // so this stays the one admin write endpoint without a `commit` field
+      // in its response.
       const csv = toCsv(["person", "name", "email", "link"], rows);
       reply.header("content-type", "text/csv; charset=utf-8");
       return csv;
@@ -376,7 +383,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       if (!participation)
         throw new ApiError("not_found", `No invitation for '${person}' on '${slug}'.`);
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "link-revoke",
         {
           actor: adminActor(request),
@@ -390,7 +397,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      return { revoked: true };
+      return { revoked: true, commit: result.commitHash };
     },
   );
 
@@ -410,7 +417,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         Boolean(fastify.storage.readModel.getParticipationByToken(candidate)),
       );
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "link-reissue",
         {
           actor: adminActor(request),
@@ -424,7 +431,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      return { link: publicLink(fastify, token) };
+      return { link: publicLink(fastify, token), commit: result.commitHash };
     },
   );
 
@@ -484,8 +491,9 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         return { targeted: candidates.length, dry_run: true };
       }
 
+      let commitHash: string | null = null;
       if (candidates.length > 0) {
-        await fastify.storage.commit(
+        const result = await fastify.storage.commit(
           "send",
           {
             actor: adminActor(request),
@@ -509,16 +517,17 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
             }
           },
         );
+        commitHash = result.commitHash;
       }
 
       fastify.events.publish({
         type: "remind",
         document: slug,
         people: candidates.map((entry) => entry.record.person),
-        commit: "",
+        commit: commitHash ?? "",
       });
 
-      return { targeted: candidates.length, dry_run: false };
+      return { targeted: candidates.length, dry_run: false, commit: commitHash };
     },
   );
 };
