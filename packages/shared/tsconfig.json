@@ -6,7 +6,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "types": ["@types/bun"],
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
