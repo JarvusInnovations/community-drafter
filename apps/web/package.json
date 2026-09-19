@@ -15,6 +15,7 @@
     "check:bundle-size": "bun run scripts/check-bundle-size.ts"
   },
   "dependencies": {
+    "@community-drafter/shared": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
     "react": "^19.2.8",
