@@ -50,3 +50,9 @@ jobs:
       - name: Build
         if: matrix.package == '@community-drafter/web'
         run: bun run --filter='${{ matrix.package }}' build
+      # `specs/architecture.md` § Web app: "Bundle budget for the
+      # participant entry: under 120 KB gzipped JS on first load, measured
+      # in CI." Reads the `dist/` this Build step just produced.
+      - name: Check participant bundle size
+        if: matrix.package == '@community-drafter/web'
+        run: bun run --filter='${{ matrix.package }}' check:bundle-size
