@@ -39,6 +39,25 @@ describe("StatusCard — the six states", () => {
     expect(screen.getByText("I have comments first")).toBeTruthy();
   });
 
+  it("not signed, after a revocation: shows the removed-on line above the sign form", () => {
+    const bundle = makeBundle({
+      signature: {
+        capacity: "personal",
+        display_name: "Jane Doe",
+        conditional: false,
+        listed: true,
+        signed_on_version: 1,
+        revoked: true,
+        signed_at: "2026-09-19T12:00:00Z",
+        revoked_at: "2026-09-19T14:00:00Z",
+      },
+    });
+    renderCard(bundle);
+
+    expect(screen.getByText(/You removed your name on/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Add your name" })).toBeTruthy();
+  });
+
   it("signed: shows the own-status line and the change/remove actions", () => {
     const bundle = makeBundle({
       signature: {

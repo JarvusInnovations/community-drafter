@@ -58,6 +58,8 @@ export const copy = {
 
   signForm: {
     heading: "Add your name",
+    /** `specs/screens/document.md` § Actions: "Remove my name → ... card switches to *Not signed* with 'You removed your name on Sep 21'." */
+    removedOn: (date: string) => `You removed your name on ${date}.`,
     capacityLegend: "How are you signing?",
     capacityPersonal: "As myself",
     capacityOfficial: "On behalf of an organization",

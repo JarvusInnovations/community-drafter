@@ -96,7 +96,14 @@ export function StatusCard({
 
       {state === "not_signed" ? (
         canAct ? (
-          <SignForm bundle={bundle} token={token} onSigned={refetch} />
+          <>
+            {signature?.revoked && signature.revoked_at ? (
+              <p className="mb-2 text-sm text-muted-foreground">
+                {copy.signForm.removedOn(formatAbsolute(signature.revoked_at))}
+              </p>
+            ) : null}
+            <SignForm bundle={bundle} token={token} onSigned={refetch} />
+          </>
         ) : (
           <p className="text-foreground">{copy.closedCard.ownNotSigned}</p>
         )
