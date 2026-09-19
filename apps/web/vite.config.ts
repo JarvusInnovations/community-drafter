@@ -18,6 +18,13 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: true,
       },
+      // `notifications` plan: the preferences screen talks to the
+      // participant API directly by relative path (same-origin in
+      // production, per `specs/architecture.md` § Deployment).
+      "/i": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
     },
   },
 });
