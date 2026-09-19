@@ -4,11 +4,23 @@ import { useCountdown } from "../hooks/useCountdown.ts";
 import { type DocumentInfo } from "../types.ts";
 
 /**
+ * Only the fields this component actually reads. Narrower than the full
+ * `DocumentInfo` on purpose so `public/components/PublicDocumentHeader.tsx`
+ * (`plans/public-and-embed.md`) can pass its own, smaller public document
+ * shape — which has no `capacities` field — straight through without
+ * padding it out to satisfy an unused property.
+ */
+export type PhaseLineDocument = Pick<
+  DocumentInfo,
+  "phase" | "comments_close_at" | "signing_closes_at"
+>;
+
+/**
  * `specs/behaviors/document-lifecycle.md` § "The visible clock": absolute
  * time (with zone name) plus a relative countdown, live within 24 h, and
  * the later deadline shown alongside the nearer one during commenting.
  */
-export function PhaseLine({ document }: { document: DocumentInfo }): JSX.Element {
+export function PhaseLine({ document }: { document: PhaseLineDocument }): JSX.Element {
   const deadline =
     document.phase === "commenting" ? document.comments_close_at : document.signing_closes_at;
   const isTicking = document.phase === "commenting" || document.phase === "signing";
