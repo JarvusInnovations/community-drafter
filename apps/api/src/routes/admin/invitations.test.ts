@@ -64,6 +64,7 @@ describe("POST /admin/api/documents/:slug/invitations/import", () => {
       people_updated: 5,
       invitations_created: 50,
       skipped_existing: 0,
+      commit: expect.any(String),
     });
 
     const after = await commitCount(dataDir);
@@ -95,11 +96,16 @@ describe("POST /admin/api/documents/:slug/invitations/import", () => {
       payload: [row],
     });
 
-    expect(JSON.parse(second.body)).toEqual({
+    const secondBody = JSON.parse(second.body);
+    // Re-importing the same row is a no-op patch (identical fields, no new
+    // participation) — the underlying commit may collapse to no real tree
+    // change, so `commit` can be null here (unlike the first import above).
+    expect(secondBody).toEqual({
       people_created: 0,
       people_updated: 1,
       invitations_created: 0,
       skipped_existing: 1,
+      commit: secondBody.commit,
     });
 
     await server.close();

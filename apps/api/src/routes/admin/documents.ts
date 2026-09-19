@@ -97,7 +97,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "create",
         {
           actor: adminActor(request),
@@ -124,7 +124,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       );
 
       reply.status(201);
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(body.slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(body.slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -162,7 +166,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         if (request.body[key] !== undefined) patch[key] = request.body[key];
       }
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "settings",
         {
           actor: adminActor(request),
@@ -175,7 +179,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -203,7 +211,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const participations = fastify.storage.readModel.listParticipationsForDocument(slug);
       const toInvite = participations.filter((p) => !p.record.sent_at);
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "open",
         {
           actor: adminActor(request),
@@ -234,10 +242,14 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         type: "invite",
         document: slug,
         people: toInvite.map((p) => p.record.person),
-        commit: "",
+        commit: result.commitHash ?? "",
       });
 
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -310,7 +322,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         commit: result.commitHash ?? "",
       });
 
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -326,7 +342,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       }
 
       const now = new Date().toISOString();
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "close",
         {
           actor: adminActor(request),
@@ -340,7 +356,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       );
 
       fastify.events.publish({ type: "closed", document: slug });
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -392,7 +412,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         commit: result.commitHash ?? "",
       });
 
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 
@@ -405,7 +429,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const slug = entry.record.slug;
       const { reason, public: isPublic } = request.body;
 
-      await fastify.storage.commit(
+      const result = await fastify.storage.commit(
         "withdraw",
         {
           actor: adminActor(request),
@@ -422,7 +446,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      return documentSummary(fastify, fastify.storage.readModel.getDocument(slug)!);
+      return documentSummary(
+        fastify,
+        fastify.storage.readModel.getDocument(slug)!,
+        result.commitHash,
+      );
     },
   );
 };
