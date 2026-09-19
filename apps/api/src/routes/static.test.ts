@@ -107,4 +107,55 @@ describe("static SPA serving", () => {
 
     await server.close();
   });
+
+  /**
+   * `specs/screens/public-and-embed.md` route table's "Framing" column +
+   * `plans/public-and-embed.md` § "Frameability headers": `frame-ancestors
+   * *` with no `X-Frame-Options` on `/d/:slug/embed` and
+   * `/d/:slug/signatories` only; `frame-ancestors 'none'` + `X-Frame-Options:
+   * DENY` on every other HTML response, including every `/i/*` page
+   * (`specs/behaviors/access-and-identity.md` § Public links: "Personal
+   * links are never embeddable").
+   */
+  it("sets frame-ancestors '*' only on /d/:slug/embed and /d/:slug/signatories", async () => {
+    process.env.NODE_ENV = "test";
+    const { dataDir, cleanup: cleanupData } = await createTestDataRepo();
+    cleanups.push(cleanupData);
+    const { root, cleanup: cleanupDist } = buildFixtureDist();
+    cleanups.push(cleanupDist);
+
+    const server = Fastify();
+    await server.register(app, {
+      storage: { dataDir, trackerIntervalMs: 3_600_000 },
+      disablePhaseObserver: true,
+      static: { root },
+    });
+    await server.ready();
+
+    const frameable = ["/d/some-slug/embed", "/d/some-slug/signatories"];
+    for (const path of frameable) {
+      const response = await server.inject({ method: "GET", url: path });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-security-policy"]).toBe("frame-ancestors *");
+      expect(response.headers["x-frame-options"]).toBeUndefined();
+    }
+
+    const notFrameable = [
+      "/",
+      "/i/some-token",
+      "/i/some-token/history",
+      "/d/some-slug",
+      "/d/some-slug/history",
+      "/d/some-slug/history/compare",
+      "/admin/dashboard",
+    ];
+    for (const path of notFrameable) {
+      const response = await server.inject({ method: "GET", url: path });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-security-policy"]).toBe("frame-ancestors 'none'");
+      expect(response.headers["x-frame-options"]).toBe("DENY");
+    }
+
+    await server.close();
+  });
 });

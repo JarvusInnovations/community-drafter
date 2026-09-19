@@ -16,6 +16,12 @@ export interface SignatorySummary {
   individuals: number;
   unlisted: number;
   list?: SignatoryListItem[];
+  /**
+   * The most recent sign/resign event among current signatories, ISO 8601 —
+   * the "last updated" time `specs/screens/public-and-embed.md`'s
+   * signatories page/fragment shows. `undefined` when nobody has signed yet.
+   */
+  updated_at?: string;
 }
 
 /**
@@ -49,6 +55,16 @@ function effectiveSignedAt(events: SignatureEvent[]): string {
   return "";
 }
 
+/** The latest `effectiveSignedAt` among a set of current signatories, or `""` if none. */
+function latestEffectiveSignedAt(entries: ParticipationEntry[]): string {
+  let latest = "";
+  for (const entry of entries) {
+    const at = effectiveSignedAt(entry.signatureEvents);
+    if (at > latest) latest = at;
+  }
+  return latest;
+}
+
 /**
  * `specs/behaviors/signatures.md` § Display + `specs/api/participant.md`
  * bundle `signatories` field. `show_signatories = none` → `null`;
@@ -74,6 +90,7 @@ export function computeSignatories(
     organizations: orgs.size,
     individuals: personals.length,
     unlisted,
+    updated_at: latestEffectiveSignedAt(current) || undefined,
   };
 
   if (showSignatories !== "list") return summary;

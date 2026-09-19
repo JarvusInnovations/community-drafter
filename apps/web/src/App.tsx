@@ -4,6 +4,7 @@ import { Route, Routes } from "react-router";
 import PrefsRoute from "./routes/prefs/PrefsRoute.tsx";
 import { DocumentScreen } from "./participant/DocumentScreen.tsx";
 import { copy } from "./participant/copy.ts";
+import { NotFoundScreen } from "./participant/NotFoundScreen.tsx";
 import { ParticipantLayout } from "./participant/ParticipantLayout.tsx";
 
 // Code-split everything past the sign card so the initial participant load
@@ -21,6 +22,27 @@ const CompareScreen = lazy(() =>
 );
 const CommentPlaceholder = lazy(() =>
   import("./participant/CommentPlaceholder.tsx").then((m) => ({ default: m.CommentPlaceholder })),
+);
+
+// `public-and-embed`: the whole `/d/:slug/*` family is code-split too — a
+// participant opening `/i/:token` never touches this tree, and vice versa.
+const PublicLayout = lazy(() =>
+  import("./public/PublicLayout.tsx").then((m) => ({ default: m.PublicLayout })),
+);
+const PublicDocumentScreen = lazy(() =>
+  import("./public/DocumentScreen.tsx").then((m) => ({ default: m.DocumentScreen })),
+);
+const PublicHistoryScreen = lazy(() =>
+  import("./public/HistoryScreen.tsx").then((m) => ({ default: m.HistoryScreen })),
+);
+const PublicCompareScreen = lazy(() =>
+  import("./public/CompareScreen.tsx").then((m) => ({ default: m.CompareScreen })),
+);
+const SignatoriesScreen = lazy(() =>
+  import("./public/SignatoriesScreen.tsx").then((m) => ({ default: m.SignatoriesScreen })),
+);
+const EmbedScreen = lazy(() =>
+  import("./public/EmbedScreen.tsx").then((m) => ({ default: m.EmbedScreen })),
 );
 
 function LazyFallback(): JSX.Element {
@@ -85,6 +107,64 @@ function App(): JSX.Element {
             </Suspense>
           }
         />
+      </Route>
+
+      {/*
+        `public-and-embed`: `/d/:slug` and its non-embed children share
+        `PublicLayout`'s one bundle fetch; `embed` and `signatories` fetch
+        their own and render no shared chrome at all (both must work
+        standing alone in a foreign-origin iframe) — see each screen's own
+        doc comment. Every route here is grouped in this one block.
+      */}
+      <Route
+        path="/d/:slug/embed"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <EmbedScreen />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/d/:slug/signatories"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <SignatoriesScreen />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/d/:slug"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <PublicLayout />
+          </Suspense>
+        }
+      >
+        <Route
+          index
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <PublicDocumentScreen />
+            </Suspense>
+          }
+        />
+        <Route
+          path="history"
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <PublicHistoryScreen />
+            </Suspense>
+          }
+        />
+        <Route
+          path="history/compare"
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <PublicCompareScreen />
+            </Suspense>
+          }
+        />
+        <Route path="*" element={<NotFoundScreen />} />
       </Route>
     </Routes>
   );
