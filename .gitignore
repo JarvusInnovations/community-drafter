@@ -1,1 +1,16 @@
 .lavish/
+
+# Bun / Node
+node_modules/
+*.log
+
+# TypeScript build artifacts
+dist/
+*.tsbuildinfo
+
+# Env
+.env
+
+# Editor / OS
+.DS_Store
+
