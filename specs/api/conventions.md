@@ -7,12 +7,13 @@
 | `/i/:token` | participant pages (SPA shell) | token in path |
 | `/i/:token/api/*` | participant API | token in path |
 | `/d/:slug/*` | public pages, embeds, JSON | none (enumerated anonymous) |
-| `/admin/*` | admin pages (SPA shell) | OAuth cookie |
-| `/admin/api/*` | admin API | bearer token **or** OAuth cookie + CSRF header |
-| `/auth/*` | OAuth login/callback/logout/session | none / cookie |
+| `/admin/*` | admin pages (SPA shell) | operator session cookie |
+| `/admin/api/*` | admin API | operator token as `Authorization: Bearer` **or** session cookie + CSRF header |
+| `/admin/api/refresh` | data-repo refresh webhook | HMAC signature (`DATA_REPO_WEBHOOK_SECRET`) |
+| `/auth/*` | magic-link request and callback, device-code flow, session, refresh, logout | none / cookie / bearer (see `api/auth.md`) |
 | `/_health` | liveness | none |
 
-The gateway is deny-by-default: every route declares `participant`, `admin`, or `public`; undeclared routes fail closed. Bearer and cookie are never mixed on one request; a present `Authorization` header is decisive.
+The gateway is deny-by-default: every route declares `participant`, `operator`, `webhook`, or `public`; undeclared routes fail closed. Bearer and cookie are never mixed on one request; a present `Authorization` header is decisive. Operator routes that name a document also require the caller to be one of its operators; otherwise 404.
 
 ## Content
 
@@ -29,10 +30,10 @@ Success bodies are the resource or a domain-shaped object; no generic envelope. 
 | Status | `error` values |
 | --- | --- |
 | 400 | `invalid_request` (schema), `invalid_anchor`, `judgement_requires_comments`, `attestation_required` |
-| 401 | `unauthenticated` (admin only; participant tokens never 401) |
+| 401 | `unauthenticated` (operator routes only; participant tokens never 401), `operator_inactive` |
 | 403 | `forbidden`, `csrf_required` |
 | 404 | `not_found` (also used for unknown/revoked/expired tokens and non-public documents) |
-| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change` |
+| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
 | 422 | `validation_failed` with field errors |
 | 429 | `rate_limited` |
 

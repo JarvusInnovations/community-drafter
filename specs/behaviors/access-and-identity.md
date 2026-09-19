@@ -39,10 +39,12 @@ A signed token adds nothing the record does not already provide.
 
 ## Admin access
 
-- **Dashboard (human):** Google OAuth with an allowlist of emails and/or domains, HMAC-signed session cookie, 24-hour lifetime. This is the `auth.ts` module from proposal-renderer, unchanged in behavior.
-- **API (agent/CLI):** `Authorization: Bearer <ADMIN_TOKEN>`, constant-time compared. One token for the instance in phase 1.
-- Admin identity (email or the label `cli:<name>` supplied by the CLI) is recorded as the author of every admin-originated commit.
-- Admins may open any participant page **as** a participant only through an explicit "view as" action that renders the page read-only with a banner; admins never act on a participant's behalf through the participant UI. Administrative fixes (e.g. revoke a signature at the person's emailed request) go through the admin API and are attributed to the admin.
+Admins are **operators**: see `behaviors/operators.md` for who they are, how they sign in (emailed magic link; device-code flow for the CLI), how sessions work (signed tokens checked against the live operator record), and how access is scoped to documents. In short:
+
+- **Dashboard (human):** magic-link sign-in, 24-hour signed session cookie, CSRF header on writes.
+- **CLI and bots:** a 90-day signed token obtained through the device-code flow, sent as `Authorization: Bearer`. Bots are operators with their own email.
+- There is no instance-wide credential. The operator's email is recorded as the `Actor` of every admin-originated commit.
+- Operators may open any participant page **as** a participant only through an explicit "view as" action that renders the page read-only with a banner; admins never act on a participant's behalf through the participant UI. Administrative fixes (e.g. revoke a signature at the person's emailed request) go through the admin API and are attributed to the admin.
 
 ## Details
 

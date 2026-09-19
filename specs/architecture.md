@@ -34,12 +34,12 @@ One private git repository, configured by URL and branch, holds every durable fa
 - gitsheets markdown normalization is **on** for version bodies so diffs reflect wording rather than formatting (decided 2026-09-19; the publisher is warned that authored line breaks and list markers are canonicalized).
 - Contact details live in the data repo, which is private. Tokens are never returned by the admin API after creation except through the explicit links export.
 
-**Departure from `jarvus-fastify`:** the skill's auth reference assumes a database-backed token store. Here the **participations sheet is the token store** for participant credentials (revocable per row, exactly the property the skill wants), and admin sessions are in-memory (single instance, 24-hour lifetime, lost on restart, which forces a harmless re-login) plus a static bearer token for the CLI. Adding a database for two tables would contradict [The record is a git repo](principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app).
+**Departure from `jarvus-fastify`:** the skill's auth reference assumes a database-backed token store. Here the **participations sheet is the token store** for participant credentials (revocable per row, exactly the property the skill wants), and operator sessions are **stateless signed tokens** whose authority is re-read from the `operators` sheet on every request, so revocation is a record change and nothing about sessions needs persisting. Magic-link nonces and pending device codes are short-lived in-memory state whose loss on restart only costs a retry. Adding a database for this would contradict [The record is a git repo](principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app).
 
 ## API server
 
 - Fastify 5 with `@fastify/env` for configuration, deny-by-default auth gateway per the house pattern: every route declares a capability; undeclared fails closed.
-- Capabilities: `participant` (token from the `/i/:token` path segment resolves to an invitation and becomes `request.principal`), `admin-user` (Google OAuth cookie session, allowlisted), `admin-token` (bearer), `public` (enumerated anonymous routes: `/d/:slug/*`, health, SPA shell and assets).
+- Capabilities: `participant` (token from the `/i/:token` path segment resolves to a participation and becomes `request.principal`), `operator` (a signed token from the session cookie or `Authorization: Bearer`, resolved to an active operator record; document routes additionally check membership), `webhook` (HMAC signature for `refresh`), `public` (enumerated anonymous routes: `/d/:slug/*`, `/auth/*`, health, SPA shell and assets).
 - Serves the built web app (`@fastify/static`) with SPA fallback for `/i/*`, `/d/*`, `/admin/*`.
 - Renders markdown to HTML server-side through a **unified** pipeline (`remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-slug`, `rehype-sanitize`, `rehype-stringify`) plus the project's **block identity** plugin (`behaviors/inline-comments.md`). Rendered HTML per version is cached in memory. Diffs between versions are computed server-side (`behaviors/versioning.md`).
 - Background work (notification dispatch with retries, the daily digest, phase-transition observation, batched flushes) runs in-process on timers; single instance makes this safe. The dispatch queue and its failures are in memory and in logs, not in the record; idempotency comes from `participations.notified`, so a restart can safely re-derive what still needs sending.
@@ -58,8 +58,10 @@ One private git repository, configured by URL and branch, holds every durable fa
 | Principal | Credential | Scope |
 | --- | --- | --- |
 | Participant | opaque token in the URL path (`/i/<token>`) | one invitation: one person on one document |
-| Admin (human) | Google OAuth session cookie, allowlisted emails/domains, CSRF header on writes | dashboard |
-| Admin (agent/CLI) | `Authorization: Bearer <ADMIN_TOKEN>` | admin API |
+| Operator (human) | magic-link sign-in → 24 h signed session cookie, CSRF header on writes | dashboard and admin API, scoped to their documents |
+| Operator (CLI or bot) | 90-day signed token from the device-code flow, `Authorization: Bearer` | admin API, scoped to their documents |
+
+Operators are records in the `operators` sheet; authorization is read from that record and from `documents.operators` on every request, never from token claims (`behaviors/operators.md`). There is no instance-wide credential; the first operator is created at boot from `BOOTSTRAP_OPERATOR_EMAIL` when the sheet is empty.
 
 Participant tokens: random, at least 96 bits, base62, unique across the instance, constant-time compared. Unknown, revoked and expired tokens yield the same "link unavailable" response. **[phase 2]** public sign-in via emailed magic links that mint a normal invitation.
 
@@ -72,7 +74,7 @@ A `Mailer` interface with implementations selected by configuration: **Postmark*
 - Container from `oven/bun` (Debian variant) with `git` and `openssh-client`; deploy key mounted from Secret Manager; entrypoint clones the data repo then starts the API server (the proposal-renderer `entrypoint.sh` pattern).
 - **Cloud Run**, `max_instance_count = 1` (load-bearing: single writer), `min_instance_count = 1` (no cold clone on a participant's first click; smaller batched-write loss window), SIGTERM handler flushes batched writes and drains the push daemon.
 - OpenTofu under `tf/` following proposal-renderer's layout (Cloud Run, Artifact Registry, Secret Manager, service accounts, domain mapping). Image build and `tofu apply` from GitHub Actions on release tags per `release-flow`.
-- Configuration (validated at boot by `@fastify/env`): `DATA_REPO_URL`, `DATA_REPO_BRANCH`, `PUBLIC_URL`, `ADMIN_TOKEN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `COOKIE_SECRET`, `OAUTH_ALLOWED_EMAILS`, `OAUTH_ALLOWED_DOMAINS`, `MAILER`, provider keys, `INSTANCE_NAME`, `INSTANCE_FROM_EMAIL`, `INSTANCE_TIMEZONE`.
+- Configuration (validated at boot by `@fastify/env`): `DATA_REPO_URL`, `DATA_REPO_BRANCH`, `DATA_REPO_WEBHOOK_SECRET`, `PUBLIC_URL`, `AUTH_SECRET` (signs sessions, CLI tokens and magic links), `BOOTSTRAP_OPERATOR_EMAIL`, `MAILER`, provider keys, `INSTANCE_NAME`, `INSTANCE_FROM_EMAIL`, `INSTANCE_TIMEZONE`.
 
 ## Repository layout
 

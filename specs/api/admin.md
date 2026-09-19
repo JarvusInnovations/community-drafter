@@ -1,11 +1,14 @@
 # API: Admin
 
-All routes under `/admin/api`. Auth: `Authorization: Bearer <ADMIN_TOKEN>` (CLI/agents) or an admin OAuth session cookie with the CSRF header (dashboard). Every write records `Actor` (email, or `cli:<label>` from the `X-Actor` header on bearer requests, default `cli`).
+All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer` (CLI, bots) or the operator session cookie with the `X-Requested-With: drafter` header (dashboard); see `api/auth.md` and `behaviors/operators.md`. Every write records `Actor` = the operator's email. **Document routes are scoped**: a caller who is not one of the document's operators gets 404 `not_found`, identical to an unknown slug.
 
 ## Documents
 
-- `GET /documents` → list with derived phase and counts.
-- `POST /documents` `{ slug, title, capacities?, public_access?, show_signatories?, owner, sender_name, reply_to, revocation_window_hours?, tags? }` → document (state `draft`).
+- `GET /documents` → the caller's documents with derived phase and counts.
+- `POST /documents` `{ slug, title, capacities?, public_access?, show_signatories?, sender_name, reply_to, revocation_window_hours?, tags? }` → document (state `draft`) with `created_by` and `operators = [caller]`.
+- `GET /documents/:slug/operators` → `[{ email, name, kind, active }]`.
+- `POST /documents/:slug/operators` `{ email }` → adds an active operator from the sheet (`Action: doc-operator-add`); 422 when the email is not an active operator.
+- `DELETE /documents/:slug/operators/:email` → removes (`Action: doc-operator-remove`); 409 `last_operator` when it would leave none.
 - `GET /documents/:slug` → document + versions (from content history) + counts.
 - `PATCH /documents/:slug` → settings fields only (not `state`, not deadlines).
 - `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; queues invitations. Errors: `validation_failed` (order), `no_version`.
@@ -54,9 +57,17 @@ All routes under `/admin/api`. Auth: `Authorization: Bearer <ADMIN_TOKEN>` (CLI/
 
 - `GET /documents/:slug/activity?limit=50&person=` → the document's commits, newest first, as `{ commit, date, subject, action, person, version, judgement, reason, actor }` parsed from trailers. This is the event log; there is no other.
 
+## Operators
+
+- `GET /operators` → every operator (email, name, kind, active, title, org); any active operator may read the list, because adding someone to a document requires choosing from it.
+- `POST /operators` `{ email, name, kind?, title?, org?, notes? }` → creates (`Action: operator-add`); 409 when the email exists.
+- `PATCH /operators/:email` `{ name?, active?, title?, org?, notes? }` → updates (`Action: operator-update`). Deactivating yourself is refused (422).
+- `DELETE /operators/:email` → removes the record (`Action: operator-remove`) and drops the email from every document's `operators` list in the same commit; 409 `last_operator` when that would leave any document with none.
+
 ## Instance
 
-- `GET /whoami` → the actor and capability.
+- `GET /whoami` → `{ email, name, kind, expires_at, transport: "bearer" | "cookie" }`.
+- `POST /refresh` → the data-repository refresh webhook (`behaviors/operators.md`): authenticated by `X-Hub-Signature-256` over the raw body with `DATA_REPO_WEBHOOK_SECRET`, never by an operator token. Responds `{ head_before, head_after, rebuilt }`, or 409 `refresh_busy` / `refresh_diverged`.
 - `POST /init-data-repo` → writes sheet configs into an empty data repo (first boot helper; refuses if sheets exist).
 
 ## Principles
