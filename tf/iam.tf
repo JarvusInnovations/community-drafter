@@ -94,14 +94,36 @@ resource "google_project_iam_member" "github_actions_browser" {
 # project IAM bindings (this file) on its own — those still need a human
 # operator to `tofu apply` from a trusted workstation session, same as the
 # original bootstrap. See plans/deploy.md Follow-ups.
-resource "google_project_iam_member" "github_actions_secretmanager_viewer" {
+#
+# Update 2026-09-19: the operator authorized the full template grants
+# (issue #7). They are declared below; applying them still has to happen
+# from a session without that gate (`cd tf && tofu apply -concise`).
+resource "google_project_iam_member" "github_actions_secretmanager_admin" {
   project = var.project_id
-  role    = "roles/secretmanager.viewer"
+  role    = "roles/secretmanager.admin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
-resource "google_project_iam_member" "github_actions_serviceusage_viewer" {
+resource "google_project_iam_member" "github_actions_artifactregistry_admin" {
   project = var.project_id
-  role    = "roles/serviceusage.serviceUsageViewer"
+  role    = "roles/artifactregistry.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_serviceaccount_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_project_iam_admin" {
+  project = var.project_id
+  role    = "roles/resourcemanager.projectIamAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_serviceusage_admin" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
