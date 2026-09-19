@@ -57,11 +57,19 @@ const schema = {
     SMTP_PORT: { type: "number" },
     SMTP_USER: { type: "string" },
     SMTP_PASSWORD: { type: "string" },
+    // `notifications` plan: where the `export` mailer appends its
+    // `name,email,subject,link` CSV rows (`lib/mailer/export.ts`). Optional —
+    // an unset path keeps rows in memory for the process lifetime only.
+    EXPORT_CSV_PATH: { type: "string" },
 
     // --- Instance identity ---
     INSTANCE_NAME: { type: "string" },
     INSTANCE_FROM_EMAIL: { type: "string" },
     INSTANCE_TIMEZONE: { type: "string" },
+    // `specs/behaviors/notifications.md` § Sending: "The digest job runs
+    // once daily at a configured hour in the instance time zone." 0-23,
+    // local to INSTANCE_TIMEZONE.
+    INSTANCE_DIGEST_HOUR: { type: "number", default: 8 },
   },
 };
 
@@ -92,10 +100,12 @@ declare module "fastify" {
       SMTP_PORT?: number;
       SMTP_USER?: string;
       SMTP_PASSWORD?: string;
+      EXPORT_CSV_PATH?: string;
 
       INSTANCE_NAME?: string;
       INSTANCE_FROM_EMAIL?: string;
       INSTANCE_TIMEZONE?: string;
+      INSTANCE_DIGEST_HOUR: number;
     };
   }
 }
