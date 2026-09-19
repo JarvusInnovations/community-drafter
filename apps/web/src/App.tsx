@@ -2,8 +2,6 @@ import { Suspense, lazy } from "react";
 import { Route, Routes } from "react-router";
 
 import PrefsRoute from "./routes/prefs/PrefsRoute.tsx";
-
-function HomePage() {
 import { DocumentScreen } from "./participant/DocumentScreen.tsx";
 import { copy } from "./participant/copy.ts";
 import { ParticipantLayout } from "./participant/ParticipantLayout.tsx";
