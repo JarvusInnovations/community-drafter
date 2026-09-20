@@ -47,6 +47,15 @@ resource "google_cloud_run_v2_service" "community_drafter" {
         value = var.mailer
       }
       env {
+        name = "POSTMARK_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = data.google_secret_manager_secret.postmark_token.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
         name  = "INSTANCE_NAME"
         value = var.instance_name
       }
@@ -88,7 +97,7 @@ resource "google_cloud_run_v2_service" "community_drafter" {
         name = "DATA_REPO_WEBHOOK_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.webhook_secret.secret_id
+            secret  = data.google_secret_manager_secret.webhook_secret.secret_id
             version = "latest"
           }
         }
@@ -163,6 +172,7 @@ resource "google_cloud_run_v2_service" "community_drafter" {
     google_secret_manager_secret_iam_member.deploy_key_accessor,
     google_secret_manager_secret_iam_member.auth_secret_accessor,
     google_secret_manager_secret_iam_member.webhook_secret_accessor,
+    google_secret_manager_secret_iam_member.postmark_token_accessor,
   ]
 }
 

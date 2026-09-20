@@ -33,31 +33,26 @@ resource "google_secret_manager_secret_iam_member" "auth_secret_accessor" {
 }
 
 # --- Data-repository refresh webhook (specs/behaviors/operators.md) ---
-#
-# `community-drafter-webhook-secret` doesn't exist yet. Created here with a
-# placeholder version (the proposal-renderer pattern) and
-# `ignore_changes = [secret_data]` so a real value can be set out of band
-# (`gcloud secrets versions add`, per docs/operations.md) without `tofu plan`
-# ever proposing to revert it back to the placeholder.
-resource "google_secret_manager_secret" "webhook_secret" {
+# `community-drafter-webhook-secret` and `community-drafter-postmark-token`
+# were created by the operator with real values (2026-09-19); reference them
+# like the other pre-existing secrets rather than managing placeholder
+# versions here.
+data "google_secret_manager_secret" "webhook_secret" {
   secret_id = "community-drafter-webhook-secret"
-
-  replication {
-    auto {}
-  }
 }
 
-resource "google_secret_manager_secret_version" "webhook_secret" {
-  secret      = google_secret_manager_secret.webhook_secret.id
-  secret_data = "placeholder-rotate-before-use"
+data "google_secret_manager_secret" "postmark_token" {
+  secret_id = "community-drafter-postmark-token"
+}
 
-  lifecycle {
-    ignore_changes = [secret_data]
-  }
+resource "google_secret_manager_secret_iam_member" "postmark_token_accessor" {
+  secret_id = data.google_secret_manager_secret.postmark_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloudrun.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "webhook_secret_accessor" {
-  secret_id = google_secret_manager_secret.webhook_secret.secret_id
+  secret_id = data.google_secret_manager_secret.webhook_secret.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloudrun.email}"
 }
