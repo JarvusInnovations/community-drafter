@@ -73,64 +73,35 @@ resource "google_cloud_run_v2_service" "community_drafter" {
         }
       }
 
-      # Admin auth + session-cookie secrets — pulled from Secret Manager at
-      # startup, never baked into the image or plain env.
+      # Operator auth secrets — pulled from Secret Manager at startup, never
+      # baked into the image or plain env (specs/behaviors/operators.md).
       env {
-        name = "ADMIN_TOKEN"
+        name = "AUTH_SECRET"
         value_source {
           secret_key_ref {
-            secret  = data.google_secret_manager_secret.admin_token.secret_id
+            secret  = data.google_secret_manager_secret.auth_secret.secret_id
             version = "latest"
           }
         }
       }
       env {
-        name = "COOKIE_SECRET"
+        name = "DATA_REPO_WEBHOOK_SECRET"
         value_source {
           secret_key_ref {
-            secret  = data.google_secret_manager_secret.cookie_secret.secret_id
+            secret  = google_secret_manager_secret.webhook_secret.secret_id
             version = "latest"
           }
         }
       }
 
-      # Google OAuth — only wired once the operator sets both tfvars (see
-      # secrets.tf). Until then admin auth is ADMIN_TOKEN-only.
+      # The only way the first operator comes into existence — see
+      # var.bootstrap_operator_email. Omitted (not merely empty) when unset,
+      # so the storage layer's "is this variable set at all" check behaves
+      # the same as a bare, unconfigured environment.
       dynamic "env" {
-        for_each = length(google_secret_manager_secret.google_client_id) > 0 ? [1] : []
+        for_each = var.bootstrap_operator_email != null ? [var.bootstrap_operator_email] : []
         content {
-          name = "GOOGLE_CLIENT_ID"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.google_client_id[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-      dynamic "env" {
-        for_each = length(google_secret_manager_secret.google_client_secret) > 0 ? [1] : []
-        content {
-          name = "GOOGLE_CLIENT_SECRET"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.google_client_secret[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-      dynamic "env" {
-        for_each = length(google_secret_manager_secret.google_client_id) > 0 && var.oauth_allowed_emails != "" ? [var.oauth_allowed_emails] : []
-        content {
-          name  = "OAUTH_ALLOWED_EMAILS"
-          value = env.value
-        }
-      }
-      dynamic "env" {
-        for_each = length(google_secret_manager_secret.google_client_id) > 0 && var.oauth_allowed_domains != "" ? [var.oauth_allowed_domains] : []
-        content {
-          name  = "OAUTH_ALLOWED_DOMAINS"
+          name  = "BOOTSTRAP_OPERATOR_EMAIL"
           value = env.value
         }
       }
@@ -190,14 +161,14 @@ resource "google_cloud_run_v2_service" "community_drafter" {
   depends_on = [
     google_artifact_registry_repository.community_drafter,
     google_secret_manager_secret_iam_member.deploy_key_accessor,
-    google_secret_manager_secret_iam_member.admin_token_accessor,
-    google_secret_manager_secret_iam_member.cookie_secret_accessor,
+    google_secret_manager_secret_iam_member.auth_secret_accessor,
+    google_secret_manager_secret_iam_member.webhook_secret_accessor,
   ]
 }
 
 # Public invocation. Participant links carry their own opaque-token auth
-# inside the app; admin routes are gated by ADMIN_TOKEN / OAuth, not Cloud
-# Run IAM.
+# inside the app; admin routes are gated by operator tokens (magic-link
+# sessions, device-code CLI tokens), not Cloud Run IAM.
 resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.community_drafter.name
   location = google_cloud_run_v2_service.community_drafter.location

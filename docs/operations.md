@@ -49,32 +49,62 @@ Delete the local private-key file once it's in Secret Manager. Rotate by
 adding a new secret version and a matching new deploy key on GitHub; Cloud
 Run always mounts `version = "latest"`.
 
-### 3. Admin token + cookie secret
+### 3. Auth secret (`AUTH_SECRET`)
 
-Two more secrets `tf/secrets.tf` references but doesn't create:
+One secret `tf/secrets.tf` references but doesn't create:
 
 ```sh
-gcloud secrets create community-drafter-admin-token --project=community-drafter \
-  --replication-policy=automatic
-openssl rand -base64 48 | gcloud secrets versions add community-drafter-admin-token \
-  --project=community-drafter --data-file=-
-
 gcloud secrets create community-drafter-cookie-secret --project=community-drafter \
   --replication-policy=automatic
 openssl rand -base64 48 | gcloud secrets versions add community-drafter-cookie-secret \
   --project=community-drafter --data-file=-
 ```
 
-`ADMIN_TOKEN` is the bearer credential the admin CLI (`drafter-axi`) uses
-against the admin API. `COOKIE_SECRET` signs the admin session cookie once
-Google OAuth is configured (see below) — until then it's provisioned but
-effectively unused.
+(The secret keeps its pre-`operators-auth` name — `community-drafter-cookie-secret`
+— but is wired to the `AUTH_SECRET` env var. `specs/behaviors/operators.md`:
+it signs every operator session cookie, CLI token and magic link.)
 
-### 4. Postmark sender (when moving off `MAILER=export`)
+`tf/secrets.tf` also creates `community-drafter-webhook-secret` itself, as a
+managed resource with a placeholder version (`ignore_changes = [secret_data]`
+so `tofu plan` never proposes reverting a real value back to the
+placeholder). Set the real value once, out of band:
+
+```sh
+openssl rand -base64 48 | gcloud secrets versions add community-drafter-webhook-secret \
+  --project=community-drafter --data-file=-
+```
+
+This is `DATA_REPO_WEBHOOK_SECRET` — the HMAC key `POST /admin/api/refresh`
+verifies (`X-Hub-Signature-256`, GitHub's header shape) to pull a hand edit
+pushed to the data repo's remote into the running instance
+(`specs/behaviors/operators.md` § Data-repository refresh).
+
+### 4. Bootstrap the first operator
+
+There is no admin allowlist any more — operators are records in the
+`operators` sheet (`specs/behaviors/operators.md`). The *only* way the first
+one comes into existence is `BOOTSTRAP_OPERATOR_EMAIL`, wired from
+`var.bootstrap_operator_email`:
+
+```sh
+tofu apply -concise -var bootstrap_operator_email="you@jarv.us"
+```
+
+Set only while the `operators` sheet is empty (the storage layer ignores it
+otherwise). Once bootstrapped, sign in at `/admin/login` with that address —
+a magic link is emailed (requires the mailer to be configured; `MAILER=export`
+writes the link to the CSV instead, see below) — and manage further
+operators from the dashboard or `drafter-axi operators add`.
+
+### 5. Postmark sender (when moving off `MAILER=export`)
 
 The instance ships with `MAILER=export` (writes a CSV of
 `name,email,subject,link` for mail-merge) so no mail provider is required
-to launch. To switch to Postmark:
+to launch — though note that operator sign-in itself requires a working
+mailer (`specs/behaviors/operators.md`: "an instance without one cannot sign
+operators in, by design"); `MAILER=export` still works for this, since the
+magic link lands in the CSV row same as any other message. To switch to
+Postmark:
 
 1. Add/verify a sender signature for `INSTANCE_FROM_EMAIL` in the Postmark
    account.
@@ -82,38 +112,8 @@ to launch. To switch to Postmark:
 3. `gcloud secrets create community-drafter-postmark-api-key ... && gcloud secrets versions add ...`
    (not yet wired into `tf/` — add a `data`/`google_secret_manager_secret`
    reference plus a `POSTMARK_API_KEY` env-from-secret block in
-   `tf/cloudrun.tf`, mirroring the pattern used for `ADMIN_TOKEN`, and flip
+   `tf/cloudrun.tf`, mirroring the pattern used for `AUTH_SECRET`, and flip
    `mailer` to `"postmark"` in the tfvars.)
-
-### 5. Google OAuth client (optional — for human admin sessions)
-
-Admin auth works via `ADMIN_TOKEN` alone; OAuth is only needed for the
-human-facing admin dashboard session flow. `tf/` treats it as fully
-optional (`var.google_client_id` / `var.google_client_secret` default to
-`null`, and the OAuth secrets + env wiring are skipped entirely until both
-are set):
-
-1. In the Google Cloud Console (a project with the OAuth consent screen
-   configured — can be this project or a shared one), create an OAuth 2.0
-   Web application client. Authorized redirect URI:
-   `https://drafter.jarv.us/auth/google/callback` (or the `*.run.app` URL's
-   equivalent path, until the domain mapping is live).
-2. Apply with both secrets set:
-
-   ```sh
-   tofu apply -concise \
-     -var google_client_id="..." \
-     -var google_client_secret="..." \
-     -var oauth_allowed_emails="alice@jarv.us,bob@jarv.us" \
-     -var oauth_allowed_domains="jarv.us"
-   ```
-
-   This creates `community-drafter-google-client-id` /
-   `-google-client-secret` in Secret Manager with the real values (not
-   placeholders — the `count`-gated resources in `tf/secrets.tf` only exist
-   once both vars are set, so there's no placeholder-clobber risk) and adds
-   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `OAUTH_ALLOWED_EMAILS` /
-   `OAUTH_ALLOWED_DOMAINS` to the Cloud Run service.
 
 ### 6. DNS for the domain mapping
 

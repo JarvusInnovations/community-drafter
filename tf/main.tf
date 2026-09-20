@@ -9,11 +9,14 @@
 # capture that state as managed (idempotent — enabling an already-enabled
 # API is a no-op) so a future fresh project bootstraps the same way.
 #
-# The three product secrets (`community-drafter-deploy-key`,
-# `community-drafter-admin-token`, `community-drafter-cookie-secret`) and the
-# private data repo already exist with real values populated — see
-# `secrets.tf`, which references them as `data` sources rather than creating
-# placeholder versions that would overwrite the operator-populated ones.
+# The two pre-existing product secrets (`community-drafter-deploy-key`,
+# `community-drafter-cookie-secret` — the latter reused as `AUTH_SECRET`,
+# `specs/behaviors/operators.md`) and the private data repo already exist
+# with real values populated — see `secrets.tf`, which references them as
+# `data` sources rather than creating placeholder versions that would
+# overwrite the operator-populated ones. `community-drafter-webhook-secret`
+# is new (`operators-auth`) and created as a managed resource with a
+# placeholder version instead, since it has no prior value to protect.
 
 terraform {
   required_version = ">= 1.6"
