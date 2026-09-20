@@ -1,9 +1,9 @@
 import { clientFrom } from "./common.js";
-import { isConfigured } from "../config.js";
+import { isConfigured, resolveConfig } from "../config.js";
 import { cliInvocation } from "../invocation.js";
-import { bool, parseFlags, type FlagSpec } from "../flags.js";
+import { bool, parseFlags, str, type FlagSpec } from "../flags.js";
 import { computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
-import type { DocumentSummary, InvitationRow, NotificationsSummary } from "../types.js";
+import type { DocumentSummary, InvitationRow, NotificationsSummary, WhoAmI } from "../types.js";
 
 const HOME_FLAGS: FlagSpec = { positionals: 0, boolean: ["--if-configured"] };
 
@@ -36,26 +36,60 @@ export async function homeCommand(args: string[]): Promise<string> {
     );
   }
 
+  // `specs/api/admin-cli.md`: the home view leads with who is signed in and
+  // where, so an agent (or a person juggling a bot profile) can never act
+  // under the wrong identity without seeing it.
+  const config = resolveConfig({ profile: str(parsed, "--profile") });
+  const client = clientFrom(parsed);
+
+  let who: WhoAmI;
   let documents: DocumentSummary[];
   try {
-    documents = await clientFrom(parsed).get<DocumentSummary[]>("/documents");
+    [who, documents] = await Promise.all([
+      client.get<WhoAmI>("/whoami"),
+      client.get<DocumentSummary[]>("/documents"),
+    ]);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const expired = /unauthenticated|operator_inactive|401/iu.test(message);
+    const identity = renderObject({
+      signed_in: expired ? "no — the stored sign-in is expired or revoked" : "unknown",
+      instance: config.url,
+      profile:
+        config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+    });
+    if (expired) {
+      return joinBlocks(
+        identity,
+        renderHelp([`Run \`${cli} login <email> --url ${config.url}\` to sign in again`]),
+      );
+    }
     if (ifConfigured) {
       // A hook must never error out a session (axi-skills: home/dashboard split).
-      const message = error instanceof Error ? error.message : String(error);
-      return renderObject({ documents: `could not reach the API: ${message}` });
+      return joinBlocks(
+        identity,
+        renderObject({ documents: `could not reach the API: ${message}` }),
+      );
     }
     throw error;
   }
 
+  const identity = renderObject({
+    signed_in: `${who.name} <${who.email}>`,
+    kind: who.kind,
+    instance: config.url,
+    profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+    token_expires: who.expires_at,
+  });
+
   if (documents.length === 0) {
     return joinBlocks(
+      identity,
       renderObject({ documents: "0 documents found" }),
       renderHelp([`Run \`${cli} docs create <slug> --title "..." ...\` to start one`]),
     );
   }
 
-  const client = clientFrom(parsed);
   const openDocs = documents
     .filter((d) => d.state === "open")
     .sort((a, b) => nextDeadline(a).localeCompare(nextDeadline(b)))
@@ -119,6 +153,7 @@ export async function homeCommand(args: string[]): Promise<string> {
   }
 
   return joinBlocks(
+    identity,
     renderList("documents", rows, [
       computed("slug", (r) => r.slug),
       computed("phase", (r) => r.phase),

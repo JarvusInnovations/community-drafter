@@ -14,7 +14,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 
 | Command | Does |
 | --- | --- |
-| `drafter-axi` | home: the signed-in operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login` |
+| `drafter-axi` | home: first the identity line (signed-in operator's email, name and kind, the instance URL, the profile in use), then that operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login`; when the stored token is expired or revoked, says that and how to `login` again |
 | `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `DRAFTER_URL`; refused if neither is given): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
 | `logout` / `whoami` | forget the token / show operator and expiry |
 | `operators list` | every operator |
