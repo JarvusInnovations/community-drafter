@@ -45,7 +45,9 @@ Six steps take a document from nothing to signatures. Run them from this skill's
    plus optional `org`, `role`, `descriptor`, `suggested_capacity` — then
    `scripts/drafter-axi people import <slug> invitees.ndjson --dry-run` to see what it would do,
    and again without `--dry-run` to write it. `scripts/drafter-axi people send <slug>` mails each
-   person their own link. Run `people import --help` for the full field list.
+   person their own link and prints how many went out; anyone the mail provider rejected is named
+   with the reason and stays `not_sent`, so fix the address and run `people send` again.
+   Run `people import --help` for the full field list.
 6. **Revise.** `scripts/drafter-axi feedback export <slug> --format md` gives you every pending
    comment. Answer them by publishing again with a dispositions file, where each comment gets one
    of four outcomes — `accepted`, `partial`, `declined`, `noted`:
@@ -150,8 +152,8 @@ every-session use instead.
 - `scripts/drafter-axi people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]` — Participation statuses — never tokens; emails only with --contacts.
 - `scripts/drafter-axi people links <slug> [--person a,b] [--out <file.csv>]` — Export personal sign-in links (recorded).
 - `scripts/drafter-axi people remove <slug> <person>` — Take back a staged invitation that was never sent.
-- `scripts/drafter-axi people send <slug> [--only-unsent] [--person a,b] [--dry-run]` — Send invitations; --dry-run lists who would receive one and who is skipped and why.
-- `scripts/drafter-axi people remind <slug> --target unopened|opened-not-acted [--dry-run]` — Send reminders to a target segment.
+- `scripts/drafter-axi people send <slug> [--only-unsent] [--person a,b] [--dry-run]` — Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why.
+- `scripts/drafter-axi people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]` — Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless).
 - `scripts/drafter-axi people revoke-link <slug> <person>` — Revoke one person's link.
 - `scripts/drafter-axi people reissue-link <slug> <person>` — Reissue one person's link (prints it once).
 

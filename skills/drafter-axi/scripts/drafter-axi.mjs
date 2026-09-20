@@ -1414,19 +1414,29 @@ async function docsCommand(args) {
         "--signing-closes",
         openUsage
       );
-      const doc = await client.post(
-        `/documents/${encodeURIComponent(slug)}/open`,
-        { comments_close_at: comments.iso, signing_closes_at: signing.iso }
-      );
+      const doc = await client.post(`/documents/${encodeURIComponent(slug)}/open`, {
+        comments_close_at: comments.iso,
+        signing_closes_at: signing.iso
+      });
+      const invitations = doc.invitations;
+      const openFailures = invitations?.failures ?? [];
       return render(
         parsed,
         doc,
         () => joinBlocks(
           renderObject(detailObject(doc, instanceUrl)),
+          invitations ? renderObject({
+            invitations_sent: invitations.sent,
+            invitations_failed: invitations.failed
+          }) : "",
+          openFailures.length > 0 ? renderList("invitation_failures", openFailures, [
+            computed("person", (f) => f.person),
+            computed("error", (f) => f.error)
+          ]) : "",
           renderHelp([
             comments.note,
             signing.note,
-            `Run \`${cli} people send ${slug}\` if invitees were imported before opening`
+            openFailures.length > 0 ? `${openFailures.length} invitation(s) were not delivered and are still not_sent \u2014 fix the address, then run \`${cli} people send ${slug}\`` : `Run \`${cli} people send ${slug}\` if invitees were imported after opening`
           ])
         )
       );
@@ -2162,7 +2172,7 @@ var PEOPLE_FLAGS = {
   links: { positionals: 1, value: ["--person", "--out"] },
   send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
   remove: { positionals: 2 },
-  remind: { positionals: 1, value: ["--target"], boolean: ["--dry-run"] },
+  remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 }
 };
@@ -2197,8 +2207,13 @@ links <slug> [--person a,b] [--out <file.csv>]
        The only command that returns tokens \u2014 recorded as an admin event.
 send <slug> [--only-unsent] [--person a,b] [--dry-run]
        Sends invitations to everyone not yet sent (or to --person, even if sent).
+       Prints how many the mailer accepted and names the ones it rejected; a
+       rejected invitee stays not_sent, so running send again picks them up.
        --dry-run lists who would receive one and who is skipped and why.
-remind <slug> --target unopened|opened-not-acted [--dry-run]
+remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
+       Skips anyone this document has messaged within --min-age hours (default
+       48; pass 0 to send regardless) and reports what it actually sent,
+       counting recently-messaged and reminders-off invitees separately.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
        Prints the new link once.`;
@@ -2217,6 +2232,17 @@ function parseImportRows(text) {
     return parsed;
   }
   return trimmed.split("\n").map((line) => line.trim()).filter((line) => line.length > 0).map((line) => JSON.parse(line));
+}
+function minAgeHours(parsed) {
+  const raw = str(parsed, "--min-age");
+  if (raw === void 0) return void 0;
+  const hours = Number(raw);
+  if (!Number.isFinite(hours) || hours < 0) {
+    throw new AxiError(`"${raw}" is not a valid --min-age`, "USAGE", [
+      "--min-age takes a number of hours, 0 or greater (default 48; 0 sends regardless)"
+    ]);
+  }
+  return hours;
 }
 function parseCsv(text) {
   const rows = [];
@@ -2397,15 +2423,24 @@ async function peopleCommand(args) {
           )
         );
       }
+      const failures = result.failures ?? [];
       return render(
         parsed,
         result,
         () => joinBlocks(
           renderObject({
-            queued: result.queued,
+            sent: result.sent,
+            failed: result.failed,
             mailer_export: result.csv ? "included (rerun with --json to capture)" : void 0
           }),
-          skippedBlock
+          skippedBlock,
+          failures.length > 0 ? renderList("failures", failures, [
+            computed("person", (f) => f.person),
+            computed("error", (f) => f.error)
+          ]) : "",
+          failures.length > 0 ? renderHelp([
+            `${failures.length} invitation(s) were not delivered and are still not_sent \u2014 fix the address, then run \`drafter-axi people send ${slug}\` again`
+          ]) : ""
         )
       );
     }
@@ -2456,10 +2491,50 @@ async function peopleCommand(args) {
         `/documents/${encodeURIComponent(slug)}/invitations/remind`,
         {
           target,
+          min_age_hours: minAgeHours(parsed),
           dry_run: bool(parsed, "--dry-run") || void 0
         }
       );
-      return render(parsed, result, () => renderObject(result));
+      const remindFailures = result.failures ?? [];
+      const help = [];
+      if (result.skipped_recent > 0) {
+        help.push(
+          `${result.skipped_recent} were already messaged within ${result.min_age_hours}h \u2014 pass \`--min-age <hours>\` (0 to send regardless) if you need to nudge sooner`
+        );
+      }
+      if (result.skipped_pref > 0) {
+        help.push(`${result.skipped_pref} have turned reminders off and were left alone`);
+      }
+      if (result.dry_run) {
+        help.push("Nothing was sent. Run again without --dry-run to send");
+      }
+      return render(
+        parsed,
+        result,
+        () => joinBlocks(
+          renderObject(
+            result.dry_run ? {
+              dry_run: true,
+              targeted: result.targeted,
+              skipped_recent: result.skipped_recent,
+              skipped_pref: result.skipped_pref,
+              min_age_hours: result.min_age_hours
+            } : {
+              sent: result.sent,
+              failed: result.failed,
+              skipped_recent: result.skipped_recent,
+              skipped_pref: result.skipped_pref,
+              min_age_hours: result.min_age_hours,
+              commit: result.commit ?? void 0
+            }
+          ),
+          remindFailures.length > 0 ? renderList("failures", remindFailures, [
+            computed("person", (f) => f.person),
+            computed("error", (f) => f.error)
+          ]) : "",
+          help.length > 0 ? renderHelp(help) : ""
+        )
+      );
     }
     case "revoke-link": {
       const slug = requirePositional(
@@ -2970,11 +3045,11 @@ var COMMAND_GROUPS = [
       },
       {
         usage: "people send <slug> [--only-unsent] [--person a,b] [--dry-run]",
-        summary: "Send invitations; --dry-run lists who would receive one and who is skipped and why."
+        summary: "Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why."
       },
       {
-        usage: "people remind <slug> --target unopened|opened-not-acted [--dry-run]",
-        summary: "Send reminders to a target segment."
+        usage: "people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]",
+        summary: "Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless)."
       },
       { usage: "people revoke-link <slug> <person>", summary: "Revoke one person's link." },
       {
@@ -3080,7 +3155,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "943b6c8" : "dev";
+var VERSION = true ? "cb60472" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

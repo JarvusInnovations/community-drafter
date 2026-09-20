@@ -53,6 +53,18 @@ export interface DocumentDetail extends DocumentSummary {
   versions: VersionListItem[];
 }
 
+/**
+ * `POST /documents/:slug/open` — the summary plus what the invitation blast
+ * actually delivered (`specs/api/admin.md`).
+ */
+export interface OpenResult extends DocumentSummary {
+  invitations?: {
+    sent: number;
+    failed: number;
+    failures: Array<{ person: string; error: string }>;
+  };
+}
+
 export interface DispositionRecord {
   submission: string;
   comment: string;
@@ -153,7 +165,10 @@ export interface InvitationRow {
 }
 
 export interface SendResult {
-  queued: number;
+  /** Messages the mailer accepted — absent on a dry run. */
+  sent?: number;
+  failed?: number;
+  failures?: Array<{ person: string; error: string }>;
   dry_run?: boolean;
   would_send?: Array<{ person: string; name: string }>;
   skipped?: Array<{ person: string; reason: string }>;
@@ -172,8 +187,15 @@ export interface RevokeLinkResult {
 }
 
 export interface RemindResult {
-  targeted: number;
   dry_run: boolean;
+  /** Dry run only: how many would be reminded. */
+  targeted?: number;
+  sent?: number;
+  failed?: number;
+  skipped_recent: number;
+  skipped_pref: number;
+  min_age_hours: number;
+  failures?: Array<{ person: string; error: string }>;
   commit?: string | null;
 }
 

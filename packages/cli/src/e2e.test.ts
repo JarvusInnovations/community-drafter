@@ -224,6 +224,33 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(importResult.exitCode).toBe(0);
     expect(importResult.output).toContain("invitations_created: 2");
 
+    // 4b. people send reports deliveries, and a reminder moments later is
+    // refused by the interval rather than mailing everyone a second time
+    // (`specs/behaviors/notifications.md` § Sending).
+    const sendResult = await run(["people", "send", slug]);
+    expect(sendResult.exitCode).toBe(0);
+    expect(sendResult.output).toContain("sent: 2");
+    expect(sendResult.output).toContain("failed: 0");
+
+    const remindTooSoon = await run(["people", "remind", slug, "--target", "unopened"]);
+    expect(remindTooSoon.exitCode).toBe(0);
+    expect(remindTooSoon.output).toContain("sent: 0");
+    expect(remindTooSoon.output).toContain("skipped_recent: 2");
+    expect(remindTooSoon.output).toContain("min_age_hours: 48");
+    expect(remindTooSoon.output).toContain("--min-age");
+
+    const remindForced = await run([
+      "people",
+      "remind",
+      slug,
+      "--target",
+      "unopened",
+      "--min-age",
+      "0",
+    ]);
+    expect(remindForced.exitCode).toBe(0);
+    expect(remindForced.output).toContain("sent: 2");
+
     // 5. people links round trip — the one command allowed to print tokens
     const links = await run(["people", "links", slug]);
     expect(links.exitCode).toBe(0);

@@ -133,11 +133,13 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       {
         usage: "people send <slug> [--only-unsent] [--person a,b] [--dry-run]",
         summary:
-          "Send invitations; --dry-run lists who would receive one and who is skipped and why.",
+          "Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why.",
       },
       {
-        usage: "people remind <slug> --target unopened|opened-not-acted [--dry-run]",
-        summary: "Send reminders to a target segment.",
+        usage:
+          "people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]",
+        summary:
+          "Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless).",
       },
       { usage: "people revoke-link <slug> <person>", summary: "Revoke one person's link." },
       {

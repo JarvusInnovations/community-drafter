@@ -72,13 +72,19 @@ Set when the participation is created, editable by the participant at any time:
 - Idempotency: the event key is checked against `participations.notified` before dispatch; present means skip. Because recipients are derived from record state, a restart re-derives outstanding sends and the `notified` check keeps them from repeating.
 - Preference-suppressed sends are simply not sent; coverage is computed from preferences on demand.
 - After a batch (invitation blast, revision alerts) the successes are recorded in **one commit** (`Action: send`, `Comments`-style list of persons in the body) patching each recipient's `notified`, never one commit per recipient.
+- **Recorded on success — invitations included.** Nothing enters `notified` until the mailer has accepted the message, and an invitation's `sent_at` is written in the *same* commit as `notified.invitation`. A recipient the mailer rejected is therefore still unsent: the funnel does not count them, the failures list names them with the reason, and the next `send` picks them up with no operator intervention. For an `export` mailer the row is the delivery, so writing it counts as accepted.
+- **Every send action reports what it did**, never what it attempted: how many messages were delivered, how many failed, and for each failure the person and the error. `sent_at` and the funnel's "sent" mean delivered.
+- **Reminders keep a minimum interval.** A reminder is not sent to anyone this document has messaged within `min_age_hours` (default 48). "Messaged" is any recorded send to that person on this document — invitation, revision alert, phase change, digest, or an earlier reminder; a link export is not a message. People skipped for recency are counted and reported separately from those skipped by the `reminders` preference, so a run that sends nothing says why. An operator who must nudge sooner passes a shorter interval; `0` disables the guard.
 - The digest job runs once daily at a configured hour in the instance time zone.
 
 ## Principles
 
 **Inherited**
+
 - [Essentials always, everything else opt-in](../principles.md#essentials-always-everything-else-opt-in).
 - [Just sign it for now](../principles.md#just-sign-it-for-now): `final-published` and `closing-soon` are forced on for signers because the early-sign promise depends on them.
 
 **Local**
+
 - **A person hears about a version at most once per channel.** If someone has both `every_revision` and `daily_digest` on, the digest omits versions already sent as `v<n>`.
+- **A sent count is a delivery count.** Only a message the mailer accepted may be recorded or counted as sent, and every send action reports deliveries and failures rather than intentions. When truth and a tidy number conflict — a partial batch, a rejected address, a reminder the interval refuses — the operator is told what actually happened. An operator who cannot trust the counts has to re-send blind, which is how a coalition emails the same person four times and misses the one person it never reached.

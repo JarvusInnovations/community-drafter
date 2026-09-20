@@ -5,6 +5,7 @@ import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts";
 import { documentSummary } from "../../lib/document-summary.ts";
 import { versionListView } from "../../lib/versions.ts";
+import { invitationTemplate } from "../../notifications/templates.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -246,7 +247,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
       const now = new Date().toISOString();
       const participations = fastify.storage.readModel.listParticipationsForDocument(slug);
-      const toInvite = participations.filter((p) => !p.record.sent_at);
+      const toInvite = participations.filter((p) => !p.record.sent_at && !p.record.link_revoked);
 
       const result = await fastify.storage.commit(
         "open",
@@ -261,32 +262,43 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             { slug },
             { state: "open", opened_at: now, comments_close_at, signing_closes_at },
           );
-          for (const entryToInvite of toInvite) {
-            const current = await tx.participations.queryFirst({
-              document: slug,
-              person: entryToInvite.record.person,
-            });
-            if (!current) continue;
-            await tx.participations.patch(
-              { document: slug, person: entryToInvite.record.person },
-              { sent_at: now, notified: { ...current.notified, invitation: now } },
-            );
-          }
         },
       );
 
-      await fastify.events.publish({
-        type: "invite",
+      // `specs/behaviors/notifications.md` § Sending: the invitation's
+      // `sent_at` lands in the dispatcher's success commit, alongside
+      // `notified.invitation`, so opening a document never claims to have
+      // reached someone the mailer rejected. `isAlreadyNotified` is off
+      // because `sent_at` — filtered above — is this route's own record of
+      // who has been invited.
+      const sentAt = new Date().toISOString();
+      const delivery = await fastify.notifications.deliver({
         document: slug,
-        people: toInvite.map((p) => p.record.person),
-        commit: result.commitHash ?? "",
+        eventKey: "invitation",
+        actor: adminActor(request),
+        requestId: request.requestId,
+        notifiedValue: sentAt,
+        isAlreadyNotified: () => false,
+        alsoSet: { sent_at: sentAt },
+        targets: toInvite.map((entryToInvite) => ({
+          person: entryToInvite.record.person,
+          markNotified: true,
+          render: (ctx) => invitationTemplate(ctx),
+        })),
       });
 
-      return documentSummary(
-        fastify,
-        fastify.storage.readModel.getDocument(slug)!,
-        result.commitHash,
-      );
+      return {
+        ...documentSummary(
+          fastify,
+          fastify.storage.readModel.getDocument(slug)!,
+          result.commitHash,
+        ),
+        invitations: {
+          sent: delivery.sent,
+          failed: delivery.failed,
+          failures: delivery.failures,
+        },
+      };
     },
   );
 

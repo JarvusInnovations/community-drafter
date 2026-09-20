@@ -13,8 +13,6 @@ import {
 } from "./triggers.ts";
 import {
   closedTemplate,
-  invitationTemplate,
-  reminderTemplate,
   reviewReceiptTemplate,
   revocationConfirmationTemplate,
   scheduleChangedTemplate,
@@ -54,11 +52,14 @@ export interface NotificationsPluginOptions {
  * kept — see that file's doc comment — this plugin is what actually
  * renders and sends). Wires the bus events that don't already carry their
  * own richer recipient computation (`sign`/`resign`/`revoke`/`decline`,
- * `invite`/`send`/`remind`, `signing-opened`/`closed`/`schedule-changed`) to
- * the dispatcher; publish-triggered sends (`v<n>`, `disposition-v<n>`,
- * `final-published`) are called directly from
- * `routes/admin/versions.ts`, which already has the exact recipient lists
- * `lib/notify.ts` computed.
+ * `signing-opened`/`closed`/`schedule-changed`) to the dispatcher.
+ * Publish-triggered sends (`v<n>`, `disposition-v<n>`, `final-published`)
+ * are called directly from `routes/admin/versions.ts`, which already has
+ * the exact recipient lists `lib/notify.ts` computed; invitations and
+ * reminders likewise, from `routes/admin/documents.ts` and
+ * `routes/admin/invitations.ts`, because those responses must report what
+ * the mailer accepted (`specs/behaviors/notifications.md` § Sending) and a
+ * fire-and-forget bus event cannot tell them.
  */
 const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = async (
   fastify,
@@ -115,45 +116,6 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
       case "decline":
       case "submit": {
         await deliverReviewReceipt(fastify, dispatcher, event.document, event.person);
-        return;
-      }
-      case "invite":
-      case "send": {
-        if (event.people.length === 0) return;
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: "invitation",
-          actor: DISPATCHER_ACTOR,
-          targets: event.people.map((person) => ({
-            person,
-            markNotified: false,
-            render: (ctx) => invitationTemplate(ctx),
-          })),
-        });
-        return;
-      }
-      case "remind": {
-        if (event.people.length === 0) return;
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: "reminder",
-          actor: DISPATCHER_ACTOR,
-          targets: event.people.map((person) => {
-            const participation = fastify.storage.readModel.getParticipation(
-              event.document,
-              person,
-            );
-            const n =
-              typeof participation?.record.notified?.reminder === "number"
-                ? participation.record.notified.reminder
-                : 1;
-            return {
-              person,
-              markNotified: false,
-              render: (ctx) => reminderTemplate(ctx, { n }),
-            };
-          }),
-        });
         return;
       }
       case "signing-opened": {

@@ -13,6 +13,7 @@ import type {
   DocOperatorAddResult,
   DocumentDetail,
   DocumentSummary,
+  OpenResult,
   OperatorRecord,
 } from "../types.js";
 import { parseDeadline } from "../deadline.js";
@@ -194,17 +195,37 @@ export async function docsCommand(args: string[]): Promise<string> {
         "--signing-closes",
         openUsage,
       );
-      const doc = await client.post<DocumentSummary>(
-        `/documents/${encodeURIComponent(slug)}/open`,
-        { comments_close_at: comments.iso, signing_closes_at: signing.iso },
-      );
+      const doc = await client.post<OpenResult>(`/documents/${encodeURIComponent(slug)}/open`, {
+        comments_close_at: comments.iso,
+        signing_closes_at: signing.iso,
+      });
+      // `specs/api/admin-cli.md`: opening prints how many invitations were
+      // delivered and names any the mailer rejected — those invitees are
+      // still `not_sent`, so `people send` will reach them.
+      const invitations = doc.invitations;
+      const openFailures = invitations?.failures ?? [];
+      type OpenFailure = (typeof openFailures)[number];
       return render(parsed, doc, () =>
         joinBlocks(
           renderObject(detailObject(doc, instanceUrl)),
+          invitations
+            ? renderObject({
+                invitations_sent: invitations.sent,
+                invitations_failed: invitations.failed,
+              })
+            : "",
+          openFailures.length > 0
+            ? renderList("invitation_failures", openFailures, [
+                computed<OpenFailure>("person", (f) => f.person),
+                computed<OpenFailure>("error", (f) => f.error),
+              ])
+            : "",
           renderHelp([
             comments.note,
             signing.note,
-            `Run \`${cli} people send ${slug}\` if invitees were imported before opening`,
+            openFailures.length > 0
+              ? `${openFailures.length} invitation(s) were not delivered and are still not_sent — fix the address, then run \`${cli} people send ${slug}\``
+              : `Run \`${cli} people send ${slug}\` if invitees were imported after opening`,
           ]),
         ),
       );
