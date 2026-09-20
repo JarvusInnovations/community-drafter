@@ -298,6 +298,19 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     rmSync(scratch, { recursive: true, force: true });
   }, 30_000);
 
+  it("home identifies the signed-in operator, instance and profile before the documents", async () => {
+    const harness = await bootServer();
+    cleanups.push(harness.cleanup);
+    withAdminEnv(harness);
+
+    const home = await run([]);
+    expect(home.exitCode).toBe(0);
+    expect(home.output).toMatch(/signed_in: .*<[^>]+@[^>]+>/u);
+    expect(home.output).toContain(`instance: ${harness.url}`);
+    expect(home.output).toContain("profile: (DRAFTER_TOKEN from the environment)");
+    expect(home.output.indexOf("signed_in")).toBeLessThan(home.output.indexOf("documents"));
+  });
+
   it("people list never prints a token or email unless --contacts", async () => {
     const harness = await bootServer();
     cleanups.push(harness.cleanup);
