@@ -55,8 +55,9 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       {
         usage:
-          'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft; the caller becomes its first operator.",
+          'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--audience public|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary:
+          "Create a document in draft; the caller becomes its first operator. --audience declares who the document is for (default closed — invitees only); --list-visible-to names organizations a closed document's signatory list is shared with, which every signer is told before signing.",
       },
       {
         usage: "docs show <slug>",
