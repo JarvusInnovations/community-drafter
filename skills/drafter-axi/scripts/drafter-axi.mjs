@@ -2874,7 +2874,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "b37d6bb" : "dev";
+var VERSION = true ? "661d806" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
@@ -2928,15 +2928,32 @@ function formatError(error) {
     exitCode: 1
   };
 }
+function leadingGlobalFlags(argv) {
+  if (argv.length === 0) return null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--json") continue;
+    if (arg === "--profile") {
+      const value = argv[i + 1];
+      if (value === void 0 || value.startsWith("--")) return null;
+      i += 1;
+      continue;
+    }
+    return null;
+  }
+  return argv;
+}
 async function main(options = {}) {
+  const rawArgv = options.argv ?? process.argv.slice(2);
+  const homeArgs = leadingGlobalFlags(rawArgv);
   await runAxiCli({
     description: DESCRIPTION,
     version: VERSION,
-    ...options.argv ? { argv: options.argv } : {},
+    argv: homeArgs ? [] : rawArgv,
     ...options.stdout ? { stdout: options.stdout } : {},
     topLevelHelp: renderTopLevelHelp(),
     getCommandHelp: (command) => COMMAND_HELP[command] ?? renderCommandHelp(command),
-    home: async () => homeCommand([]),
+    home: async () => homeCommand(homeArgs ?? []),
     commands: COMMANDS,
     formatError
     // Hooks are managed explicitly via the `hook` command. The SDK's
