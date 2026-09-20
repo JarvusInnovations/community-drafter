@@ -13,7 +13,7 @@ body = 'body'
 
 [gitsheet.schema]
 type = 'object'
-required = ['slug', 'title', 'state', 'body']
+required = ['slug', 'title', 'state', 'body', 'created_by', 'operators']
 additionalProperties = false
 
 [gitsheet.schema.properties.slug]
@@ -62,8 +62,17 @@ type = 'string'
 enum = ['list', 'count', 'none']
 default = 'list'
 
-[gitsheet.schema.properties.owner]
+[gitsheet.schema.properties.created_by]
 type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.operators]
+type = 'array'
+minItems = 1
+
+[gitsheet.schema.properties.operators.items]
+type = 'string'
+format = 'email'
 
 [gitsheet.schema.properties.sender_name]
 type = 'string'

@@ -6,6 +6,7 @@
  * (eventually) the API routes share.
  */
 export * from "./documents.ts";
+export * from "./operators.ts";
 export * from "./people.ts";
 export * from "./participations.ts";
 export * from "./submissions.ts";

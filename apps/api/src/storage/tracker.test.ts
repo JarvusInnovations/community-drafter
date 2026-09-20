@@ -29,7 +29,7 @@ describe("OpenTracker", () => {
     await commit(
       store,
       "invite",
-      { actor: { kind: "cli", label: "fixture" }, subject: "invite: jane-doe on doc" },
+      { actor: { kind: "system" }, subject: "invite: jane-doe on doc" },
       async (tx) => {
         await tx.people.upsert({
           id: "jane-doe",
@@ -86,7 +86,7 @@ describe("OpenTracker", () => {
     await commit(
       store,
       "invite",
-      { actor: { kind: "cli", label: "fixture" }, subject: "invite: p1 on doc" },
+      { actor: { kind: "system" }, subject: "invite: p1 on doc" },
       async (tx) => {
         await tx.people.upsert({ id: "p1", name: "P1", email: "p1@x.org", source: "admin" });
         await tx.participations.upsert({

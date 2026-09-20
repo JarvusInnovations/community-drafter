@@ -32,9 +32,16 @@ describe("push daemon", () => {
     await commit(
       store,
       "create",
-      { actor: { kind: "cli", label: "fixture" }, subject: "create: doc", document: "doc" },
+      { actor: { kind: "system" }, subject: "create: doc", document: "doc" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc", title: "Doc", state: "draft", body: "hello" });
+        await tx.documents.upsert({
+          slug: "doc",
+          title: "Doc",
+          state: "draft",
+          body: "hello",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
       },
     );
 
@@ -62,9 +69,16 @@ describe("push daemon", () => {
     await commit(
       store,
       "create",
-      { actor: { kind: "cli", label: "fixture" }, subject: "create: doc", document: "doc" },
+      { actor: { kind: "system" }, subject: "create: doc", document: "doc" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc", title: "Doc", state: "draft", body: "hello" });
+        await tx.documents.upsert({
+          slug: "doc",
+          title: "Doc",
+          state: "draft",
+          body: "hello",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
       },
     );
 

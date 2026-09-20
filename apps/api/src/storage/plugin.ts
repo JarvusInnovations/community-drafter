@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Action, Trailers } from "@community-drafter/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import type { PushDaemon } from "gitsheets";
+import type { PushDaemon, Repository } from "gitsheets";
 
 import {
   commit as commitFn,
@@ -11,6 +11,7 @@ import {
   type CommitResult,
   type DataStoreTx,
 } from "./commit.ts";
+import { bootstrapOperator, migrateLegacyDocuments } from "./operators-bootstrap.ts";
 import { openDataRepo } from "./repo.ts";
 import { ReadModel } from "./read-model.ts";
 import type { DataStore } from "./schemas.ts";
@@ -18,6 +19,8 @@ import { OpenTracker } from "./tracker.ts";
 
 export interface StorageDecoration {
   store: DataStore;
+  /** The underlying gitsheets `Repository` — `repo.withLock`/`repo.refresh` back the `refresh` webhook. */
+  repo: Repository;
   dataDir: string;
   readModel: ReadModel;
   tracker: OpenTracker;
@@ -82,6 +85,23 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
     return result;
   };
 
+  // `specs/behaviors/operators.md` § Bootstrap + `plans/operators-auth.md`'s
+  // legacy-document migration — both boot-time, both idempotent, both
+  // attributed to `system`. Must run before the gateway/routes can serve
+  // any traffic, so it happens here rather than on an `onReady` hook.
+  await bootstrapOperator({
+    readModel,
+    commit: boundCommit,
+    bootstrapOperatorEmail: fastify.config.BOOTSTRAP_OPERATOR_EMAIL,
+    log: (message) => fastify.log.info(message),
+  });
+  await migrateLegacyDocuments({
+    readModel,
+    commit: boundCommit,
+    bootstrapOperatorEmail: fastify.config.BOOTSTRAP_OPERATOR_EMAIL,
+    log: (message) => fastify.log.info(message),
+  });
+
   const tracker = new OpenTracker(boundCommit, opts.trackerIntervalMs);
   tracker.start();
 
@@ -117,6 +137,7 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
 
   const storage: StorageDecoration = {
     store,
+    repo,
     dataDir: resolvedDataDir,
     readModel,
     tracker,

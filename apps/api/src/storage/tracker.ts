@@ -17,7 +17,7 @@ interface PendingOpen {
   opensIncrement: number;
 }
 
-const TRACKER_ACTOR: Actor = { kind: "cli", label: "tracker" };
+const TRACKER_ACTOR: Actor = { kind: "system" };
 
 /**
  * `specs/architecture.md` § Storage: "Batched commits (write-behind, at most
