@@ -57,6 +57,15 @@ type = 'string'
 enum = ['none', 'read', 'participate']
 default = 'none'
 
+# `specs/data-model.md` § Audience: organizations the team will show a
+# closed document's signatory list to besides the invitees. Optional, so
+# every record written before the field existed still validates.
+[gitsheet.schema.properties.list_visible_to]
+type = 'array'
+
+[gitsheet.schema.properties.list_visible_to.items]
+type = 'string'
+
 [gitsheet.schema.properties.show_signatories]
 type = 'string'
 enum = ['list', 'count', 'none']
@@ -95,6 +104,9 @@ type = 'string'
 
 [gitsheet.schema.properties.body]
 type = 'string'
+
+[gitsheet.fields.list_visible_to]
+sort = true
 
 [gitsheet.fields.tags]
 sort = true

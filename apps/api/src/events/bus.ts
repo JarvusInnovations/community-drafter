@@ -31,6 +31,13 @@ export type DrafterEvent =
   | { type: "sign"; document: string; person: string; commit: string }
   | { type: "resign"; document: string; person: string; commit: string }
   | { type: "revoke"; document: string; person: string; commit: string; reason?: string }
+  /**
+   * A signature's display fields were edited (`specs/behaviors/
+   * signatures.md` § Changing how a signature is listed). Distinct from
+   * `sign`, which is a signature event: this one changes only how an
+   * existing signature is named, and its message says so.
+   */
+  | { type: "listing-changed"; document: string; person: string; commit: string }
   | { type: "decline"; document: string; person: string; commit: string; reason?: string }
   | {
       type: "submit";

@@ -1,3 +1,4 @@
+import type { Signature } from "@community-drafter/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
@@ -14,6 +15,7 @@ import {
 } from "./triggers.ts";
 import {
   closedTemplate,
+  listingChangedTemplate,
   reviewReceiptTemplate,
   revocationConfirmationTemplate,
   type ScheduleChangeLine,
@@ -94,6 +96,31 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
                 signatureConfirmationTemplate(ctx, {
                   capacity: signature.capacity,
                   conditional: signature.conditional === true,
+                }),
+            },
+          ],
+        });
+        return;
+      }
+      case "listing-changed": {
+        const participation = fastify.storage.readModel.getParticipation(
+          event.document,
+          event.person,
+        );
+        const signature = participation?.record.signature;
+        if (!signature || signature.revoked) return;
+        await dispatcher.deliver({
+          document: event.document,
+          eventKey: `listing-changed-${new Date().toISOString()}`,
+          actor: DISPATCHER_ACTOR,
+          targets: [
+            {
+              person: event.person,
+              markNotified: true,
+              render: (ctx) =>
+                listingChangedTemplate(ctx, {
+                  listedAs: listedAs(signature),
+                  listed: signature.listed !== false,
                 }),
             },
           ],
@@ -220,6 +247,18 @@ declare module "fastify" {
  * event, since a person may submit more than once and the position is
  * always the most recent one.
  */
+/**
+ * How a signature currently reads on the list
+ * (`specs/behaviors/signatures.md` § Display), for the one message that
+ * has to quote it back: official capacity leads with the organization,
+ * personal capacity with the person and their descriptor.
+ */
+function listedAs(signature: Signature): string {
+  const detail = signature.capacity === "official" ? signature.title : signature.descriptor;
+  const named = detail ? `${signature.display_name}, ${detail}` : signature.display_name;
+  return signature.capacity === "official" && signature.org ? `${signature.org} — ${named}` : named;
+}
+
 async function deliverReviewReceipt(
   fastify: FastifyInstance,
   dispatcher: NotificationDispatcher,

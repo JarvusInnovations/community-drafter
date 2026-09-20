@@ -49,6 +49,14 @@ const signatureBodySchema = {
   },
 } as const;
 
+/**
+ * The display fields "Change how you're listed" edits
+ * (`specs/behaviors/signatures.md` § Changing how a signature is listed) —
+ * a patch that moves any of them is a listing edit and sends
+ * `listing-changed-<ts>`.
+ */
+const LISTING_FIELDS = ["display_name", "descriptor", "org", "title", "listed"] as const;
+
 function notSigned(): ApiError {
   return new ApiError("not_found", "You have not signed this document.");
 }
@@ -77,12 +85,24 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
               { field: "capacity" },
             );
           }
+          const officialTitle = body.title?.trim() ?? "";
           if (body.capacity === "official") {
             if (!body.org) {
               throw new ApiError(
                 "validation_failed",
                 "An organization name is required for an official signature.",
                 { field: "org" },
+              );
+            }
+            if (officialTitle.length === 0) {
+              // `specs/behaviors/signatures.md` § Capacity: "Official
+              // capacity requires a title" — a bare name under an
+              // organization's name tells a reader nothing about the
+              // standing of the person who gave the signature.
+              throw new ApiError(
+                "validation_failed",
+                "Your title is required when you sign for an organization.",
+                { field: "title" },
               );
             }
             if (body.authorized !== true) {
@@ -104,7 +124,7 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             display_name: body.display_name,
             descriptor: body.descriptor,
             org: body.capacity === "official" ? body.org : undefined,
-            title: body.capacity === "official" ? (body.title ?? "") : undefined,
+            title: body.capacity === "official" ? officialTitle : undefined,
             authorized: true,
             conditional: false,
             listed: body.listed ?? true,
@@ -191,14 +211,39 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             conditional: reaffirming ? false : current.conditional,
             signed_on_version: reaffirming ? signedOnVersion : current.signed_on_version,
           };
-          if (current.capacity === "official" && body.authorized === false) {
-            throw new ApiError(
-              "attestation_required",
-              "You must attest that you are authorized to sign on behalf of your organization.",
-            );
+
+          if (current.capacity === "official") {
+            // `specs/behaviors/signatures.md` § Changing how a signature is
+            // listed: the organization is the claim the signature makes
+            // about authority, so swapping it is a new claim and needs the
+            // attestation again. An unchanged organization does not.
+            const orgChanged =
+              signature.org !== undefined && signature.org.trim() !== (current.org ?? "").trim();
+            if ((orgChanged || body.authorized === false) && body.authorized !== true) {
+              throw new ApiError(
+                "attestation_required",
+                orgChanged
+                  ? "Confirm that you are authorized to sign on behalf of the organization you named."
+                  : "You must attest that you are authorized to sign on behalf of your organization.",
+              );
+            }
+            if ((signature.title ?? "").trim().length === 0) {
+              throw new ApiError(
+                "validation_failed",
+                "Your title is required when you sign for an organization.",
+                { field: "title" },
+              );
+            }
           }
 
-          await fastify.storage.commit(
+          // § Changing how a signature is listed: a listing edit sends the
+          // signer a confirmation; a bare re-affirmation changes no display
+          // field and sends nothing.
+          const listingChanged = LISTING_FIELDS.some(
+            (field) => body[field] !== undefined && body[field] !== current[field],
+          );
+
+          const result = await fastify.storage.commit(
             "sign",
             {
               actor: { kind: "participant" },
@@ -216,6 +261,16 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
           );
 
           const updated = fastify.storage.readModel.getParticipation(slug, person);
+
+          if (listingChanged) {
+            await fastify.events.publish({
+              type: "listing-changed",
+              document: slug,
+              person,
+              commit: result.commitHash ?? "",
+            });
+          }
+
           return buildSignatureView(updated!);
         },
       );
