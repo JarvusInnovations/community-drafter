@@ -33,6 +33,7 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Submission` | submission id | `comment`, `submit` |
 | `Judgement` | `sign` \| `sign_conditional` \| `comment` \| `decline` | `submit` |
 | `Disposed` | comma-separated `<submission>:<comment>` refs | `publish` |
+| `Signature` | `sign` \| `resign` \| `revoke` | `submit` when the same commit also writes the participation's `signature` table |
 | `Reason` | text | `revoke`, `withdraw`, `admin-revoke`, and `submit` with `decline` |
 | `Request-Id` | id | every commit from a request |
 
@@ -142,11 +143,11 @@ One record per person per document, created by an invitation. Current state only
 | `signed_on_version` | integer | |
 | `revoked` | boolean | current signatory = present, `revoked = false`, `display_approved = true` |
 
-Signed-at, revoked-at, re-signed-at and the revoke reason are not fields: they are the dates and `Reason` trailers of the `sign`, `revoke`, `resign` and `admin-revoke` commits touching this record.
+Signed-at, revoked-at, re-signed-at and the revoke reason are not fields: they are the dates and `Reason` trailers of the `sign`, `revoke`, `resign` and `admin-revoke` commits touching this record — and of a `submit` commit carrying a `Signature` trailer, which is the same event written by comment mode.
 
 A person's **position** (latest judgement) is not a field either: it is the latest `submitted` record in `submissions` for this person and document. The read model caches it.
 
-Derived participant status for the dashboard: `not_sent` (staged, no `sent_at`) → `unopened` → `opened` → `drafting` (has a `draft` submission) → `commented` / `signed` / `signed (conditional)` / `declined`.
+Derived participant status for the dashboard: `not_sent` (staged, no `sent_at`) → `unopened` → `opened` → `drafting` (has a `draft` submission) → `commented` / `signed` / `signed_conditional` / `declined`. The wire values are snake_case throughout; screens label them for people.
 
 ## `submissions`
 

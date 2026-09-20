@@ -52,6 +52,7 @@ Set when the participation is created, editable by the participant at any time:
 
 - Every message names the document, states the current phase and its next deadline in the recipient's time zone when known (else the document's), and links to the personal link.
 - Revision messages include the version number, the summary line, and a "see what changed" link to the diff.
+- `schedule-changed` says what changed: one line per deadline that moved, with its old and new time ("Comments close moved from Thu, Sep 24 · 5:00 PM EDT to Sat, Sep 26 · 5:00 PM EDT"), before the current clock. A reopening that sets a deadline which had none states the new time alone.
 - The digest lists versions published, disposition outcomes for the recipient's comments, and current signatory counts, for the previous 24 hours.
 - Subscription messages end with "Manage how we contact you" → `/i/<token>/prefs` and a one-click "stop all optional messages" link that sets every optional preference off (transactional messages continue).
 - No message ever includes another participant's contact details or unsubmitted content.
