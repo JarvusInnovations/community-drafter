@@ -8,7 +8,9 @@ import {
   removeDocumentOperator,
 } from "../api.ts";
 import { copy } from "../copy.ts";
+import { quietButtonClass, selectClass } from "../styles.ts";
 import { type OperatorRecord } from "../types.ts";
+import { Card } from "./Card.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 
 /**
@@ -79,9 +81,14 @@ export function DocumentOperatorsPanel({ slug }: { slug: string }): JSX.Element 
 
   return (
     <section className="mt-6">
-      <h2 className="font-semibold">{copy.documentOperators.heading}</h2>
+      <h2 className="text-base font-bold tracking-tight text-foreground">
+        {copy.documentOperators.heading}
+      </h2>
       {banner ? (
-        <p role="status" className="mt-2 text-sm">
+        <p
+          role="status"
+          className="mt-2 rounded-xl bg-ok-soft px-3 py-2 text-sm font-medium text-ok"
+        >
           {banner}
         </p>
       ) : null}
@@ -96,34 +103,36 @@ export function DocumentOperatorsPanel({ slug }: { slug: string }): JSX.Element 
       ) : operators.length === 0 ? (
         <p className="mt-2 text-muted-foreground">{copy.documentOperators.empty}</p>
       ) : (
-        <ul className="mt-2 flex flex-col gap-1 text-sm">
-          {operators.map((operator) => (
-            <li
-              key={operator.email}
-              className="flex items-center justify-between border-b border-border py-1"
-            >
-              <span>
-                {operator.name} ({operator.email})
-              </span>
-              <button
-                type="button"
-                onClick={() => setPendingRemove(operator)}
-                className="rounded border border-border px-2 py-1 text-xs"
+        <Card className="mt-2 p-0">
+          <ul className="flex flex-col text-sm">
+            {operators.map((operator) => (
+              <li
+                key={operator.email}
+                className="flex items-center justify-between border-b border-border px-4 py-2.5 last:border-0"
               >
-                {copy.documentOperators.remove}
-              </button>
-            </li>
-          ))}
-        </ul>
+                <span className="text-foreground">
+                  {operator.name} ({operator.email})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPendingRemove(operator)}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  {copy.documentOperators.remove}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label className="text-sm">
+        <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
           {copy.documentOperators.addLabel}
           <select
             value={selected}
             onChange={(event) => setSelected(event.target.value)}
-            className="ml-2 rounded border border-border p-1 text-sm"
+            className={selectClass}
           >
             <option value="">—</option>
             {available.map((operator) => (
@@ -137,7 +146,7 @@ export function DocumentOperatorsPanel({ slug }: { slug: string }): JSX.Element 
           type="button"
           onClick={() => void handleAdd()}
           disabled={!selected}
-          className="rounded border border-border px-2 py-1 text-xs disabled:opacity-40"
+          className={quietButtonClass}
         >
           {copy.documentOperators.add}
         </button>

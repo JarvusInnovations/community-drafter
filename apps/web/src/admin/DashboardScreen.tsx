@@ -9,10 +9,14 @@ import {
   getNotifications,
 } from "./api.ts";
 import { copy } from "./copy.ts";
+import { Card } from "./components/Card.tsx";
 import { DocumentOperatorsPanel } from "./components/DocumentOperatorsPanel.tsx";
 import { ExtendDeadlineDialog } from "./components/ExtendDeadlineDialog.tsx";
+import { FunnelBar, StatTile } from "./components/Funnel.tsx";
 import { useAdminDocument } from "./DocumentContext.tsx";
+import { quietButtonClass } from "./styles.ts";
 import { type ActivityEntry, type InvitationRow, type NotificationsHealth } from "./types.ts";
+import { Timeline } from "../participant/components/Timeline.tsx";
 
 function downloadText(filename: string, text: string, mime: string): void {
   const blob = new Blob([text], { type: mime });
@@ -134,34 +138,24 @@ export function DashboardScreen(): JSX.Element {
   const funnel = invitations ? computeFunnel(invitations) : null;
 
   return (
-    <main className="p-4">
+    <main className="mx-auto max-w-[1120px] px-5 py-6">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="rounded border border-border px-2 py-1">
+        <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           {document.state} / {document.phase}
-        </span>
-        <span className="text-muted-foreground">
-          Comments close:{" "}
-          {document.comments_close_at ? new Date(document.comments_close_at).toLocaleString() : "—"}
-        </span>
-        <span className="text-muted-foreground">
-          Signing closes:{" "}
-          {document.signing_closes_at ? new Date(document.signing_closes_at).toLocaleString() : "—"}
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setExtendOpen(true)}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
+      <Timeline document={document} />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={() => setExtendOpen(true)} className={quietButtonClass}>
           {copy.dashboard.extendDeadline}
         </button>
         {document.public_access && document.public_access !== "none" ? (
           <button
             type="button"
             onClick={() => void handleCopyPublicLink()}
-            className="rounded border border-border px-3 py-1.5 text-sm"
+            className={quietButtonClass}
           >
             {copy.dashboard.copyPublicLink}
           </button>
@@ -169,26 +163,25 @@ export function DashboardScreen(): JSX.Element {
         <button
           type="button"
           onClick={() => void handleExportFeedback()}
-          className="rounded border border-border px-3 py-1.5 text-sm"
+          className={quietButtonClass}
         >
           {copy.dashboard.exportFeedback}
         </button>
-        <button
-          type="button"
-          onClick={() => void handleExportLinks()}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
+        <button type="button" onClick={() => void handleExportLinks()} className={quietButtonClass}>
           {copy.dashboard.exportLinks}
         </button>
       </div>
 
       {banner ? (
-        <p role="status" className="mt-2 rounded border border-border bg-muted p-2 text-sm">
+        <p
+          role="status"
+          className="mt-3 rounded-xl bg-ok-soft px-3 py-2 text-sm font-medium text-ok"
+        >
           {banner}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-2 text-destructive">
+        <p role="alert" className="mt-3 text-destructive">
           {error}
         </p>
       ) : null}
@@ -203,120 +196,121 @@ export function DashboardScreen(): JSX.Element {
       <DocumentOperatorsPanel slug={document.slug} />
 
       <section className="mt-6">
-        <h2 className="font-semibold">{copy.dashboard.funnel}</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">
+          {copy.dashboard.funnel}
+        </h2>
         {funnel ? (
-          <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.invited}</dt>
-              <dd className="text-lg font-semibold">{funnel.invited}</dd>
+          <Card className="mt-2">
+            <FunnelBar
+              funnel={funnel}
+              labels={{
+                invited: copy.dashboard.invited,
+                sent: copy.dashboard.sent,
+                opened: copy.dashboard.opened,
+                acted: copy.dashboard.acted,
+              }}
+            />
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatTile label={copy.dashboard.organizations} value={funnel.organizations} />
+              <StatTile label={copy.dashboard.individuals} value={funnel.individuals} />
+              <StatTile
+                label={copy.dashboard.conditional}
+                value={funnel.conditional}
+                tone="muted"
+              />
+              <StatTile label={copy.dashboard.revoked} value={funnel.revoked} tone="muted" />
             </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.sent}</dt>
-              <dd className="text-lg font-semibold">{funnel.sent}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.opened}</dt>
-              <dd className="text-lg font-semibold">{funnel.opened}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.acted}</dt>
-              <dd className="text-lg font-semibold">{funnel.acted}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.organizations}</dt>
-              <dd>{funnel.organizations}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.individuals}</dt>
-              <dd>{funnel.individuals}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.conditional}</dt>
-              <dd>{funnel.conditional}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{copy.dashboard.revoked}</dt>
-              <dd>{funnel.revoked}</dd>
-            </div>
-          </dl>
+          </Card>
         ) : (
-          <p className="text-muted-foreground">{copy.loading}</p>
+          <p className="mt-2 text-muted-foreground">{copy.loading}</p>
         )}
       </section>
 
       <section className="mt-6">
-        <h2 className="font-semibold">{copy.dashboard.versions}</h2>
-        <p className="mt-1 rounded border border-border bg-muted p-2 text-sm text-muted-foreground">
+        <h2 className="text-base font-bold tracking-tight text-foreground">
+          {copy.dashboard.versions}
+        </h2>
+        <p className="mt-2 rounded-xl border-l-[3px] border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
           {copy.dashboard.publishHint}{" "}
-          <code className="rounded bg-background px-1.5 py-0.5">
+          <code className="rounded bg-card px-1.5 py-0.5">
             {copy.dashboard.publishCommand(document.slug)}
           </code>
         </p>
-        <table className="mt-2 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-1">#</th>
-              <th className="py-1">Published</th>
-              <th className="py-1">Summary</th>
-              <th className="py-1">Dispositions</th>
-              <th className="py-1">Final</th>
-            </tr>
-          </thead>
-          <tbody>
-            {document.versions.map((v) => (
-              <tr key={v.number} className="border-b border-border">
-                <td className="py-1">{v.number}</td>
-                <td className="py-1">{new Date(v.published_at).toLocaleString()}</td>
-                <td className="py-1">{v.summary}</td>
-                <td className="py-1">{v.dispositions}</td>
-                <td className="py-1">{v.final ? "final" : ""}</td>
+        <Card className="mt-3 overflow-x-auto p-0">
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-2.5">#</th>
+                <th className="px-4 py-2.5">Published</th>
+                <th className="px-4 py-2.5">Summary</th>
+                <th className="px-4 py-2.5">Dispositions</th>
+                <th className="px-4 py-2.5">Final</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {document.versions.map((v) => (
+                <tr key={v.number} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2.5 font-semibold text-foreground">{v.number}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">
+                    {new Date(v.published_at).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2.5 text-foreground">{v.summary}</td>
+                  <td className="px-4 py-2.5 text-foreground">{v.dispositions}</td>
+                  <td className="px-4 py-2.5">{v.final ? "final" : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       </section>
 
       <section className="mt-6">
-        <h2 className="font-semibold">{copy.dashboard.recentActivity}</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">
+          {copy.dashboard.recentActivity}
+        </h2>
         {activity && activity.length === 0 ? (
-          <p className="text-muted-foreground">{copy.dashboard.noActivity}</p>
+          <p className="mt-2 text-muted-foreground">{copy.dashboard.noActivity}</p>
         ) : null}
         {activity ? (
-          <ul className="mt-2 flex flex-col gap-1 text-sm">
-            {activity.map((entry) => (
-              <li key={entry.commit} className="border-b border-border pb-1">
-                <span className="text-muted-foreground">
-                  {new Date(entry.date).toLocaleString()}
-                </span>{" "}
-                — {entry.subject}
-                {entry.actor ? (
-                  <span className="text-muted-foreground"> ({entry.actor})</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <Card className="mt-2 p-0">
+            <ul className="flex flex-col text-sm">
+              {activity.map((entry) => (
+                <li key={entry.commit} className="border-b border-border px-4 py-2.5 last:border-0">
+                  <span className="text-muted-foreground">
+                    {new Date(entry.date).toLocaleString()}
+                  </span>{" "}
+                  — {entry.subject}
+                  {entry.actor ? (
+                    <span className="text-muted-foreground"> ({entry.actor})</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </Card>
         ) : (
-          <p className="text-muted-foreground">{copy.loading}</p>
+          <p className="mt-2 text-muted-foreground">{copy.loading}</p>
         )}
       </section>
 
       <section className="mt-6 mb-8">
-        <h2 className="font-semibold">{copy.dashboard.notificationHealth}</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">
+          {copy.dashboard.notificationHealth}
+        </h2>
         {notifications ? (
-          <div className="mt-2 text-sm">
+          <Card className="mt-2 text-sm">
             <p>
               {copy.dashboard.sentLabel}:{" "}
               {Object.entries(notifications.sent)
                 .map(([event, count]) => `${event}: ${count}`)
                 .join(", ") || "—"}
             </p>
-            <p>
+            <p className="mt-1">
               {copy.dashboard.pendingLabel}: {notifications.pending} · {copy.dashboard.failedLabel}:{" "}
               {notifications.failed}
             </p>
-          </div>
+          </Card>
         ) : (
-          <p className="text-muted-foreground">{copy.loading}</p>
+          <p className="mt-2 text-muted-foreground">{copy.loading}</p>
         )}
       </section>
     </main>
