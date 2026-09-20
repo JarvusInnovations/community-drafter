@@ -4,7 +4,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { ApiError } from "../../errors.ts";
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { withIdempotency } from "../../lib/idempotency.ts";
-import { buildSignatureView } from "../../lib/signature-view.ts";
+import { buildSignatureView, effectiveSignedVersion } from "../../lib/signature-view.ts";
 import { resolveVersion } from "../../lib/versions.ts";
 import { assertPhase } from "../../phase/phase.ts";
 import { loadParticipantContext } from "./context.ts";
@@ -168,6 +168,19 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
           const person = participation.record.person;
           const slug = document.record.slug;
 
+          // `specs/behaviors/signatures.md` § A signature belongs to a
+          // version: re-affirming — "Keep my name" against a newer version,
+          // or "Confirm my signature" on the final one — moves the
+          // signature onto the current version and clears `conditional`.
+          // An edit to how the signature is listed leaves it where it is.
+          // A record written before the field existed keeps deriving it
+          // from the trailer rather than being rewritten to carry it, so
+          // the stored value only ever changes here on a re-affirmation.
+          const reaffirming = body.confirm === true;
+          const signedOnVersion = reaffirming
+            ? resolveVersion(document).number
+            : effectiveSignedVersion(participation);
+
           const signature: Signature = {
             ...current,
             display_name: body.display_name ?? current.display_name,
@@ -175,7 +188,8 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             org: body.org ?? current.org,
             title: body.title ?? current.title,
             listed: body.listed ?? current.listed,
-            conditional: body.confirm === true ? false : current.conditional,
+            conditional: reaffirming ? false : current.conditional,
+            signed_on_version: reaffirming ? signedOnVersion : current.signed_on_version,
           };
           if (current.capacity === "official" && body.authorized === false) {
             throw new ApiError(
@@ -188,10 +202,12 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             "sign",
             {
               actor: { kind: "participant" },
-              subject: `sign: ${person} on ${slug} (updated)`,
+              subject: reaffirming
+                ? `sign: ${person} on ${slug} (reaffirmed v${signedOnVersion ?? "?"})`
+                : `sign: ${person} on ${slug} (updated)`,
               document: slug,
               person,
-              version: current.signed_on_version,
+              version: signedOnVersion,
               requestId: request.requestId,
             },
             async (tx) => {

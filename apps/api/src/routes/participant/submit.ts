@@ -147,8 +147,20 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
             if (hasLiveSignature && existingSignature) {
               // "Keep my signature" / "Make my signature conditional" — the
               // signature already in force is unchanged as a signature, so
-              // this is not a new signature event.
-              signatureUpdate = { ...existingSignature, conditional };
+              // this is not a new signature event. It is a re-affirmation
+              // though: `specs/behaviors/signatures.md` § A signature
+              // belongs to a version — a signer who submits with `sign` or
+              // "keep" moves their name onto the version they submitted
+              // against. Only ever forward: someone who kept commenting on
+              // v2 while v3 was published has not seen v3, so submitting
+              // against v2 must not drag a v3 signature backwards.
+              const priorVersion = existingSignature.signed_on_version;
+              signatureUpdate = {
+                ...existingSignature,
+                conditional,
+                signed_on_version:
+                  priorVersion === undefined || version > priorVersion ? version : priorVersion,
+              };
             } else {
               const sig = body.signature;
               if (!sig) {

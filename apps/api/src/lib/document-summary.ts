@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { computeSignatories } from "./signatories.ts";
+import { isSignatureBehind } from "./signature-view.ts";
 import { derivePhase } from "../phase/phase.ts";
 import type { DocumentEntry } from "../storage/read-model.ts";
 
@@ -28,6 +29,10 @@ export function documentSummary(
     individuals: 0,
     unlisted: 0,
   };
+  // `specs/api/admin.md`: the signature counts carry `behind` — live
+  // signatures attached to a version older than the current one, the number
+  // the team needs before marking anything final (`specs/screens/admin-dashboard.md`).
+  const behind = participations.filter((p) => isSignatureBehind(p, entry.versions.length)).length;
   const submissions = fastify.storage.readModel.listSubmissionsForDocument(entry.record.slug);
   const submitted = submissions.filter((s) => s.record.state === "submitted").length;
   const draft = submissions.filter((s) => s.record.state === "draft").length;
@@ -53,7 +58,7 @@ export function documentSummary(
     counts: {
       versions: entry.versions.length,
       participations: participations.length,
-      signatures: signatories,
+      signatures: { ...signatories, behind },
       submissions: { submitted, draft },
     },
   };
