@@ -24,8 +24,8 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `operators update <email> [--name …] [--active true\|false] [--superadmin true\|false] [--title …] [--org …] [--notes …]` | update, deactivate, or (superadmins only) grant or revoke superadmin |
 | `operators remove <email>` | remove |
 | `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
-| `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
-| `docs show <slug>` | dashboard numbers (including how many signatures are behind the current version), versions, schedule |
+| `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--audience public\|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list]` | create; the caller becomes the first operator. `--audience` defaults to `closed` and is how the document's audience is set (`specs/data-model.md` § Audience); `--list-visible-to` names organizations the team will show a closed document's signatory list to, which the sign card tells every signer |
+| `docs show <slug>` | dashboard numbers (including how many signatures are behind the current version), the audience and any `list_visible_to` organizations, versions, schedule |
 | `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations, printing how many were delivered and naming any the mailer rejected; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
 | `docs extend <slug> [--comments-close <when>] [--signing-closes <when>]` | extension |
 | `docs close | reopen | withdraw <slug> …` | lifecycle |
@@ -50,6 +50,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 
 - Every mutation prints the resulting record's key fields and the commit subject.
 - `people list` and `docs show` never print tokens or emails unless `--contacts` is passed (emails only, still never tokens).
+- **Every document view prints `audience`** — `public` or `closed` — and, on a closed document with organizations named, `list_visible_to`. It is derived from `public_access`, never stored beside it, so the CLI and the dashboard cannot disagree about who a document is for.
 - **`docs create`, `docs show` and `docs open` print `public_url`** — `<instance>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
 - Errors map API `error` codes to exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other; the message is the API's `message`.
 - The home view includes `help[]` lines suggesting the next likely command, per AXI.

@@ -21,6 +21,7 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `invitation` | document opened, or admin "send" for later-added invitations | invitations without `sent_at` | yes |
 | `signature-confirmation-<ts>` | a signature written | the signer | yes |
 | `revocation-confirmation-<ts>` | a revocation written | the signer | yes |
+| `listing-changed-<ts>` | a signature's display fields edited — name, descriptor, organization, title or the listing choice (`behaviors/signatures.md` § Changing how a signature is listed) | the signer | yes (names how they are now listed, and says plainly if they are no longer named on the list) |
 | `review-receipt-<ts>` | a review submitted | the author | yes (brief; lists judgement and comment count) |
 | `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (not a participation message: no `notified` mark, no preference link; subject "Sign in to *Instance name*"; body: greeting by name, one sentence naming the instance URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Instance name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
@@ -56,7 +57,7 @@ Set when the participation is created, editable by the participant at any time:
 - The digest lists versions published, disposition outcomes for the recipient's comments, and current signatory counts, for the previous 24 hours.
 - Subscription messages end with "Manage how we contact you" → `/i/<token>/prefs` and a one-click "stop all optional messages" link that sets every optional preference off (transactional messages continue).
 - No message ever includes another participant's contact details or unsubmitted content.
-- Subject lines are short and stable: "[Title] — version 3 published", "[Title] — final version, please confirm", "[Title] — you signed".
+- Subject lines are short and stable: "[Title] — version 3 published", "[Title] — final version, please confirm", "[Title] — you signed", "[Title] — how you're listed changed".
 
 **Shape.** Every message to a participant has the same shape as `operator-magic-link`, so mail from an instance always looks like it comes from one place and never like a form letter or a phishing attempt:
 

@@ -13,13 +13,23 @@ A signature is a person's name added to a specific document, in a stated capacit
 | Capacity | Required fields | Display |
 | --- | --- | --- |
 | **personal** | `display_name`; optional `descriptor` (≤ 120 chars) | "Jane Doe, former Academy educator" or "Jane Doe" |
-| **official** | `display_name`, `org`, `title` (title may be blank), `authorized = true` | "Skype a Scientist — Jane Doe, Executive Director" |
+| **official** | `display_name`, `org`, `title`, `authorized = true` | "Skype a Scientist — Jane Doe, Executive Director" |
 
 - The document's `capacities` setting controls which options the sign card offers; when only one is allowed the choice is not shown.
 - The sign card preselects from the invitation's `suggested_capacity`, else `personal`. Fields prefill from the `people` record (`name`, `org`, `role`, `descriptor`); the participant may edit any of them for this signature. Edits do not change the `people` record.
 - Official capacity shows the attestation as a required checkbox with the text: "I am authorized to sign this on behalf of *Org*." The server rejects an official signature without it.
+- **Official capacity requires a title.** An organization's signature is read as the organization's, and the reader is owed the standing of the person who gave it: the field is labeled "Your title" with no "(optional)", and the server refuses an official signature with a blank one. In personal capacity there is no title at all — the descriptor takes its place. (Decided 2026-09-20, resolving the first half of the judgement call in issue #81: a bare name under an organization's name tells a reader nothing about whether the signature was the director's or the intern's.)
 - The descriptor for personal capacity is introduced as "How would you like to be described? (optional)" with a hint such as "your neighborhood, profession, or connection to the Academy". It is free text; the copy discourages job titles at organizations the person is not signing for, and the render never places it in the organizations section.
 - **One signature per person per document.** A person who wants to sign for their organization and also as a resident picks one; changing capacity replaces the signature. (Decided 2026-09-19: simplicity of the card and of the counts wins over the rare dual case.)
+
+## Consent at signing
+
+A person decides how they will appear **before** they add their name, never only afterwards. The sign card therefore carries two things above its button (`screens/document.md` § Display Rules 3):
+
+- **One sentence saying who will see the name.** It is derived from the document's audience (`../data-model.md` § Audience), its `show_signatories` setting, and — on a `closed` document — the organizations named in `list_visible_to`. It states what the settings actually give and never more: a `closed` document's sentence says the list is shown to the invited people, and names any organizations the team will also show it to.
+- **The listing choice**, "List my name publicly" on a `public` document and "List my name on the signatory list" on a `closed` one, on by default, writing `signature.listed`. It is offered only when `show_signatories = list`, because that is the only setting under which any name is shown at all; with `count` or `none` the sentence has already said so and `listed` stays true.
+
+Both appear in every capacity, and both are part of the same card as the attestation — the signer reads what is being claimed, who will see it, and how they will be named, in one place, before the button.
 
 ## Signing
 
@@ -28,6 +38,14 @@ A signature is a person's name added to a specific document, in a stated capacit
 - Re-signing after revocation is an `Action: resign` commit setting `revoked = false`; the dates of signing, revoking and re-signing are those commits' dates. The re-signature is a new signature: everywhere a signature's time is shown to its signer or to the team, it is the time of the commit that put the signature currently in force — the `resign` commit, not the superseded `sign` one.
 - A signer who submits with `sign` or "keep" while a newer version exists produces a `submit` commit with the newer `Version` trailer and moves the signature onto that version (§ A signature belongs to a version).
 - Signing through comment mode is the same signature by another door. A `submit` commit that writes, re-instates or revokes the `signature` table carries a `Signature` trailer (`sign` | `resign` | `revoke`) and is read back as that signature event, so a signature made with comments has the same dates and the same audit trail as one made from the sign card.
+
+## Changing how a signature is listed
+
+"Change how you're listed" edits the display fields of the signature already in force — `display_name`, `descriptor`, `org`, `title`, `listed`. It is not a new signature: the date stays the date of the commit behind the signature in force, and the version stays where it was (§ A signature belongs to a version).
+
+- **Changing the organization requires the attestation again.** The organization is the claim the signature makes about authority, so swapping it is a new claim: the form shows the attestation with the new organization's name, unchecked, and the server refuses a change of `org` on an official signature without `authorized = true`. Changing *capacity* is not an edit at all — it replaces the signature (§ Capacity) and so goes through signing, with its own attestation.
+- **Every saved listing edit sends the signer a confirmation** (`listing-changed-<ts>`, `notifications.md`), naming how they are now listed. A change to how a person is publicly named is exactly the kind of change they must be able to notice if it was not theirs — the same reason a signature and a revocation each send one. A re-affirmation ("Keep my name", "Confirm my signature") changes no display field and sends nothing.
+- An official signature may never be saved with a blank `title` (§ Capacity), whichever door the edit came through.
 
 ## A signature belongs to a version
 
@@ -40,7 +58,7 @@ A signature is a person's name added to a specific document, in a stated capacit
 ## Conditional signatures
 
 - `signature.conditional = true` is set by the `sign_conditional` judgement or "make my signature conditional", and cleared by a later `sign`/"keep" judgement or by the signer pressing "Confirm my signature" on the final version.
-- Public display is identical to an unconditional signature.
+- **It is marked for the two sides who need to act on it, and nowhere else.** The signer's own card carries a *Conditional* marker beside its heading with the line saying what happens when the final version lands (`screens/document.md` § Display Rules 3); the team's people table and dashboard count and mark them for outreach (`screens/admin-dashboard.md`). Public display is identical to an unconditional signature.
 - When a `final` version is published, conditional signers receive a message showing their comments' dispositions and two buttons: confirm or remove. Unconfirmed conditional signatures **remain signatures** through closing; the team's dashboard lists them for outreach.
 
 ## Revocation

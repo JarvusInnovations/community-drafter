@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 depends:
   - signature-version
 specs:
@@ -9,7 +9,9 @@ specs:
   - specs/screens/admin-dashboard.md
   - specs/api/admin.md
   - specs/api/admin-cli.md
+  - specs/api/participant.md
   - specs/behaviors/notifications.md
+issues: [70, 57]
 ---
 
 # Plan: audience-and-consent
