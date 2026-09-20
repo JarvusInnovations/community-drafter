@@ -148,14 +148,16 @@ export default function PrefsRoute() {
   }
 
   if (status === "loading") {
-    return <main className="mx-auto max-w-xl p-6 text-muted-foreground">Loading…</main>;
+    return <main className="mx-auto max-w-xl px-5 py-8 text-muted-foreground">Loading…</main>;
   }
   if (status === "error" || !prefs) {
     return (
-      <main className="mx-auto max-w-xl p-6">
-        <p role="alert" className="text-foreground">
-          We couldn&apos;t load your preferences. The link may have expired.
-        </p>
+      <main className="mx-auto max-w-xl px-5 py-8">
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <p role="alert" className="text-foreground">
+            We couldn&apos;t load your preferences. The link may have expired.
+          </p>
+        </div>
       </main>
     );
   }
@@ -170,60 +172,62 @@ export default function PrefsRoute() {
   };
 
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-xl font-semibold text-foreground">
-        How we contact you about <em>{documentTitle ?? "this document"}</em>
-      </h1>
-      {prefs.email_masked && (
-        <p className="mt-1 text-sm text-muted-foreground">Email: {prefs.email_masked}</p>
-      )}
-
-      <div aria-live="polite">
-        {banner && (
-          <p className="mt-4 rounded border border-border bg-muted px-3 py-2 text-sm text-foreground">
-            {banner}
-          </p>
+    <main className="mx-auto max-w-xl px-5 py-8">
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          How we contact you about <em>{documentTitle ?? "this document"}</em>
+        </h1>
+        {prefs.email_masked && (
+          <p className="mt-1 text-sm text-muted-foreground">Email: {prefs.email_masked}</p>
         )}
+
+        <div aria-live="polite">
+          {banner && (
+            <p className="mt-4 rounded-xl bg-ok-soft px-3 py-2 text-sm font-medium text-ok">
+              {banner}
+            </p>
+          )}
+        </div>
+
+        <ul className="mt-6 space-y-5">
+          {TOGGLES.map((toggle) => {
+            const isForced = forced.has(toggle.key);
+            const inputId = `notify-${toggle.key}`;
+            return (
+              <li key={toggle.key} className="flex items-start gap-3">
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  className="mt-1"
+                  checked={values[toggle.key]}
+                  disabled={isForced || pending.has(toggle.key)}
+                  onChange={(event) => void saveToggle(toggle.key, event.target.checked)}
+                />
+                <label htmlFor={inputId} className="flex flex-col gap-0.5">
+                  <span className="font-medium text-foreground">{toggle.label}</span>
+                  {toggle.description && (
+                    <span className="text-sm text-muted-foreground">{toggle.description}</span>
+                  )}
+                  {isForced && (
+                    <span className="text-sm text-muted-foreground">{FORCED_EXPLANATION}</span>
+                  )}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+
+        <p className="mt-6 text-sm text-muted-foreground">{ALWAYS_CONFIRM_NOTE}</p>
+
+        <button
+          type="button"
+          onClick={() => void stopOptional()}
+          disabled={pending.has("stop-optional")}
+          className="mt-6 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:opacity-60"
+        >
+          Stop all optional messages
+        </button>
       </div>
-
-      <ul className="mt-6 space-y-5">
-        {TOGGLES.map((toggle) => {
-          const isForced = forced.has(toggle.key);
-          const inputId = `notify-${toggle.key}`;
-          return (
-            <li key={toggle.key} className="flex items-start gap-3">
-              <input
-                id={inputId}
-                type="checkbox"
-                className="mt-1"
-                checked={values[toggle.key]}
-                disabled={isForced || pending.has(toggle.key)}
-                onChange={(event) => void saveToggle(toggle.key, event.target.checked)}
-              />
-              <label htmlFor={inputId} className="flex flex-col gap-0.5">
-                <span className="font-medium text-foreground">{toggle.label}</span>
-                {toggle.description && (
-                  <span className="text-sm text-muted-foreground">{toggle.description}</span>
-                )}
-                {isForced && (
-                  <span className="text-sm text-muted-foreground">{FORCED_EXPLANATION}</span>
-                )}
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-
-      <p className="mt-6 text-sm text-muted-foreground">{ALWAYS_CONFIRM_NOTE}</p>
-
-      <button
-        type="button"
-        onClick={() => void stopOptional()}
-        disabled={pending.has("stop-optional")}
-        className="mt-6 rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-      >
-        Stop all optional messages
-      </button>
     </main>
   );
 }
