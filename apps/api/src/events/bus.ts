@@ -20,6 +20,13 @@ import type { FastifyPluginAsync } from "fastify";
  * `fastify.notifications.deliver` and reading its summary, not announcing
  * an intention.
  */
+/** One deadline moved by an `extend` or `reopen`. */
+export interface DeadlineChange {
+  deadline: "comments_close_at" | "signing_closes_at";
+  from?: string;
+  to: string;
+}
+
 export type DrafterEvent =
   | { type: "sign"; document: string; person: string; commit: string }
   | { type: "resign"; document: string; person: string; commit: string }
@@ -34,7 +41,18 @@ export type DrafterEvent =
       judgement: Judgement;
     }
   | { type: "publish"; document: string; version: number; commit: string; final: boolean }
-  | { type: "schedule-changed"; document: string; commit: string }
+  | {
+      type: "schedule-changed";
+      document: string;
+      commit: string;
+      /**
+       * What moved, so `schedule-changed` can say so (`specs/behaviors/
+       * notifications.md` § Content rules; `specs/behaviors/
+       * document-lifecycle.md` § Extension: "announced ... with old and new
+       * times"). `from` is absent when the deadline had none before.
+       */
+      changes?: DeadlineChange[];
+    }
   | { type: "signing-opened"; document: string }
   | { type: "closed"; document: string };
 

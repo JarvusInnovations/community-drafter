@@ -45,6 +45,48 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
 
     await server.close();
   });
+
+  /**
+   * Issue #71 — `specs/behaviors/document-lifecycle.md` § Extension: the
+   * change is "announced ... with old and new times", so the event the
+   * notification dispatcher consumes has to carry the previous values.
+   */
+  it("publishes schedule-changed with the old and new value of each deadline that moved", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const commentsCloseAt = new Date(Date.now() + 3_600_000).toISOString();
+    const signingClosesAt = new Date(Date.now() + 7_200_000).toISOString();
+    await seedDocument(server, {
+      slug: "doc-schedule-event",
+      comments_close_at: commentsCloseAt,
+      signing_closes_at: signingClosesAt,
+    });
+
+    const seen: unknown[] = [];
+    const off = server.events.on((event) => {
+      if (event.type === "schedule-changed") seen.push(event);
+    });
+
+    const laterSigning = new Date(Date.now() + 10_800_000).toISOString();
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-schedule-event/schedule",
+      headers: adminHeaders(),
+      payload: { signing_closes_at: laterSigning },
+    });
+    expect(response.statusCode).toBe(200);
+    off();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      type: "schedule-changed",
+      document: "doc-schedule-event",
+      changes: [{ deadline: "signing_closes_at", from: signingClosesAt, to: laterSigning }],
+    });
+
+    await server.close();
+  });
 });
 
 describe("POST /admin/api/documents/:slug/open", () => {

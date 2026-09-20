@@ -2,6 +2,7 @@ import type { Capacity, PublicAccess, ShowSignatories } from "@community-drafter
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
+import type { DeadlineChange } from "../../events/bus.ts";
 import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts";
 import { documentSummary } from "../../lib/document-summary.ts";
 import { versionListView } from "../../lib/versions.ts";
@@ -74,6 +75,27 @@ function parseDeadline(value: unknown, field: string): string {
     throw new ApiError("validation_failed", `${field} is not a valid date-time.`, { field });
   }
   return date.toISOString();
+}
+
+/**
+ * The deadlines this patch moves, paired with what they were — the payload
+ * `schedule-changed` needs to say "Comments close moved from … to …"
+ * (`specs/behaviors/notifications.md` § Content rules). Must be called
+ * before the commit, while `previous` is still the pre-change record.
+ */
+function deadlineChanges(
+  patch: Record<string, string>,
+  previous: { comments_close_at?: string; signing_closes_at?: string },
+): DeadlineChange[] {
+  const changes: DeadlineChange[] = [];
+  for (const deadline of ["comments_close_at", "signing_closes_at"] as const) {
+    const to = patch[deadline];
+    if (to === undefined) continue;
+    const from = previous[deadline];
+    if (from === to) continue;
+    changes.push({ deadline, ...(from ? { from } : {}), to });
+  }
+  return changes;
 }
 
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
@@ -359,6 +381,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         );
       }
 
+      // `specs/behaviors/document-lifecycle.md` § Extension: the change is
+      // "announced to subscribers of phase changes with old and new times",
+      // so carry the previous values on the event before the record moves.
+      const changes = deadlineChanges(patch, entry.record);
+
       const result = await fastify.storage.commit(
         "extend",
         {
@@ -376,6 +403,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         type: "schedule-changed",
         document: slug,
         commit: result.commitHash ?? "",
+        changes,
       });
 
       return documentSummary(
@@ -453,6 +481,8 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const patch: Record<string, string> = { state: "open", signing_closes_at };
       if (comments_close_at !== undefined) patch.comments_close_at = comments_close_at;
 
+      const changes = deadlineChanges(patch, entry.record);
+
       const result = await fastify.storage.commit(
         "reopen",
         {
@@ -470,6 +500,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         type: "schedule-changed",
         document: slug,
         commit: result.commitHash ?? "",
+        changes,
       });
 
       return documentSummary(
