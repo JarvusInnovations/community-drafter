@@ -1,11 +1,20 @@
 import { AxiError, runAxiCli, type AxiCliCommand } from "axi-sdk-js";
 
+import {
+  LOGIN_HELP,
+  LOGOUT_HELP,
+  loginCommand,
+  logoutCommand,
+  WHOAMI_HELP,
+  whoamiCommand,
+} from "./commands/auth.js";
 import { docsCommand, DOCS_HELP } from "./commands/docs.js";
 import { feedbackCommand, FEEDBACK_HELP } from "./commands/feedback.js";
 import { homeCommand } from "./commands/home.js";
 import { hookCommand_, HOOK_HELP } from "./commands/hook.js";
 import { initDataRepoCommand, INIT_DATA_REPO_HELP } from "./commands/instance.js";
 import { notificationsCommand, NOTIFICATIONS_HELP } from "./commands/notifications.js";
+import { operatorsCommand, OPERATORS_HELP } from "./commands/operators.js";
 import { peopleCommand, PEOPLE_HELP } from "./commands/people.js";
 import { signaturesCommand, SIGNATURES_HELP } from "./commands/signatures.js";
 import { submissionsCommand, SUBMISSIONS_HELP } from "./commands/submissions.js";
@@ -19,6 +28,10 @@ declare const __DRAFTER_AXI_VERSION__: string;
 const VERSION = typeof __DRAFTER_AXI_VERSION__ === "string" ? __DRAFTER_AXI_VERSION__ : "dev";
 
 const COMMAND_HELP: Record<string, string> = {
+  login: LOGIN_HELP,
+  logout: LOGOUT_HELP,
+  whoami: WHOAMI_HELP,
+  operators: OPERATORS_HELP,
   docs: DOCS_HELP,
   versions: VERSIONS_HELP,
   people: PEOPLE_HELP,
@@ -36,6 +49,10 @@ const COMMANDS: Record<string, AxiCliCommand<undefined>> = {
   // the SDK rejects a leading flag before a command, so the bare zero-arg
   // form can never itself accept a flag (axi-skills § gotchas).
   home: homeCommand,
+  login: loginCommand,
+  logout: logoutCommand,
+  whoami: whoamiCommand,
+  operators: operatorsCommand,
   docs: docsCommand,
   versions: versionsCommand,
   people: peopleCommand,

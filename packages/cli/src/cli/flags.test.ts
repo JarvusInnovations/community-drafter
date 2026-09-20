@@ -51,15 +51,10 @@ describe("parseFlags", () => {
     expect(bool(parsed, "--help")).toBe(true);
   });
 
-  it("always allows the global --actor/--json/--profile flags", () => {
-    const parsed = parseFlags(
-      "docs show",
-      ["slug", "--actor", "cli:me", "--json", "--profile", "work"],
-      {
-        positionals: 1,
-      },
-    );
-    expect(str(parsed, "--actor")).toBe("cli:me");
+  it("always allows the global --json/--profile flags", () => {
+    const parsed = parseFlags("docs show", ["slug", "--json", "--profile", "work"], {
+      positionals: 1,
+    });
     expect(bool(parsed, "--json")).toBe(true);
     expect(str(parsed, "--profile")).toBe("work");
   });

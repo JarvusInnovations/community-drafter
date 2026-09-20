@@ -24,6 +24,33 @@ export class NetworkError extends AxiError {
 }
 
 /**
+ * `plans/operators-cli-and-dashboard.md`: "on 401 print 'Sign-in expired or
+ * revoked; run login again' (exit 5)". Raised by `client.ts` in place of
+ * the API's own `unauthenticated`/`operator_inactive` error — whichever of
+ * the two comes back, this one fixed sentence is what the CLI shows,
+ * because the underlying cause (revoked, deactivated, expired) isn't
+ * actionable information for the person at the keyboard.
+ */
+export class SignInExpiredError extends AxiError {
+  constructor() {
+    super("Sign-in expired or revoked; run login again.", "SIGN_IN_EXPIRED", [
+      "Run `drafter-axi login <email> --url <instance>` to sign in again",
+    ]);
+  }
+}
+
+/**
+ * `specs/behaviors/operators.md` § CLI sign-in: device code — raised when
+ * `POST /auth/device/token` reports the device code unknown/expired, or the
+ * 15-minute wait elapses with no approval.
+ */
+export class DeviceExpiredError extends AxiError {
+  constructor(message: string) {
+    super(message, "DEVICE_EXPIRED", ["Run `drafter-axi login <email> [--url <instance>]` again"]);
+  }
+}
+
+/**
  * `specs/api/admin-cli.md` § Output rules: "Errors map API `error` codes to
  * exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other."
  * CLI-level usage errors (missing/unknown flags) are validation errors too,
@@ -50,14 +77,22 @@ const EXIT_CODE_BY_CODE: Record<string, number> = {
   unsaved_items: 3,
   no_change: 3,
   no_version: 3,
+  already_exists: 3,
+  last_operator: 3,
+  refresh_busy: 3,
+  refresh_diverged: 3,
+  device_pending: 3,
+  DEVICE_EXPIRED: 3,
 
   // Not found (404).
   not_found: 4,
 
   // Auth (401/403).
   unauthenticated: 5,
+  operator_inactive: 5,
   forbidden: 5,
   csrf_required: 5,
+  SIGN_IN_EXPIRED: 5,
 
   // Everything else (rate limits, internal errors, network failures).
   rate_limited: 1,

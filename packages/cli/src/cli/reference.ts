@@ -21,12 +21,41 @@ export interface CommandGroup {
 
 export const COMMAND_GROUPS: CommandGroup[] = [
   {
+    group: "Session",
+    commands: [
+      {
+        usage: "login <email> [--url <instance>]",
+        summary:
+          "Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.",
+      },
+      { usage: "logout", summary: "Forget the stored token for this profile." },
+      { usage: "whoami", summary: "Show the signed-in operator and token expiry." },
+    ],
+  },
+  {
+    group: "Operators",
+    commands: [
+      { usage: "operators list", summary: "Every operator in the directory." },
+      {
+        usage:
+          'operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]',
+        summary: "Create an operator.",
+      },
+      {
+        usage:
+          'operators update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
+        summary: "Update or deactivate an operator.",
+      },
+      { usage: "operators remove <email>", summary: "Remove an operator." },
+    ],
+  },
+  {
     group: "Documents",
     commands: [
       {
         usage:
-          'docs create <slug> --title "<text>" --owner <email> --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft.",
+          'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary: "Create a document in draft; the caller becomes its first operator.",
       },
       { usage: "docs show <slug>", summary: "Dashboard numbers, versions, and schedule." },
       {
@@ -45,6 +74,15 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       {
         usage: 'docs withdraw <slug> --reason "<text>" [--public]',
         summary: "Withdraw the document.",
+      },
+      { usage: "docs operators <slug>", summary: "List a document's operators." },
+      {
+        usage: "docs operators add <slug> <email>",
+        summary: "Add an active operator to a document.",
+      },
+      {
+        usage: "docs operators remove <slug> <email>",
+        summary: "Remove an operator from a document (refused for the last one).",
       },
     ],
   },
@@ -176,7 +214,7 @@ export function renderCommandHelp(name: string): string | null {
     "",
     doc.summary,
     "",
-    "`--actor <label>` sets X-Actor (default cli:<os user>); `--json` prints raw JSON instead of TOON.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
   ];
   // The SDK writes this string verbatim, so the trailing newline is ours.
   return `${lines.join("\n")}\n`;
@@ -196,8 +234,8 @@ export function renderTopLevelHelp(): string {
 
   lines.push(
     "",
-    "Config: DRAFTER_URL / DRAFTER_ADMIN_TOKEN in the environment (or ~/.config/drafter/<profile>.toml).",
-    "`--actor <label>` sets X-Actor on any command; `--json` prints raw JSON instead of TOON.",
+    "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
     "Run `drafter-axi <command> --help` for usage on any command.",
     "Run `drafter-axi` with no arguments to see every open document's status.",
   );

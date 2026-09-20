@@ -26,11 +26,12 @@ const ALWAYS_ALLOWED = new Set(["--help", "-h"]);
 
 /**
  * Global flags accepted on every command without per-command declaration:
- * `--actor` sets `X-Actor` (`specs/api/admin-cli.md` § Configuration),
  * `--json` switches to raw JSON output, `--profile` selects a
  * `~/.config/drafter/<profile>.toml` block. Never reported as unknown.
+ * There is no actor label (`specs/api/admin-cli.md` § Configuration:
+ * "every write is attributed to the signed-in operator") — no `--actor`.
  */
-const GLOBAL_VALUE_FLAGS = new Set(["--actor", "--profile"]);
+const GLOBAL_VALUE_FLAGS = new Set(["--profile"]);
 const GLOBAL_BOOLEAN_FLAGS = new Set(["--json"]);
 
 function isValueLike(arg: string | undefined): boolean {
@@ -60,8 +61,8 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
     throw new AxiError(`unknown flag ${name} for \`${command}\``, "UNKNOWN_FLAG", [
       ...(hint ? [hint] : []),
       known.length > 0
-        ? `valid flags for \`${command}\`: ${known.join(", ")} (--help, --actor, --json, --profile always allowed)`
-        : `\`${command}\` takes no flags of its own (--help, --actor, --json, --profile always allowed)`,
+        ? `valid flags for \`${command}\`: ${known.join(", ")} (--help, --json, --profile always allowed)`
+        : `\`${command}\` takes no flags of its own (--help, --json, --profile always allowed)`,
     ]);
   };
 

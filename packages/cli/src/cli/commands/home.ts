@@ -28,9 +28,9 @@ export async function homeCommand(args: string[]): Promise<string> {
   if (!isConfigured()) {
     if (ifConfigured) return ""; // hook: stay silent when unconfigured (spec: "when DRAFTER_URL is set")
     return joinBlocks(
-      renderObject({ documents: "DRAFTER_URL is not set" }),
+      renderObject({ documents: "not signed in" }),
       renderHelp([
-        "Set DRAFTER_URL and DRAFTER_ADMIN_TOKEN in the environment (or ~/.config/drafter/default.toml)",
+        `Run \`${cli} login <email> --url <instance>\` to sign in`,
         `Run \`${cli} --help\` to see the full command list`,
       ]),
     );
@@ -51,9 +51,7 @@ export async function homeCommand(args: string[]): Promise<string> {
   if (documents.length === 0) {
     return joinBlocks(
       renderObject({ documents: "0 documents found" }),
-      renderHelp([
-        `Run \`${cli} docs create <slug> --title "..." --owner <email> ...\` to start one`,
-      ]),
+      renderHelp([`Run \`${cli} docs create <slug> --title "..." ...\` to start one`]),
     );
   }
 
