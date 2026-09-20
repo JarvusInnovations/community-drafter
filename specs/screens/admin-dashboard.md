@@ -16,9 +16,9 @@ Everything: document, versions (from body-changing commits), participations with
 
 **Device approval** (`/auth/device?code=…`): shows the 8-character user code, the operator it will be bound to (the signed-in one), and "Approve this device" / "Not me"; after approval, "You can close this page; the command line will finish signing in."
 
-**Document list** (`/admin`): only documents the signed-in operator is on: title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI. Header shows the operator's email and a sign-out link.
+**Document list** (`/admin`): only documents the signed-in operator is on (a superadmin sees every document, with a line saying so): title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI. Header shows the operator's email and a sign-out link.
 
-**Operators** (`/admin/operators`): every operator (name, email, kind, active, title, org) with add / edit / deactivate / remove, each requiring a confirmation and showing the resulting commit subject. The signed-in operator cannot deactivate or remove themself here.
+**Operators** (`/admin/operators`): every operator (name, email, kind, active, a superadmin pill where set, title, org) with add / edit / deactivate / remove, each requiring a confirmation and showing the resulting commit subject. The signed-in operator cannot deactivate or remove themself here.
 
 **Dashboard** (`/admin/d/<slug>`):
 - Header with title, state, phase, both deadlines, and buttons: "Extend deadline…", "Copy public link" (if enabled), "Export feedback" (downloads the bundle from `behaviors/review-and-judgement.md`), "Export links" (CSV; recorded).

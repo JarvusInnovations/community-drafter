@@ -32,6 +32,8 @@ Every `/admin/*` and `/auth/*` route, the admin CLI, the admin dashboard, the `A
 
 A request by an operator who is not on the document returns 404 `not_found`, the same body as an unknown document, so document slugs are not disclosed across operators.
 
+**Superadmins.** An operator record may carry `superadmin: true`. A superadmin sees every document in the list and passes document scoping everywhere: dashboards, people, submissions, versions, view-as, and adding or removing a document's operators. Nothing else changes: their actions are recorded under their own email like anyone else's. The flag is granted or removed only by another superadmin (`PATCH /operators/:email { superadmin }`; anyone else gets 403 `forbidden`, and nobody can change their own) or by editing the record in the data repo. At boot the operator named by `BOOTSTRAP_OPERATOR_EMAIL`, if it exists and lacks the flag, is made a superadmin in a commit attributed to `system`, so an instance always has one. The operators page shows the flag as a pill; the document list tells a superadmin that they are seeing every document.
+
 ## Sign-in: magic link
 
 - The login form accepts any email address and always responds "If that address belongs to an operator, a sign-in link is on its way." No enumeration.

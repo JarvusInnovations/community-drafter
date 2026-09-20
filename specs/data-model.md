@@ -93,6 +93,7 @@ One record per person or bot allowed to run documents (`behaviors/operators.md`)
 | `active` | boolean | false = no access anywhere, at the next request |
 | `title`, `org` | string? | |
 | `notes` | string? | team-facing |
+| `superadmin` | boolean? | sees and may act on every document (`behaviors/operators.md` § Superadmins); set only by another superadmin or by editing the record in the data repo |
 
 Who added or deactivated an operator and when is the history of the record (`operator-add`, `operator-update`, `operator-remove` commits with the acting operator's email as `Actor`).
 

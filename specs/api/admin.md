@@ -1,10 +1,10 @@
 # API: Admin
 
-All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer` (CLI, bots) or the operator session cookie with the `X-Requested-With: drafter` header (dashboard); see `api/auth.md` and `behaviors/operators.md`. Every write records `Actor` = the operator's email. **Document routes are scoped**: a caller who is not one of the document's operators gets 404 `not_found`, identical to an unknown slug.
+All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer` (CLI, bots) or the operator session cookie with the `X-Requested-With: drafter` header (dashboard); see `api/auth.md` and `behaviors/operators.md`. Every write records `Actor` = the operator's email. **Document routes are scoped**: a caller who is not one of the document's operators gets 404 `not_found`, identical to an unknown slug (superadmins pass everywhere; `behaviors/operators.md` § Superadmins).
 
 ## Documents
 
-- `GET /documents` → the caller's documents with derived phase and counts.
+- `GET /documents` → the caller's documents with derived phase and counts (every document for a superadmin).
 - `POST /documents` `{ slug, title, capacities?, public_access?, show_signatories?, sender_name, reply_to, revocation_window_hours?, tags? }` → document (state `draft`) with `created_by` and `operators = [caller]`.
 - `GET /documents/:slug/operators` → `[{ email, name, kind, active }]`.
 - `POST /documents/:slug/operators` `{ email }` → adds an active operator from the sheet (`Action: doc-operator-add`); 422 when the email is not an active operator.
@@ -59,9 +59,9 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## Operators
 
-- `GET /operators` → every operator (email, name, kind, active, title, org); any active operator may read the list, because adding someone to a document requires choosing from it.
+- `GET /operators` → every operator (email, name, kind, active, superadmin, title, org); any active operator may read the list, because adding someone to a document requires choosing from it.
 - `POST /operators` `{ email, name, kind?, title?, org?, notes? }` → creates (`Action: operator-add`); 409 when the email exists.
-- `PATCH /operators/:email` `{ name?, active?, title?, org?, notes? }` → updates (`Action: operator-update`). Deactivating yourself is refused (422).
+- `PATCH /operators/:email` `{ name?, active?, superadmin?, title?, org?, notes? }` → updates (`Action: operator-update`). Deactivating yourself is refused (422). `superadmin` may be set only by a superadmin (403 `forbidden` otherwise) and never on yourself (422).
 - `DELETE /operators/:email` → removes the record (`Action: operator-remove`) and drops the email from every document's `operators` list in the same commit; 409 `last_operator` when that would leave any document with none.
 
 ## Instance

@@ -19,7 +19,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `logout` / `whoami` | forget the token / show operator and expiry |
 | `operators list` | every operator |
 | `operators add <email> --name … [--kind person\|bot] [--title …] [--org …]` | create |
-| `operators update <email> [--name …] [--active true\|false] [--title …] [--org …] [--notes …]` | update or deactivate |
+| `operators update <email> [--name …] [--active true\|false] [--superadmin true\|false] [--title …] [--org …] [--notes …]` | update, deactivate, or (superadmins only) grant or revoke superadmin |
 | `operators remove <email>` | remove |
 | `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
 | `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
