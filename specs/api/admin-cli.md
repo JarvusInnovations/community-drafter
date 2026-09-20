@@ -24,8 +24,8 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
 | `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
 | `docs show <slug>` | dashboard numbers, versions, schedule |
-| `docs open <slug> --comments-close <iso> --signing-closes <iso>` | open and send invitations |
-| `docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` | extension |
+| `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
+| `docs extend <slug> [--comments-close <when>] [--signing-closes <when>]` | extension |
 | `docs close|reopen|withdraw <slug> …` | lifecycle |
 | `versions list <slug>` / `versions show <slug> <n> [--body]` | read |
 | `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts |
