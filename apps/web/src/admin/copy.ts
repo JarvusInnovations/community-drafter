@@ -96,7 +96,7 @@ export const copy = {
     versions: "Versions",
     publishHint: "Publishing is CLI-only. To publish a new version:",
     publishCommand: (slug: string) =>
-      `drafter-axi versions publish ${slug} --body <file.md> --summary "…"`,
+      `drafter-axi versions publish ${slug} --file <file.md> --summary "…"`,
     recentActivity: "Recent activity",
     noActivity: "No activity yet.",
     /**
