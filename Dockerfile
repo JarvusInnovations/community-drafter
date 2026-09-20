@@ -33,6 +33,8 @@ RUN bun install --frozen-lockfile
 COPY apps/api/ apps/api/
 COPY apps/web/ apps/web/
 COPY packages/shared/ packages/shared/
+# The sheet configs the API syncs into the data repo at boot (storage/init.ts).
+COPY .gitsheets/ .gitsheets/
 
 # Build the web app to static assets the API will serve.
 RUN cd apps/web && bun run build

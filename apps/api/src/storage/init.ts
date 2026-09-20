@@ -114,6 +114,12 @@ export async function syncSheetConfigs(opts: SyncSheetConfigsOptions): Promise<s
     sourceConfigDir = DEFAULT_SOURCE_CONFIG_DIR,
     author = { name: "community-drafter", email: "bootstrap@community-drafter.local" },
   } = opts;
+  if (!existsSync(sourceConfigDir)) {
+    // A build that ships without its `.gitsheets/` (or a misconfigured source)
+    // must not stop the service from booting; the data repo keeps whatever
+    // configs it has and the caller logs the skip.
+    return [];
+  }
   const targetConfigDir = join(dataDir, ".gitsheets");
   mkdirSync(targetConfigDir, { recursive: true });
 
