@@ -1,3 +1,4 @@
+import { audienceOf } from "@community-drafter/shared";
 import type { FastifyInstance } from "fastify";
 
 import { computeSignatories } from "./signatories.ts";
@@ -51,6 +52,11 @@ export function documentSummary(
     reply_to: entry.record.reply_to,
     capacities: entry.record.capacities,
     public_access: entry.record.public_access,
+    // `specs/api/admin.md`: every document shape carries `audience` derived
+    // from `public_access`, so no consumer does the mapping itself and the
+    // CLI and the dashboard cannot disagree about it.
+    audience: audienceOf(entry.record),
+    list_visible_to: entry.record.list_visible_to,
     show_signatories: entry.record.show_signatories,
     revocation_window_hours: entry.record.revocation_window_hours,
     tags: entry.record.tags,

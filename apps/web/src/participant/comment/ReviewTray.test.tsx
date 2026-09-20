@@ -46,6 +46,10 @@ describe("ReviewTray — a refused submission is never swallowed", () => {
     fireEvent.change(screen.getByLabelText("Organization"), {
       target: { value: "St. Brigid Parish Council" },
     });
+    // `specs/behaviors/signatures.md` § Capacity: official capacity
+    // requires a title, and the tray reports that before the attestation.
+    expect(screen.getByText("Add your title to sign for an organization.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Your title"), { target: { value: "Chair" } });
 
     const button = screen.getByRole("button", { name: "Sign and send comments" });
     expect(button.hasAttribute("disabled")).toBe(true);

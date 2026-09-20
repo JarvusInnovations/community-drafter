@@ -93,6 +93,7 @@ export interface SeedDocumentOptions {
   revocation_window_hours?: number;
   show_signatories?: ShowSignatories;
   public_access?: PublicAccess;
+  list_visible_to?: string[];
   reply_to?: string;
   sender_name?: string;
   /** Defaults to `[TEST_ACTOR.email]` — pass explicit operators for scoping tests. */
@@ -119,6 +120,7 @@ export async function seedDocument(
         revocation_window_hours: opts.revocation_window_hours,
         show_signatories: opts.show_signatories,
         public_access: opts.public_access,
+        list_visible_to: opts.list_visible_to,
         reply_to: opts.reply_to,
         sender_name: opts.sender_name,
         created_by: opts.created_by ?? opts.operators?.[0] ?? TEST_ACTOR.email,

@@ -46,6 +46,7 @@ function documentAt(versionCount: number): DocumentDetail {
     title: "Stock medications",
     state: "open",
     phase: "signing",
+    audience: "closed" as const,
     operators: ["team@example.org"],
     counts: {
       versions: versionCount,

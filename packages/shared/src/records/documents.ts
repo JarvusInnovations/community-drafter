@@ -16,6 +16,25 @@ export const ShowSignatoriesSchema = z.enum(["list", "count", "none"]);
 export type ShowSignatories = z.infer<typeof ShowSignatoriesSchema>;
 
 /**
+ * `specs/data-model.md` § Audience. The audience is deliberately **not** a
+ * stored field: it is `public_access` read as the two-way partition it
+ * already is, so a record can never say two different things about who a
+ * document is for and no existing document needs a migration.
+ */
+export const AudienceSchema = z.enum(["public", "closed"]);
+export type Audience = z.infer<typeof AudienceSchema>;
+
+/** `none` → `closed`; `read` / `participate` → `public`. */
+export function audienceOf(document: { public_access?: PublicAccess }): Audience {
+  return (document.public_access ?? "none") === "none" ? "closed" : "public";
+}
+
+/** The inverse, for a write: `public` → `read`, `closed` → `none`. */
+export function publicAccessForAudience(audience: Audience): PublicAccess {
+  return audience === "public" ? "read" : "none";
+}
+
+/**
  * The `documents` sheet record. Frontmatter holds every field except `body`;
  * `body` is the markdown text and is the thing whose history is the version
  * history (see `packages/shared/src/records/index.ts` doc comment).
@@ -38,6 +57,10 @@ export const DocumentRecordSchema = z.object({
   capacities: z.array(CapacitySchema).optional(),
   public_access: PublicAccessSchema.optional(),
   show_signatories: ShowSignatoriesSchema.optional(),
+  // `specs/data-model.md` § Audience: the organizations a closed document's
+  // signatory list is shared with besides the invitees — a disclosure the
+  // sign card reads out, not an access control.
+  list_visible_to: z.array(z.string()).optional(),
   // `specs/behaviors/operators.md`: the operator who created the document,
   // always also present in `operators`. Optional here (not `.default()`)
   // because gitsheets "validation is on writes only" — a legacy record

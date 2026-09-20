@@ -27,6 +27,8 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
       "--sender-name",
       "--reply-to",
       "--capacities",
+      "--audience",
+      "--list-visible-to",
       "--public",
       "--show-signatories",
       "--revocation-window-hours",
@@ -45,9 +47,18 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
 export const DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --sender-name <text> --reply-to <email>
-       [--capacities personal,official] [--public none|read|participate]
-       [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
+       [--capacities personal,official] [--audience public|closed]
+       [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none]
+       [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
+
+--audience declares who the document is for, and defaults to closed:
+  closed  only the people you invite, each through their own personal link
+  public  anyone with the link can read it (sets public_access to read)
+--list-visible-to names the organizations a closed document's signatory list is
+shared with besides its invitees. It is a disclosure, not a permission: every
+signer is shown those names before they sign. It has no meaning on a public
+document.
 show <slug>
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
@@ -93,6 +104,12 @@ function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string,
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
     public_access: doc.public_access,
+    // `specs/api/admin-cli.md` § Output rules: every document view prints
+    // the audience, derived from `public_access` rather than stored beside
+    // it, so the CLI and the dashboard cannot disagree.
+    audience: doc.audience,
+    list_visible_to:
+      doc.audience === "closed" && doc.list_visible_to?.length ? doc.list_visible_to : undefined,
     public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
@@ -119,6 +136,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>',
       );
       const capacities = csv(str(parsed, "--capacities"));
+      const listVisibleTo = csv(str(parsed, "--list-visible-to"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
@@ -134,6 +152,11 @@ export async function docsCommand(args: string[]): Promise<string> {
           "drafter-axi docs create <slug> --reply-to <email> ...",
         ),
         capacities: capacities.length > 0 ? capacities : undefined,
+        // `specs/data-model.md` § Audience: `--audience` is the spelling an
+        // operator uses; it writes `public_access`, which is where the
+        // audience lives. `--public` stays for the phase-2 `participate`.
+        audience: str(parsed, "--audience") ?? (str(parsed, "--public") ? undefined : "closed"),
+        list_visible_to: listVisibleTo.length > 0 ? listVisibleTo : undefined,
         public_access: str(parsed, "--public"),
         show_signatories: str(parsed, "--show-signatories"),
         revocation_window_hours: str(parsed, "--revocation-window-hours")

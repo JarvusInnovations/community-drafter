@@ -31,6 +31,8 @@ export function makeBundle(overrides: {
       signing_closes_at: "2026-09-30T21:00:00Z",
       capacities: ["personal", "official"],
       show_signatories: "list",
+      audience: "closed",
+      list_visible_to: [],
       reply_to: "team@example.org",
       sender_name: "The Coalition",
       ...overrides.document,

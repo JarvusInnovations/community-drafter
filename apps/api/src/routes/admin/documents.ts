@@ -1,4 +1,10 @@
-import type { Capacity, PublicAccess, ShowSignatories } from "@community-drafter/shared";
+import {
+  type Audience,
+  type Capacity,
+  publicAccessForAudience,
+  type PublicAccess,
+  type ShowSignatories,
+} from "@community-drafter/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
@@ -17,8 +23,10 @@ interface CreateDocumentBody {
   slug: string;
   title: string;
   capacities?: Capacity[];
+  audience?: Audience;
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
+  list_visible_to?: string[];
   sender_name: string;
   reply_to: string;
   revocation_window_hours?: number;
@@ -28,8 +36,10 @@ interface CreateDocumentBody {
 interface PatchDocumentBody {
   title?: string;
   capacities?: Capacity[];
+  audience?: Audience;
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
+  list_visible_to?: string[];
   sender_name?: string;
   reply_to?: string;
   revocation_window_hours?: number;
@@ -98,6 +108,31 @@ function deadlineChanges(
   return changes;
 }
 
+/**
+ * `specs/data-model.md` § Audience + `specs/api/admin.md` § Documents: the
+ * audience lives in `public_access` and nowhere else. `audience` is the
+ * spelling callers prefer; `public_access` stays available for the phase-2
+ * `participate` value. Passing both is fine only when they agree about who
+ * the document is for.
+ */
+function resolvePublicAccess(
+  audience: Audience | undefined,
+  publicAccess: PublicAccess | undefined,
+): PublicAccess | undefined {
+  if (audience === undefined) return publicAccess;
+  const fromAudience = publicAccessForAudience(audience);
+  if (publicAccess === undefined) return fromAudience;
+  const agree = (publicAccess === "none") === (audience === "closed");
+  if (!agree) {
+    throw new ApiError(
+      "validation_failed",
+      `audience '${audience}' and public_access '${publicAccess}' disagree about who this document is for.`,
+      { field: "audience" },
+    );
+  }
+  return publicAccess;
+}
+
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/documents", { config: OPERATOR_ROUTE }, async (request) => {
     const principal = request.principal!;
@@ -126,8 +161,10 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
               type: "array",
               items: { type: "string", enum: ["personal", "official"] },
             },
+            audience: { type: "string", enum: ["public", "closed"] },
             public_access: { type: "string", enum: ["none", "read", "participate"] },
             show_signatories: { type: "string", enum: ["list", "count", "none"] },
+            list_visible_to: { type: "array", items: { type: "string" } },
             sender_name: { type: "string" },
             reply_to: { type: "string" },
             revocation_window_hours: { type: "integer", minimum: 1 },
@@ -164,8 +201,9 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             title: body.title,
             state: "draft",
             capacities: body.capacities,
-            public_access: body.public_access,
+            public_access: resolvePublicAccess(body.audience, body.public_access),
             show_signatories: body.show_signatories,
+            list_visible_to: body.list_visible_to,
             created_by: callerEmail,
             operators: [callerEmail],
             sender_name: body.sender_name,
@@ -209,6 +247,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         "capacities",
         "public_access",
         "show_signatories",
+        "list_visible_to",
         "sender_name",
         "reply_to",
         "revocation_window_hours",
@@ -218,6 +257,10 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       for (const key of allowedKeys) {
         if (request.body[key] !== undefined) patch[key] = request.body[key];
       }
+      // `audience` is a spelling of `public_access` (`specs/data-model.md`
+      // § Audience), so it lands on that one field rather than beside it.
+      const resolvedAccess = resolvePublicAccess(request.body.audience, request.body.public_access);
+      if (resolvedAccess !== undefined) patch.public_access = resolvedAccess;
 
       const result = await fastify.storage.commit(
         "settings",

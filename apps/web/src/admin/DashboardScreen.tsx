@@ -166,6 +166,20 @@ export function DashboardScreen(): JSX.Element {
         >
           {document.state} / {document.phase}
         </span>
+        {/*
+         * `specs/screens/admin-dashboard.md` § Dashboard: the audience,
+         * beside the state, because it is what every signer is told about
+         * who will see their name.
+         */}
+        <span className="text-muted-foreground">
+          <span className="font-semibold text-foreground">{copy.dashboard.audienceLabel}:</span>{" "}
+          {document.audience === "public"
+            ? copy.dashboard.audiencePublic
+            : copy.dashboard.audienceClosed}
+          {document.audience === "closed" && (document.list_visible_to?.length ?? 0) > 0
+            ? ` · ${copy.dashboard.listVisibleTo(document.list_visible_to ?? [])}`
+            : ""}
+        </span>
       </div>
 
       <Timeline document={document} />

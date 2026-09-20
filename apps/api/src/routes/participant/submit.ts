@@ -184,6 +184,16 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
                     { field: "org" },
                   );
                 }
+                if ((sig.title ?? "").trim().length === 0) {
+                  // `specs/behaviors/signatures.md` § Capacity: official
+                  // capacity requires a title, whichever door the
+                  // signature comes through.
+                  throw new ApiError(
+                    "validation_failed",
+                    "Your title is required when you sign for an organization.",
+                    { field: "title" },
+                  );
+                }
                 if (sig.authorized !== true) {
                   throw new ApiError(
                     "attestation_required",
@@ -196,7 +206,7 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
                 display_name: sig.display_name,
                 descriptor: sig.descriptor,
                 org: sig.capacity === "official" ? sig.org : undefined,
-                title: sig.capacity === "official" ? (sig.title ?? "") : undefined,
+                title: sig.capacity === "official" ? (sig.title ?? "").trim() : undefined,
                 authorized: true,
                 conditional,
                 listed: sig.listed ?? true,

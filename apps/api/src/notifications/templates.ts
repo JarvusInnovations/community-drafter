@@ -144,6 +144,32 @@ export function revocationConfirmationTemplate(
   );
 }
 
+/**
+ * `specs/behaviors/notifications.md` § Messages → `listing-changed-<ts>`,
+ * and `specs/behaviors/signatures.md` § Changing how a signature is
+ * listed: it names how the signer is now listed, and says plainly when
+ * they are no longer named on the list. The point is that a signer can
+ * notice a change to their public name that was not theirs, so the message
+ * states the resulting line rather than a vague "your details changed".
+ */
+export function listingChangedTemplate(
+  ctx: RecipientContext,
+  extra: { listedAs: string; listed: boolean },
+): TemplateResult {
+  const line = extra.listed
+    ? `You're now listed on ${quoted(ctx)} as ${extra.listedAs}.`
+    : `Your name is no longer shown on the signatory list for ${quoted(ctx)}. Your signature still counts toward the totals.`;
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — how you're listed changed`,
+    [
+      `${line} If you didn't make this change, open the document and change it back, or reply to this message.`,
+      clock(ctx),
+    ],
+    { label: "Open the document", url: ctx.personalLink },
+  );
+}
+
 export function reviewReceiptTemplate(
   ctx: RecipientContext,
   extra: { judgement: Judgement; commentCount: number },

@@ -20,6 +20,7 @@ type DisabledReason =
   | "nothingChanged"
   | "unsaved"
   | "needsSignature"
+  | "needsTitle"
   | "needsAttestation"
   | null;
 
@@ -140,7 +141,9 @@ function SignatureFields({
             {copy.signForm.titleLabel}
             <input
               type="text"
+              required
               value={title}
+              placeholder={copy.signForm.titleHint}
               onChange={(event) => {
                 setTitle(event.target.value);
                 emit({ title: event.target.value });
@@ -296,6 +299,10 @@ export function ReviewTray({
     disabledReason = "unsaved";
   } else if (needsNewSignature && !signature?.display_name?.trim()) {
     disabledReason = "needsSignature";
+  } else if (needsNewSignature && signature?.capacity === "official" && !signature.title?.trim()) {
+    // `specs/behaviors/signatures.md` § Capacity: official capacity
+    // requires a title, whichever door the signature comes through.
+    disabledReason = "needsTitle";
   } else if (
     needsNewSignature &&
     signature?.capacity === "official" &&

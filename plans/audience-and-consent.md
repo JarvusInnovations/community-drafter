@@ -1,5 +1,5 @@
 ---
-status: planned
+status: done
 depends:
   - signature-version
 specs:
@@ -9,7 +9,10 @@ specs:
   - specs/screens/admin-dashboard.md
   - specs/api/admin.md
   - specs/api/admin-cli.md
+  - specs/api/participant.md
   - specs/behaviors/notifications.md
+issues: [70, 57]
+pr: 87
 ---
 
 # Plan: audience-and-consent
@@ -37,9 +40,9 @@ Decisions 2 and 4 of 2026-09-20 plus the official-capacity gaps (#70, #57). A do
 
 ## Validation
 
-- [ ] The parish signer's scenario: organization change requires re-attestation and produces an email; the button reads "Sign for St. Brigid Parish Council".
-- [ ] The skeptic's scenario: the who-sees sentence and the listing choice are visible before signing.
-- [ ] #70 and #57 closed by the PR.
+- [x] The parish signer's scenario: organization change requires re-attestation and produces an email; the button reads "Sign for St. Brigid Parish Council".
+- [x] The skeptic's scenario: the who-sees sentence and the listing choice are visible before signing.
+- [x] #70 and #57 closed by the PR.
 
 ## Risks / unknowns
 
@@ -47,8 +50,33 @@ Decisions 2 and 4 of 2026-09-20 plus the official-capacity gaps (#70, #57). A do
 
 ## Notes
 
-(closeout)
+- **The audience is derived, not stored.** The plan listed `documents.audience` as a
+  field and, in the same breath, named the overlap with `public_access` as its risk.
+  `public` / `closed` is exactly the partition `public_access` already draws, so storing
+  both would have been two fields encoding one fact — the drift the risk warned about.
+  `--audience` writes `public_access`; every surface derives the word from it
+  (`specs/data-model.md` § Audience). Consequence worth remembering: no migration was
+  needed, and a document created before the word existed already has an audience.
+- **`list_visible_to` is a disclosure, not a permission.** Phase 1 has no way to
+  authenticate an organization, so naming one there changes the sentence the signer
+  reads and the line the dashboard shows, and nothing else. Specifying it that way is
+  what keeps the sign card's promise honest; if a phase-2 organization sign-in ever
+  lands, the field is already the right shape to gate on.
+- **Title required in official capacity** resolves the first judgement call in #81
+  (decided 2026-09-20). The field carries `required`, so the empty case never reaches
+  the submit handler — the trim check exists for whitespace, which `required` lets past.
+- `.gitsheets/documents.toml` changed (optional `list_visible_to`); production's data
+  repo receives it through `syncSheetConfigs` at boot, so the next deploy is worth
+  watching. Existing records still validate.
+- The re-attestation gate keys on `org` alone. Capacity cannot change through PATCH —
+  changing capacity replaces the signature and goes through `POST /signature`, which has
+  always required the attestation — so there was nothing to add for the capacity half of
+  the rule beyond writing it down.
 
 ## Follow-ups
 
-(closeout)
+- Issue [#81](https://github.com/JarvusInnovations/community-drafter/issues/81) — its
+  second observation (a preferences link on transactional messages) is untouched and the
+  issue stays open. The plan resolved only the title half, as scoped.
+- None other. The conditional marker for the team (people-table pill, dashboard tile)
+  already existed from earlier plans and needed no work.

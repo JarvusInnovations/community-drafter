@@ -13,7 +13,7 @@ Response:
   instance: { name },
   person:   { id, name },
   document: { slug, title, state, phase, opened_at, comments_close_at, signing_closes_at,
-              capacities, show_signatories, reply_to, sender_name },
+              capacities, show_signatories, audience, list_visible_to, reply_to, sender_name },
   version:  { number, summary, published_at, final, html, is_current },   // ?v=<n> selects
   versions: [{ number, summary, published_at, final, dispositions }],
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
@@ -34,11 +34,11 @@ Side effect: records an open (batched).
 ## `POST /i/:token/api/signature`
 
 Body: `{ capacity, display_name, descriptor?, org?, title?, authorized?, listed?, version }`.
-Creates or replaces the person's signature (`behaviors/signatures.md`). Errors: `phase_closed`, `attestation_required`, `validation_failed`. Response: the signature. Sends the confirmation.
+Creates or replaces the person's signature (`behaviors/signatures.md`). In official capacity `org`, `title` and `authorized = true` are all required. Errors: `phase_closed`, `attestation_required`, `validation_failed` (a missing `org` or `title` names the field). Response: the signature. Sends the confirmation.
 
 ## `PATCH /i/:token/api/signature`
 
-Body: any of the display fields, or `{ confirm: true }` to clear `conditional`. Response: the signature.
+Body: any of the display fields, or `{ confirm: true }` to clear `conditional`. A change to `org` on an official signature requires `authorized: true` in the same body — `attestation_required` otherwise — and an official signature may not be saved with a blank `title` (`validation_failed`). A body that changes any display field sends `listing-changed-<ts>`; `{ confirm: true }` alone changes none and sends nothing. Response: the signature.
 
 ## `DELETE /i/:token/api/signature`
 

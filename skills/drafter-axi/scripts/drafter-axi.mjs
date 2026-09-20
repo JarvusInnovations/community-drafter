@@ -1266,6 +1266,8 @@ var DOCS_FLAGS = {
       "--sender-name",
       "--reply-to",
       "--capacities",
+      "--audience",
+      "--list-visible-to",
       "--public",
       "--show-signatories",
       "--revocation-window-hours",
@@ -1283,9 +1285,18 @@ var DOCS_FLAGS = {
 var DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --sender-name <text> --reply-to <email>
-       [--capacities personal,official] [--public none|read|participate]
-       [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
+       [--capacities personal,official] [--audience public|closed]
+       [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none]
+       [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
+
+--audience declares who the document is for, and defaults to closed:
+  closed  only the people you invite, each through their own personal link
+  public  anyone with the link can read it (sets public_access to read)
+--list-visible-to names the organizations a closed document's signatory list is
+shared with besides its invitees. It is a disclosure, not a permission: every
+signer is shown those names before they sign. It has no meaning on a public
+document.
 show <slug>
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
@@ -1322,6 +1333,11 @@ function detailObject(doc, instanceUrl) {
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
     public_access: doc.public_access,
+    // `specs/api/admin-cli.md` § Output rules: every document view prints
+    // the audience, derived from `public_access` rather than stored beside
+    // it, so the CLI and the dashboard cannot disagree.
+    audience: doc.audience,
+    list_visible_to: doc.audience === "closed" && doc.list_visible_to?.length ? doc.list_visible_to : void 0,
     public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
@@ -1343,6 +1359,7 @@ async function docsCommand(args) {
         'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>'
       );
       const capacities = csv(str(parsed, "--capacities"));
+      const listVisibleTo = csv(str(parsed, "--list-visible-to"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
@@ -1358,6 +1375,11 @@ async function docsCommand(args) {
           "drafter-axi docs create <slug> --reply-to <email> ..."
         ),
         capacities: capacities.length > 0 ? capacities : void 0,
+        // `specs/data-model.md` § Audience: `--audience` is the spelling an
+        // operator uses; it writes `public_access`, which is where the
+        // audience lives. `--public` stays for the phase-2 `participate`.
+        audience: str(parsed, "--audience") ?? (str(parsed, "--public") ? void 0 : "closed"),
+        list_visible_to: listVisibleTo.length > 0 ? listVisibleTo : void 0,
         public_access: str(parsed, "--public"),
         show_signatories: str(parsed, "--show-signatories"),
         revocation_window_hours: str(parsed, "--revocation-window-hours") ? Number(str(parsed, "--revocation-window-hours")) : void 0,
@@ -2979,8 +3001,8 @@ var COMMAND_GROUPS = [
     group: "Documents",
     commands: [
       {
-        usage: 'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft; the caller becomes its first operator."
+        usage: 'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--audience public|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary: "Create a document in draft; the caller becomes its first operator. --audience declares who the document is for (default closed \u2014 invitees only); --list-visible-to names organizations a closed document's signatory list is shared with, which every signer is told before signing."
       },
       {
         usage: "docs show <slug>",
@@ -3160,7 +3182,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "85b3a29" : "dev";
+var VERSION = true ? "4d9db4f" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

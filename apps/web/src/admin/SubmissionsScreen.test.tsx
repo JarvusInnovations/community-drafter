@@ -14,6 +14,7 @@ const DOCUMENT: DocumentDetail = {
   title: "Coalition Charter",
   state: "open",
   phase: "commenting",
+  audience: "closed" as const,
   counts: {
     versions: 1,
     participations: 2,

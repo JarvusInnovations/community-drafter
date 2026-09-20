@@ -53,8 +53,9 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `opened_at`, `comments_close_at`, `signing_closes_at` | timestamp? | |
 | `revocation_window_hours` | integer, default 72 | |
 | `capacities` | array of `personal` \| `official`, default both | |
-| `public_access` | enum `none` \| `read` \| `participate`, default `none` | `participate` is **[phase 2]** |
+| `public_access` | enum `none` \| `read` \| `participate`, default `none` | the document's **audience** in stored form (below); `participate` is **[phase 2]** |
 | `show_signatories` | enum `list` \| `count` \| `none`, default `list` | |
+| `list_visible_to` | array of string | organizations the team will show the signatory list to besides the invitees; meaningful only on a `closed` document (below) |
 | `created_by` | email | the operator who created the document; always also in `operators` |
 | `operators` | array of email | current operators of this document; never empty |
 | `sender_name`, `reply_to` | string | |
@@ -63,6 +64,23 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `body` | markdown | the text |
 
 The sheet's format sets `body = 'body'` and does not set `title`, so the body may or may not begin with a heading; `title` is a plain setting.
+
+### Audience
+
+Every document declares, before anyone is invited, **who it is for**: `public` — anyone holding the link may read it — or `closed` — only the people invited, each through their own personal link. It is the first thing an operator decides and the thing a signer is told before they sign (`screens/document.md` § Display Rules 3), so it has exactly one home in the record.
+
+That home is `public_access`. The audience **is not a separate field**: it is `public_access` read as the two-way partition it already is, so the record cannot say two different things about who a document is for.
+
+| `public_access` | Audience | Means |
+| --- | --- | --- |
+| `none` | `closed` | invitees only; nothing but a personal link opens the document |
+| `read`, `participate` | `public` | anyone with the link may read it (`screens/public-and-embed.md`) |
+
+`audience` is the word every surface uses: `docs create --audience public\|closed` is how an operator sets it (`api/admin-cli.md`) and it writes `public_access` (`public` → `read`, `closed` → `none`) and nothing else; the admin API returns it alongside `public_access`; the dashboard and the sign card derive it. Because it is derived rather than stored, a document created before the word existed already has one, and no migration is needed.
+
+`show_signatories` is the separate question of whether the *signatory list* is shown at all, and it is orthogonal: a `public` document may show only counts, and a `closed` one may show a full list to its invitees.
+
+`list_visible_to` names the organizations the team will show a `closed` document's signatory list to besides the invitees. It is a **disclosure** — the sign card names those organizations in the sentence a signer reads before signing — and not an access control: phase 1 has no sign-in for an organization, and nothing in this field lets anyone new open the document. On a `public` document it has no meaning and is not shown.
 
 ### Versions
 

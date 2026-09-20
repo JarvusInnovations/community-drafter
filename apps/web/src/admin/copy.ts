@@ -80,6 +80,17 @@ export const copy = {
   },
 
   dashboard: {
+    /**
+     * `specs/screens/admin-dashboard.md` § Dashboard: the audience is the
+     * promise the sign card makes to every signer, so the team reads it
+     * where they read the rest of the document's settings
+     * (`specs/data-model.md` § Audience).
+     */
+    audienceLabel: "Audience",
+    audiencePublic: "Public — anyone with the link can read",
+    audienceClosed: "Invitees only",
+    listVisibleTo: (organizations: string[]) =>
+      `signatory list also shared with ${organizations.join(", ")}`,
     extendDeadline: "Extend deadline…",
     copyPublicLink: "Copy public link",
     exportFeedback: "Export feedback",

@@ -50,16 +50,29 @@ export function SignForm({
   const [org, setOrg] = useState(prefill.org ?? "");
   const [title, setTitle] = useState(prefill.role ?? "");
   const [authorized, setAuthorized] = useState(false);
+  // `specs/behaviors/signatures.md` § Consent at signing: on by default,
+  // and decided before the button rather than after the signature exists.
+  const [listed, setListed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formId = useId();
 
   const isOfficial = capacity === "official";
+  // § Consent at signing: the listing choice is offered only when a list is
+  // shown at all; with `count` or `none` the who-sees sentence has already
+  // said so and `listed` stays true.
+  const showListingChoice = document.show_signatories === "list";
+  const sharedWith = document.audience === "closed" ? document.list_visible_to : [];
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (readOnly) return;
     setError(null);
+
+    if (isOfficial && title.trim().length === 0) {
+      setError(copy.signForm.titleError);
+      return;
+    }
 
     if (isOfficial && !authorized) {
       setError(copy.signForm.attestationError(org));
@@ -75,6 +88,7 @@ export function SignForm({
         org: isOfficial ? org : undefined,
         title: isOfficial ? title : undefined,
         authorized: isOfficial ? authorized : true,
+        listed,
         version: bundle.version.number,
       });
       await onSigned();
@@ -155,8 +169,10 @@ export function SignForm({
             {copy.signForm.titleLabel}
             <input
               type="text"
+              required
               value={title}
               disabled={readOnly}
+              placeholder={copy.signForm.titleHint}
               onChange={(event) => setTitle(event.target.value)}
               className={FIELD}
             />
@@ -185,6 +201,35 @@ export function SignForm({
           />
         </label>
       )}
+
+      {/*
+       * § Consent at signing: who will see this name, and how it will be
+       * named — both above the button, so the decision is made before the
+       * signature exists rather than only after it (issue #70).
+       */}
+      <div className="flex flex-col gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+        <p>
+          {copy.signForm.whoSees(document.audience, document.show_signatories)}
+          {sharedWith.length > 0 ? ` ${copy.signForm.alsoSharedWith(sharedWith)}` : ""}
+        </p>
+        {showListingChoice ? (
+          <label className="flex items-start gap-2 font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={listed}
+              disabled={readOnly}
+              onChange={(event) => setListed(event.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              {copy.signForm.listedLabel(document.audience)}
+              <span className="block font-normal text-muted-foreground">
+                {copy.signForm.listedHint}
+              </span>
+            </span>
+          </label>
+        ) : null}
+      </div>
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

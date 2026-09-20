@@ -128,7 +128,7 @@ every-session use instead.
 
 ### Documents
 
-- `scripts/drafter-axi docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft; the caller becomes its first operator.
+- `scripts/drafter-axi docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--audience public|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft; the caller becomes its first operator. --audience declares who the document is for (default closed — invitees only); --list-visible-to names organizations a closed document's signatory list is shared with, which every signer is told before signing.
 - `scripts/drafter-axi docs show <slug>` — Dashboard numbers, versions, and schedule; prints public_url when the document is publicly readable.
 - `scripts/drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>` — Open commenting and signing, and send invitations.
 - `scripts/drafter-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` — Push a deadline later (never earlier).

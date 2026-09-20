@@ -1,3 +1,4 @@
+import { audienceOf } from "@community-drafter/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
@@ -61,6 +62,12 @@ export function buildParticipantBundle(
       signing_closes_at: document.record.signing_closes_at,
       capacities: document.record.capacities ?? ["personal", "official"],
       show_signatories: document.record.show_signatories ?? "list",
+      // `specs/behaviors/signatures.md` § Consent at signing: the sign card
+      // says who will see the signer's name, which is the audience
+      // (`specs/data-model.md` § Audience) plus, on a closed document, the
+      // organizations the list is shared with.
+      audience: audienceOf(document.record),
+      list_visible_to: document.record.list_visible_to ?? [],
       reply_to: document.record.reply_to,
       sender_name: document.record.sender_name,
     },
