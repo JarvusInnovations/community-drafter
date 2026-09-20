@@ -1,6 +1,6 @@
 ---
 name: drafter-axi
-description: Drive a community-drafter document from the shell — create it, publish revisions, invite and track signers, export the pending-feedback bundle for an LLM disposition round, and check in on every open document at the start of a session. Use whenever a task involves a community-drafter admin API instance (DRAFTER_URL/DRAFTER_ADMIN_TOKEN), a document slug, invitations, signatures, or publishing a version.
+description: Drive a community-drafter document from the shell — sign in, create a document, publish revisions, invite and track signers, export the pending-feedback bundle for an LLM disposition round, and check in on every open document at the start of a session. Use whenever a task involves a community-drafter admin API instance (DRAFTER_URL/DRAFTER_TOKEN, or `login`), a document slug, invitations, signatures, or publishing a version.
 metadata:
   internal: false
 ---
@@ -23,16 +23,22 @@ elsewhere shows a follow-up command starting with `drafter-axi`, run it as
 
 ## Configuration
 
-Set `DRAFTER_URL` and `DRAFTER_ADMIN_TOKEN` in the environment before running any command, or add
-them to `~/.config/drafter/<profile>.toml` as `url = "..."` and `admin_token = "..."` (select a
-non-default profile with `--profile <name>`). `--actor <label>` sets the `X-Actor` header recorded
-on every write (default: `cli:<os user>`).
+Run `scripts/drafter-axi login you@example.org --url https://drafts.example.org` once: it sends a
+sign-in link to that address, prints an 8-character code, and waits for a human (you, or the
+mailbox owner for a bot operator) to open the link and approve the device. On approval it writes
+the instance URL, the operator's email, and a 90-day token to `~/.config/drafter/<profile>.toml`
+(mode 600) — every later command reads from there, and the CLI refreshes the token silently once
+it's more than 30 days old. Select a non-default profile with `--profile <name>`.
 
 ```sh
-export DRAFTER_URL=https://drafts.example.org
-export DRAFTER_ADMIN_TOKEN=...
+scripts/drafter-axi login you@example.org --url https://drafts.example.org
 scripts/drafter-axi
 ```
+
+For CI or a bot with no profile file, set `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment
+instead — either overrides the profile independently. There is no actor label any more: every
+write is attributed to the signed-in operator. `scripts/drafter-axi whoami` shows who that is and
+when the token expires; `scripts/drafter-axi logout` forgets it.
 
 ## Output
 
@@ -67,15 +73,31 @@ every-session use instead.
 
 <!-- BEGIN GENERATED: command-reference -->
 
+### Session
+
+- `scripts/drafter-axi login <email> [--url <instance>]` — Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.
+- `scripts/drafter-axi logout` — Forget the stored token for this profile.
+- `scripts/drafter-axi whoami` — Show the signed-in operator and token expiry.
+
+### Operators
+
+- `scripts/drafter-axi operators list` — Every operator in the directory.
+- `scripts/drafter-axi operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]` — Create an operator.
+- `scripts/drafter-axi operators update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]` — Update or deactivate an operator.
+- `scripts/drafter-axi operators remove <email>` — Remove an operator.
+
 ### Documents
 
-- `scripts/drafter-axi docs create <slug> --title "<text>" --owner <email> --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft.
+- `scripts/drafter-axi docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft; the caller becomes its first operator.
 - `scripts/drafter-axi docs show <slug>` — Dashboard numbers, versions, and schedule.
 - `scripts/drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>` — Open commenting and signing, and send invitations.
 - `scripts/drafter-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` — Push a deadline later (never earlier).
 - `scripts/drafter-axi docs close <slug>` — Close signing now.
 - `scripts/drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>` — Reopen a closed document.
 - `scripts/drafter-axi docs withdraw <slug> --reason "<text>" [--public]` — Withdraw the document.
+- `scripts/drafter-axi docs operators <slug>` — List a document's operators.
+- `scripts/drafter-axi docs operators add <slug> <email>` — Add an active operator to a document.
+- `scripts/drafter-axi docs operators remove <slug> <email>` — Remove an operator from a document (refused for the last one).
 
 ### Versions
 
