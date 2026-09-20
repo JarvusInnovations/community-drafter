@@ -189,18 +189,7 @@ tagged with the release version (`vX.Y.Z` → `X.Y.Z`) and `latest`, then runs
 authenticated via Workload Identity Federation (no long-lived key). See
 `release-flow` for cutting the release itself.
 
-**Known gap:** the CI service account (`community-drafter-ci@…`) holds
-narrower project-level roles than a typical "CI is the canonical applier"
-setup — `secretmanager.viewer` / `serviceusage.serviceUsageViewer` rather
-than the `*.admin` equivalents (see the comment in `tf/iam.tf` for why).
-This is enough for a routine image-tag-bump apply, but if `tofu plan`'s
-state refresh needs to read `google_project_iam_member` bindings it doesn't
-already have permission to see (`resourcemanager.projectIamAdmin` or
-broader), the CI apply will 403. If that happens, grant the CI SA
-`roles/resourcemanager.projectIamAdmin` from an operator workstation
-(`tofu apply` there, or `gcloud projects add-iam-policy-binding`) — this
-promotes CI to a fully self-managing applier, matching the
-proposal-renderer/jarvus-allocator template.
+**Manual applies:** `tf/terraform.tfvars` pins `image_tag` and `public_url`, so a bare `tofu apply -concise` (for example to change IAM) keeps the running service as it is. Update `image_tag` there on each manual deploy. The CI service account holds the template's project admin roles (issue #7, applied 2026-09-19), so the release workflow's `tofu apply` can manage secrets, the registry and IAM on its own.
 
 ## Verifying a deploy
 
