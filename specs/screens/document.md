@@ -75,10 +75,13 @@ Arrives from: the invitation email/SMS, any notification, comment mode, history,
 ## Principles
 
 **Inherited**
+
 - [Sign first, everything else after](../principles.md#sign-first-everything-else-after): the status card precedes the text; commenting is a link on the card, not a mode you must pass through.
 - [Just sign it for now](../principles.md#just-sign-it-for-now): the reassurance line under the sign button is mandatory copy, not optional polish.
 - [The link is the identity](../principles.md#the-link-is-the-identity): identity line and "Not you?" on every page.
 - [Say exactly who signed](../principles.md#say-exactly-who-signed): the attestation checkbox and the organizations/individuals split.
+- [Keyboard first, announce every state change](../principles.md#keyboard-first-announce-every-state-change): sign, change listing, remove and decline each move focus to the card's new heading and announce it; the desktop skip link jumps from the action panel to the text.
 
 **Local**
+
 - **The card tells you your own state before anything else.** Whatever else changes on this page, the first sentence a returning participant reads is what they have done and what they can do next.

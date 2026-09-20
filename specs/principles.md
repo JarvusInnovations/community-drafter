@@ -69,3 +69,9 @@ Confirmation of a signature, a revocation, and the invitation itself are always 
 A comment records which version and which passage it was written against. When the text changes, the comment is re-attached where the passage moved to if it can be found, and otherwise shown alongside its quoted original text, marked as written on the earlier version. A comment is never dropped from view because the words it pointed at changed.
 
 *Why:* the precedent system (proposal-renderer) anchored comments to *current* text only and lost them silently on edit. In a tool whose whole point is revising text in response to comments, that failure mode is disqualifying.
+
+## Keyboard first, announce every state change
+
+Every interactive control has a visible focus ring, every action moves focus somewhere sensible (the heading of the state it produced, the field it opened), and every result is announced in a live region. Nothing is reachable only by pointer, and a page has exactly one `h1`.
+
+*Why:* the people a coalition most needs to sign are often the ones reading on a phone with a screen reader or tabbing through on a keyboard between meetings. A control that only works with a mouse, or an action whose result appears somewhere focus never goes, is a silent "no" from exactly those people — and they will not tell us.

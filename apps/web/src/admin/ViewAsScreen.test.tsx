@@ -98,5 +98,9 @@ describe("ViewAsScreen", () => {
     expect(screen.getByRole("button", { name: /change how you're listed/iu })).toBeTruthy();
 
     expectEverythingDisabled();
+
+    // `specs/screens/admin-dashboard.md` § View as: "exactly one `h1`" — the
+    // admin document layout owns it, so view-as itself contributes none.
+    expect(document.querySelectorAll("h1")).toHaveLength(0);
   });
 });

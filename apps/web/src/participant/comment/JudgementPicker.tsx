@@ -40,7 +40,7 @@ export function JudgementPicker({
         return (
           <label
             key={judgement}
-            className={`flex cursor-pointer flex-col gap-0.5 rounded-xl border border-border p-3 text-sm has-checked:border-primary has-checked:bg-primary-soft ${
+            className={`flex cursor-pointer flex-col gap-0.5 rounded-xl border border-border p-3 text-sm has-checked:border-primary has-checked:bg-primary-soft has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary has-[:focus-visible]:outline-offset-2 ${
               optionDisabled ? "cursor-not-allowed opacity-50" : ""
             }`}
           >

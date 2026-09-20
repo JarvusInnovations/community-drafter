@@ -1,5 +1,5 @@
 import { type Anchor } from "@community-drafter/shared/browser";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { type SubmitInput, getVersion, postSubmit } from "../api.ts";
@@ -20,6 +20,7 @@ import { VersionMismatchBar } from "./VersionMismatchBar.tsx";
 export function CommentModeScreen(): JSX.Element {
   const { bundle, token, refetch } = useParticipantBundle();
   const [confirmation, setConfirmation] = useState<{ judgement: string } | null>(null);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
   const [movingVersion, setMovingVersion] = useState(false);
   const [displayedVersionNumber, setDisplayedVersionNumber] = useState<number | null>(null);
   const [displayedVersion, setDisplayedVersion] = useState<VersionDetail | null>(null);
@@ -112,6 +113,15 @@ export function CommentModeScreen(): JSX.Element {
     await refetch();
   }
 
+  // `## Principles` (#72): submitting swaps the whole screen for this
+  // confirmation panel — move focus to its heading so a keyboard/screen
+  // reader user isn't left on a button that just vanished from the DOM.
+  useEffect(() => {
+    if (confirmation) {
+      confirmationHeadingRef.current?.focus();
+    }
+  }, [confirmation]);
+
   const signatureLine =
     bundle.signature && !bundle.signature.revoked
       ? copy.signed.heading(
@@ -126,8 +136,12 @@ export function CommentModeScreen(): JSX.Element {
   if (confirmation) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
+        <div role="status" className="rounded-2xl border border-border bg-card p-6">
+          <h1
+            ref={confirmationHeadingRef}
+            tabIndex={-1}
+            className="text-xl font-bold tracking-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
             {copy.commentMode.confirmation.heading}
           </h1>
           <p className="mt-2 text-muted-foreground">

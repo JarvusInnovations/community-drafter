@@ -140,7 +140,10 @@ export function DashboardScreen(): JSX.Element {
   return (
     <main className="mx-auto max-w-[1120px] px-5 py-6">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        <span
+          role="status"
+          className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+        >
           {document.state} / {document.phase}
         </span>
       </div>
