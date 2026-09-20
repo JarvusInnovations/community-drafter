@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
+import { AutoTextarea } from "../components/AutoTextarea.tsx";
 import { copy } from "../copy.ts";
 import { type CommentStatus, type TrayComment } from "./useDraftTray.ts";
 
@@ -46,8 +47,21 @@ export function TrayItem({
   onDelete: () => void;
 }): JSX.Element {
   const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const quoteRef = useRef<HTMLQuoteElement>(null);
   const quote = comment.anchor?.quote;
   const heading = headingPathText(comment.anchor);
+
+  // "Show more" used to appear for any quote over 80 characters, whether or
+  // not the two-line clamp actually hid anything — so on a short quote it
+  // toggled a class that changed nothing (issue #73). Ask the layout.
+  useLayoutEffect(() => {
+    const element = quoteRef.current;
+    if (!element || expanded || !quote) {
+      return;
+    }
+    setClamped(element.scrollHeight > element.clientHeight + 1);
+  }, [quote, expanded]);
 
   return (
     <li
@@ -60,11 +74,12 @@ export function TrayItem({
         <div className="text-xs text-muted-foreground">
           {heading ? <p className="font-semibold uppercase tracking-wider">{heading}</p> : null}
           <blockquote
+            ref={quoteRef}
             className={`mt-1 border-l-2 border-border pl-2 italic ${expanded ? "" : "line-clamp-2"}`}
           >
             "{quote}"
           </blockquote>
-          {quote.length > 80 ? (
+          {clamped || expanded ? (
             <button
               type="button"
               className="mt-0.5 font-medium text-primary"
@@ -81,12 +96,12 @@ export function TrayItem({
         </div>
       ) : null}
 
-      <textarea
+      <AutoTextarea
         value={comment.body}
         onChange={(event) => onEdit(event.target.value)}
         onBlur={onCommit}
         rows={2}
-        className="w-full rounded-xl border border-border bg-card p-2.5 text-sm text-foreground"
+        className="w-full resize-none rounded-xl border border-border bg-card p-2.5 text-sm text-foreground"
       />
 
       {comment.conflictNote ? <p className="text-xs text-amber">{comment.conflictNote}</p> : null}

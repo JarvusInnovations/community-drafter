@@ -1,6 +1,7 @@
 import { type Anchor, type SelectionInfo, computeAnchor } from "@community-drafter/shared/browser";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { AutoTextarea } from "../components/AutoTextarea.tsx";
 import { copy } from "../copy.ts";
 import { blocksFromDom } from "./blocks.ts";
 import { type HighlightTarget, applyHighlights } from "./highlights.ts";
@@ -119,7 +120,7 @@ export function DocumentColumn({
       {pending && !composerOpen ? (
         <button
           type="button"
-          className="fixed z-20 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-[0_4px_10px_rgba(36,87,245,0.28)]"
+          className="fixed z-30 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-[0_4px_10px_rgba(36,87,245,0.28)]"
           style={anchorStyle}
           onClick={() => setComposerOpen(true)}
         >
@@ -131,7 +132,7 @@ export function DocumentColumn({
         <div
           role="dialog"
           aria-label={copy.commentMode.composerDialogLabel}
-          className="fixed z-20 flex w-72 flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)]"
+          className="fixed z-30 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)]"
           style={anchorStyle}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
@@ -143,7 +144,7 @@ export function DocumentColumn({
           <label htmlFor={composerFieldId} className="sr-only">
             {copy.commentMode.composerFieldLabel}
           </label>
-          <textarea
+          <AutoTextarea
             id={composerFieldId}
             autoFocus
             value={composerBody}
@@ -154,7 +155,7 @@ export function DocumentColumn({
               }
             }}
             rows={3}
-            className="w-full rounded-xl border border-border bg-card p-2.5 text-sm text-foreground"
+            className="w-full resize-none rounded-xl border border-border bg-card p-2.5 text-sm text-foreground"
           />
           <div className="flex justify-end gap-3 text-xs">
             <button

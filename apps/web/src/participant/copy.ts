@@ -10,7 +10,13 @@
  */
 import { type ApiError } from "./api.ts";
 import { formatAbsolute } from "./format.ts";
-import { type DiffSummaryItem, type Phase } from "./types.ts";
+import { type DiffSummaryItem, type Phase, type SignatureView } from "./types.ts";
+
+/** Just the fields the signed-state line reads off a signature. */
+export type SignedWho = Pick<
+  SignatureView,
+  "capacity" | "display_name" | "descriptor" | "org" | "title"
+>;
 
 export const copy = {
   instanceBar: (name: string) => name,
@@ -99,13 +105,25 @@ export const copy = {
     capacityOfficial: "On behalf of an organization",
     nameLabel: "Your name",
     descriptorLabel: "How would you like to be described? (optional)",
-    descriptorHint: "your neighborhood, profession, or connection to the Academy",
+    descriptorHint: "your neighborhood, profession, or organization",
     orgLabel: "Organization",
     titleLabel: "Your title (optional)",
     attestation: (org: string) =>
       `I am authorized to sign this on behalf of ${org || "this organization"}.`,
     listedLabel: "List my name publicly",
     signButton: (name: string) => `Sign as ${name || "…"}`,
+    /**
+     * `specs/screens/document.md` § Display Rules 3: in official capacity
+     * "the sign button reads 'Sign for St. Brigid Parish Council'" — the
+     * signature is the organization's, and the button should say so.
+     */
+    signButtonOfficial: (org: string) => `Sign for ${org || "your organization"}`,
+    /**
+     * The attestation gate used to echo the checkbox label back at the
+     * signer, which said nothing about what had gone wrong (issue #73).
+     */
+    attestationError: (org: string) =>
+      `Check the box confirming you're authorized to sign for ${org || "this organization"} before adding your name.`,
     reassurance: (deadline: string) =>
       `You can remove your name any time until ${deadline}. We'll email you when the final version is published.`,
     declineLink: "I'd rather not sign",
@@ -114,9 +132,17 @@ export const copy = {
   },
 
   signed: {
-    heading(date: string, name: string, descriptor?: string): string {
-      const who = descriptor ? `${name}, ${descriptor}` : name;
-      return `You signed on ${date} as ${who}.`;
+    /**
+     * `specs/screens/document.md` § Display Rules 3 (*Signed*). The date is
+     * the signature currently in force; in official capacity the line names
+     * the organization the signature belongs to.
+     */
+    heading(date: string, who: SignedWho): string {
+      const detail = who.capacity === "official" ? who.title : who.descriptor;
+      const named = detail ? `${who.display_name}, ${detail}` : who.display_name;
+      return who.capacity === "official" && who.org
+        ? `You signed on ${date} for ${who.org} as ${named}.`
+        : `You signed on ${date} as ${named}.`;
     },
     changeListing: "Change how you're listed",
     remove: "Remove my name",
@@ -329,6 +355,8 @@ export const copy = {
       nothingChanged: "Nothing has changed since your last submission.",
       unsaved: "Some comments are still saving — wait a moment before submitting.",
       needsSignature: "Add your name to sign.",
+      /** `specs/screens/comment-mode.md` § Review tray: official capacity without the attestation. */
+      needsAttestation: "Check the box confirming you're authorized to sign for your organization.",
     },
     confirmation: {
       heading: "Sent.",
