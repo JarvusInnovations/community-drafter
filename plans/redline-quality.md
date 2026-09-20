@@ -1,8 +1,11 @@
 ---
-status: planned
+status: in-progress
 depends: []
 specs:
   - specs/screens/version-history.md
+  - specs/behaviors/versioning.md
+  - specs/api/participant.md
+issues: [69]
 ---
 
 # Plan: redline-quality
