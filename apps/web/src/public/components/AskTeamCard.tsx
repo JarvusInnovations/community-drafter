@@ -10,12 +10,12 @@ import { copy } from "../copy.ts";
  */
 export function AskTeamCard({ replyTo }: { replyTo?: string }): JSX.Element {
   return (
-    <div className="mx-4 mt-3 rounded border border-border bg-muted p-3 text-sm">
-      <p className="font-semibold text-foreground">{copy.askTeam.heading}</p>
+    <div className="rounded-2xl border border-border bg-card p-5 text-sm">
+      <p className="text-xl font-bold tracking-tight text-foreground">{copy.askTeam.heading}</p>
       <p className="mt-1 text-muted-foreground">
         {copy.askTeam.intro}{" "}
         {replyTo ? (
-          <a href={`mailto:${replyTo}`} className="underline">
+          <a href={`mailto:${replyTo}`} className="font-medium text-primary">
             {replyTo}
           </a>
         ) : (

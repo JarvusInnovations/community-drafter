@@ -69,64 +69,67 @@ export function SignForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-foreground">{copy.signForm.heading}</h2>
+      <h2 className="text-xl font-bold tracking-tight text-foreground">{copy.signForm.heading}</h2>
+      <p className="-mt-2 text-sm text-muted-foreground">{copy.signForm.sub}</p>
 
       {showCapacityChoice ? (
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-sm font-medium text-foreground">
-            {copy.signForm.capacityLegend}
-          </legend>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name={`${formId}-capacity`}
-              checked={capacity === "personal"}
-              onChange={() => setCapacity("personal")}
-            />
-            {copy.signForm.capacityPersonal}
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name={`${formId}-capacity`}
-              checked={capacity === "official"}
-              onChange={() => setCapacity("official")}
-            />
-            {copy.signForm.capacityOfficial}
-          </label>
+          <legend className="sr-only">{copy.signForm.capacityLegend}</legend>
+          <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
+            <label className="cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm">
+              <input
+                type="radio"
+                name={`${formId}-capacity`}
+                className="sr-only"
+                checked={capacity === "personal"}
+                onChange={() => setCapacity("personal")}
+              />
+              {copy.signForm.capacityPersonal}
+            </label>
+            <label className="cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm">
+              <input
+                type="radio"
+                name={`${formId}-capacity`}
+                className="sr-only"
+                checked={capacity === "official"}
+                onChange={() => setCapacity("official")}
+              />
+              {copy.signForm.capacityOfficial}
+            </label>
+          </div>
         </fieldset>
       ) : null}
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
         {copy.signForm.nameLabel}
         <input
           type="text"
           required
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
-          className="rounded border border-border p-2"
+          className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
         />
       </label>
 
       {isOfficial ? (
         <>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
             {copy.signForm.orgLabel}
             <input
               type="text"
               required
               value={org}
               onChange={(event) => setOrg(event.target.value)}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
             {copy.signForm.titleLabel}
             <input
               type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
             />
           </label>
           <label className="flex items-start gap-2 text-sm">
@@ -140,14 +143,14 @@ export function SignForm({
           </label>
         </>
       ) : (
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
           {copy.signForm.descriptorLabel}
           <input
             type="text"
             value={descriptor}
             onChange={(event) => setDescriptor(event.target.value)}
             placeholder={copy.signForm.descriptorHint}
-            className="rounded border border-border p-2"
+            className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
           />
         </label>
       )}
@@ -161,12 +164,12 @@ export function SignForm({
       <button
         type="submit"
         disabled={submitting || displayName.trim().length === 0}
-        className="rounded bg-foreground px-4 py-2 text-sm font-semibold text-background"
+        className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:opacity-60"
       >
         {submitting ? copy.signForm.signing : copy.signForm.signButton(displayName)}
       </button>
 
-      <p className="text-sm text-muted-foreground">
+      <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">
         {copy.signForm.reassurance(formatAbsolute(document.signing_closes_at))}
       </p>
     </form>

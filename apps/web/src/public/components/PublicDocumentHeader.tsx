@@ -9,8 +9,10 @@ import { type PublicDocumentInfo } from "../types.ts";
  */
 export function PublicDocumentHeader({ document }: { document: PublicDocumentInfo }): JSX.Element {
   return (
-    <header className="px-4 pt-4">
-      <h1 className="text-2xl font-bold text-foreground">{document.title}</h1>
+    <header className="pt-6">
+      <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl">
+        {document.title}
+      </h1>
       <Timeline document={document} />
     </header>
   );

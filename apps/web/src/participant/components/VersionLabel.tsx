@@ -29,9 +29,9 @@ export function VersionLabel({
   readOnly?: boolean;
 }): JSX.Element {
   return (
-    <div className="mt-3 flex flex-col gap-1 text-sm">
+    <div className="flex flex-col gap-2 text-sm">
       {!isCurrent ? (
-        <p className="rounded border border-border bg-muted p-2 text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted p-3 text-muted-foreground">
           {copy.olderVersionBanner.reading(number)}{" "}
           {readOnly ? (
             copy.olderVersionBanner.readCurrent(currentNumber)
@@ -42,21 +42,32 @@ export function VersionLabel({
           )}
         </p>
       ) : null}
-      <p className="text-muted-foreground">
-        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+        <span
+          className={
+            "rounded-full px-2.5 py-0.5 text-xs font-bold " +
+            (isCurrent ? "bg-ok-soft text-ok" : "bg-muted text-muted-foreground")
+          }
+        >
+          {copy.versionLabel.chip(number, isCurrent)}
+        </span>
+        <span>{copy.versionLabel.rest(formatAbsolute(publishedAt), summary)}</span>
         {readOnly ? null : (
           <>
             {number > 1 ? (
               <>
                 {" "}
                 ·{" "}
-                <Link to={`/i/${token}/history/compare?to=${number}`} className="underline">
+                <Link
+                  to={`/i/${token}/history/compare?to=${number}`}
+                  className="font-medium text-primary"
+                >
                   {copy.versionLabel.seeWhatChanged}
                 </Link>
               </>
             ) : null}{" "}
             ·{" "}
-            <Link to={`/i/${token}/history`} className="underline">
+            <Link to={`/i/${token}/history`} className="font-medium text-primary">
               {copy.versionLabel.allVersions}
             </Link>
           </>

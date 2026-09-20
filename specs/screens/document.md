@@ -33,6 +33,21 @@ The page must render its status card and title within the bundle budget in `arch
 
 Phone width is the primary layout; the sign card is the first thing visible after the title on a phone.
 
+## Design
+
+The visual design chosen on 2026-09-19 from three concepts (the "Docket" direction). It applies to the participant document screen and its shared parts (timeline, sign card, version label, signatories, footer), to comment mode's frame, and to the public read view; the admin dashboard follows the same tokens.
+
+- **Tokens**: a cool neutral page background with white cards (rounded, 1 px border, no heavy shadows); near-black ink, a muted ink for secondary text, one accent blue for actions and the active period, with a pale blue tint for "current" surfaces; green for done states, an amber tint for the reassurance note. Dark scheme provides the same roles. A system/Inter-style sans-serif throughout; the title is heavy and tight, section headings are semibold; no serif, no decorative type.
+- **Frame**: a slim sticky top bar with the instance name and a live pill ("Comment period · closes in 4d 21h"). Content is centered at up to 1120 px with 20 px gutters.
+- **Timeline**: the rail form: two countdown chips side by side (label, big relative time, absolute time; the active period's chip in the blue tint with a blue border), then a proportional track (active segment striped in blue, done segment solid green, pending segment a dashed outline), a "today" marker, and the three dated points (Opened, Comments close, Signatures due) under it. Never aligned to columns of text.
+- **Layout**: at 960 px and wider, the document card on the left and a sticky action panel (360 px) on the right; on narrower screens the action panel comes first, above the document card, and a sticky bottom bar ("Add your name" / "Sign as Alex Kim" + Sign button) appears only while the panel is scrolled out of view.
+- **Action panel (sign card)**: heading "Add your name", a one-line reassurance ("Takes ten seconds. You can always change or remove it."), the unsent-comments notice as a dashed row with a Continue link, a segmented control for capacity, labeled rounded inputs, a full-width blue primary button with a soft shadow, the deadline reassurance in the amber note, and the two quiet links.
+- **Document card**: the version chip ("Version 2 · current" in green, or "Version 1" neutral) with date, summary and the history links on one wrapping line; the rendered text below at a comfortable measure; headings semibold.
+- **Signatories card**: heading, a row of initial avatars with the counts sentence, then a responsive grid of chips (initial avatar, name, descriptor or org and title; organization avatars in the deep blue).
+- **Footer**: quiet, with the questions and preferences links and the private-link line.
+
+Screenshots of the mock that defines this are in `site/img/` once the live app matches; the mock itself is not versioned.
+
 ## Actions
 
 | Action | Effect |

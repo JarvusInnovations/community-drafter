@@ -20,14 +20,14 @@ export function Footer({
   readOnly?: boolean;
 }): JSX.Element {
   return (
-    <footer className="mx-4 mt-6 mb-8 flex flex-col gap-1 border-t border-border pt-3 text-sm text-muted-foreground">
+    <footer className="mt-6 mb-8 flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted-foreground">
       {replyTo ? (
-        <a href={`mailto:${replyTo}`} className="underline">
+        <a href={`mailto:${replyTo}`} className="font-medium text-primary">
           {copy.footer.questions}
         </a>
       ) : null}
       {readOnly ? null : (
-        <Link to={`/i/${token}/prefs`} className="underline">
+        <Link to={`/i/${token}/prefs`} className="font-medium text-primary">
           {copy.footer.managePrefs}
         </Link>
       )}

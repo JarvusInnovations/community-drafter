@@ -52,8 +52,15 @@ export const copy = {
       return `${label} · closes ${absolute} · in ${relativeLabel}`;
     },
     laterDeadline: (absolute: string) => `Signatures and removals until ${absolute}`,
+    pill: (label: string, relative: string) =>
+      relative ? `${label} · closes in ${relative}` : label,
     closedLine: (absolute: string) => `The signatory list closed ${absolute}.`,
     withdrawnLine: "This document was withdrawn.",
+  },
+
+  stickyBar: {
+    label: "Add your name",
+    button: "Sign",
   },
 
   timeline: {
@@ -64,6 +71,7 @@ export const copy = {
     signaturesDue: "Signatures due",
     signingClosed: "Signing closed",
     notOpen: "Not yet open",
+    now: "today",
     inLabel: (relative: string) => (relative ? `in ${relative}` : "now"),
     nowSr(phase: Phase): string {
       switch (phase) {
@@ -81,6 +89,7 @@ export const copy = {
 
   signForm: {
     heading: "Add your name",
+    sub: "Takes ten seconds. You can always change or remove it.",
     /** `specs/screens/document.md` § Actions: "Remove my name → ... card switches to *Not signed* with 'You removed your name on Sep 21'." */
     removedOn: (date: string) => `You removed your name on ${date}.`,
     capacityLegend: "How are you signing?",
@@ -157,6 +166,9 @@ export const copy = {
     line: (number: number, absolute: string, summary: string) =>
       `Version ${number} · published ${absolute} · ${summary}`,
     seeWhatChanged: "See what changed",
+    chip: (number: number, isCurrent: boolean) =>
+      isCurrent ? `Version ${number} · current` : `Version ${number}`,
+    rest: (absolute: string, summary: string) => `${absolute} · ${summary}`,
     allVersions: "All versions",
   },
 

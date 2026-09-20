@@ -37,5 +37,5 @@ export function DocumentBody({ html }: { html: string }): JSX.Element {
     }
   }, [html]);
 
-  return <div ref={ref} className="doc-body mt-4 px-4" />;
+  return <div ref={ref} className="doc-body mt-4" />;
 }

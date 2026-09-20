@@ -23,20 +23,26 @@ export function PublicVersionLabel({
   summary: string;
 }): JSX.Element {
   return (
-    <div className="mt-3 flex flex-col gap-1 text-sm">
-      <p className="text-muted-foreground">
-        {copy.versionLabel.line(number, formatAbsolute(publishedAt), summary)}
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+        <span className="rounded-full bg-ok-soft px-2.5 py-0.5 text-xs font-bold text-ok">
+          {copy.versionLabel.chip(number, true)}
+        </span>
+        <span>{copy.versionLabel.rest(formatAbsolute(publishedAt), summary)}</span>
         {number > 1 ? (
           <>
             {" "}
             ·{" "}
-            <Link to={`/d/${slug}/history/compare?to=${number}`} className="underline">
+            <Link
+              to={`/d/${slug}/history/compare?to=${number}`}
+              className="font-medium text-primary"
+            >
               {copy.versionLabel.seeWhatChanged}
             </Link>
           </>
         ) : null}{" "}
         ·{" "}
-        <Link to={`/d/${slug}/history`} className="underline">
+        <Link to={`/d/${slug}/history`} className="font-medium text-primary">
           {copy.versionLabel.allVersions}
         </Link>
       </p>

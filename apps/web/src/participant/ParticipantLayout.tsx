@@ -95,7 +95,7 @@ export function ParticipantLayout(): JSX.Element | null {
 
   return (
     <BundleContext.Provider value={contextValue}>
-      <InstanceBar name={state.bundle.instance.name} />
+      <InstanceBar name={state.bundle.instance.name} document={state.bundle.document} />
       <Outlet />
     </BundleContext.Provider>
   );
