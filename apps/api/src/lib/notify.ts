@@ -24,6 +24,33 @@ export function prefOn(entry: ParticipationEntry, key: NotifyPrefKey): boolean {
   return value ?? DEFAULT_ON[key];
 }
 
+/**
+ * `notified` keys that record an operator action rather than a message to
+ * the person — `specs/data-model.md`: "`notified."links-exported"` is an
+ * operator's CSV export, not a message."
+ */
+const NOT_A_MESSAGE = new Set(["links-exported"]);
+
+/**
+ * When this document last reached this person, or `undefined` if it never
+ * has (`specs/behaviors/notifications.md` § Sending, the reminder
+ * interval: "any recorded send to that person on this document").
+ * `notified` holds a timestamp per delivered message plus a couple of
+ * non-timestamp entries — the numeric `reminder` count, the `digest`
+ * date — so this takes the newest value that reads as a date and ignores
+ * the rest.
+ */
+export function lastMessagedAt(entry: ParticipationEntry): string | undefined {
+  let newest: string | undefined;
+  for (const [key, value] of Object.entries(entry.record.notified ?? {})) {
+    if (NOT_A_MESSAGE.has(key)) continue;
+    if (typeof value !== "string") continue;
+    if (Number.isNaN(new Date(value).getTime())) continue;
+    if (newest === undefined || new Date(value) > new Date(newest)) newest = value;
+  }
+  return newest;
+}
+
 /** `specs/behaviors/signatures.md` § Display: current signatory. */
 export function isCurrentSigner(entry: ParticipationEntry): boolean {
   const signature = entry.record.signature;

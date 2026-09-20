@@ -6,13 +6,19 @@ import type { FastifyPluginAsync } from "fastify";
  * `plans/api-core.md` § Approach 5-6: "notification hooks emit typed events
  * onto an in-process bus that `notifications` consumes." This plan owns
  * emitting the events at the right lifecycle points (sign/revoke/decline,
- * publish, invite/send/remind, the phase clock) and — for the handful of
- * cases its own endpoints must answer synchronously (invitation CSV export,
- * publish's `notified` counts) — computing recipients and writing the
- * `Action: send` idempotency commit itself (`lib/notify.ts`). The general
- * async consumer that renders and sends every other subscription message
- * (`v<n>`, `digest-<date>`, phase-change broadcasts, …) is the
- * `notifications` plan's addition; this bus is where it attaches.
+ * publish, the phase clock) and — for the handful of cases its own
+ * endpoints must answer synchronously (invitation CSV export, publish's
+ * `notified` counts) — computing recipients and writing the `Action: send`
+ * idempotency commit itself (`lib/notify.ts`). The general async consumer
+ * that renders and sends every other subscription message (`v<n>`,
+ * `digest-<date>`, phase-change broadcasts, …) is the `notifications`
+ * plan's addition; this bus is where it attaches.
+ *
+ * Invitations and reminders deliberately have no event here: their
+ * endpoints must report what the mailer accepted
+ * (`specs/behaviors/notifications.md` § Sending), which means calling
+ * `fastify.notifications.deliver` and reading its summary, not announcing
+ * an intention.
  */
 export type DrafterEvent =
   | { type: "sign"; document: string; person: string; commit: string }
@@ -27,9 +33,6 @@ export type DrafterEvent =
       submission: string;
       judgement: Judgement;
     }
-  | { type: "invite"; document: string; people: string[]; commit: string }
-  | { type: "send"; document: string; people: string[]; commit: string }
-  | { type: "remind"; document: string; people: string[]; commit: string }
   | { type: "publish"; document: string; version: number; commit: string; final: boolean }
   | { type: "schedule-changed"; document: string; commit: string }
   | { type: "signing-opened"; document: string }

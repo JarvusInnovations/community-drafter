@@ -38,7 +38,7 @@ describe("NotificationDispatcher", () => {
         },
       ],
     });
-    expect(first).toEqual({ sent: 1, failed: 0, skipped: 0 });
+    expect(first).toMatchObject({ sent: 1, failed: 0, skipped: 0, sentPeople: ["jane-doe"] });
     expect(mailer.sent.length).toBe(1);
 
     const second = await server.notifications.deliver({
@@ -53,7 +53,7 @@ describe("NotificationDispatcher", () => {
         },
       ],
     });
-    expect(second).toEqual({ sent: 0, failed: 0, skipped: 1 });
+    expect(second).toMatchObject({ sent: 0, failed: 0, skipped: 1, sentPeople: [], commit: null });
     expect(mailer.sent.length).toBe(1);
 
     const participation = server.storage.readModel.getParticipation("doc-idem", "jane-doe");
@@ -118,7 +118,7 @@ describe("NotificationDispatcher", () => {
         },
       ],
     });
-    expect(result).toEqual({ sent: 0, failed: 1, skipped: 0 });
+    expect(result).toMatchObject({ sent: 0, failed: 1, skipped: 0, commit: null });
     expect(server.notifications.failedCount("doc-retry")).toBe(1);
 
     const participation = server.storage.readModel.getParticipation("doc-retry", "jane-doe");

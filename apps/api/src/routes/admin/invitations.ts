@@ -4,12 +4,13 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { toCsv } from "../../lib/csv.ts";
-import { prefOn } from "../../lib/notify.ts";
+import { lastMessagedAt, prefOn } from "../../lib/notify.ts";
 import { participationStatus } from "../../lib/participation-status.ts";
 import { buildPrefsView } from "../../lib/prefs.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { uniqueSlug } from "../../lib/slug.ts";
 import { mintUniqueToken } from "../../lib/tokens.ts";
+import { invitationTemplate, reminderTemplate } from "../../notifications/templates.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -54,7 +55,27 @@ interface ExpireBody {
 
 interface RemindBody {
   target: "unopened" | "opened_not_acted";
+  min_age_hours?: number;
   dry_run?: boolean;
+}
+
+/**
+ * `specs/behaviors/notifications.md` § Sending: reminders keep a minimum
+ * interval since this document last messaged the person, "default 48; `0`
+ * disables the guard".
+ */
+const DEFAULT_REMINDER_MIN_AGE_HOURS = 48;
+
+function parseMinAgeHours(value: unknown): number {
+  if (value === undefined || value === null) return DEFAULT_REMINDER_MIN_AGE_HOURS;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new ApiError(
+      "validation_failed",
+      "min_age_hours must be a number of hours, 0 or greater.",
+      { field: "min_age_hours" },
+    );
+  }
+  return value;
 }
 
 function publicLink(fastify: { config: { PUBLIC_URL?: string } }, token: string): string {
@@ -383,58 +404,50 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         };
       }
 
-      const now = new Date().toISOString();
-      const rows: string[][] = [];
-      for (const entry of candidates) {
-        const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
-        rows.push([
-          personRecord?.name ?? entry.record.person,
-          personRecord?.email ?? "",
-          `[${document.record.title}] — You're invited to review`,
-          publicLink(fastify, entry.record.token),
-        ]);
-      }
-
-      let commitHash: string | null = null;
-      if (candidates.length > 0) {
-        const result = await fastify.storage.commit(
-          "send",
-          {
-            actor: adminActor(request),
-            subject: `send: invitations for ${slug} (${candidates.length} recipients)`,
-            document: slug,
-            requestId: request.requestId,
-          },
-          async (tx) => {
-            for (const entry of candidates) {
-              const current = await tx.participations.queryFirst({
-                document: slug,
-                person: entry.record.person,
-              });
-              if (!current) continue;
-              await tx.participations.patch(
-                { document: slug, person: entry.record.person },
-                { sent_at: now, notified: { ...current.notified, invitation: now } },
-              );
-            }
-          },
-        );
-        commitHash = result.commitHash;
-      }
-
-      await fastify.events.publish({
-        type: "send",
+      // `specs/behaviors/notifications.md` § Sending: `sent_at` rides in the
+      // dispatcher's success commit next to `notified.invitation`, so this
+      // response counts deliveries rather than intentions and a rejected
+      // recipient stays unsent for the next run to pick up. The
+      // already-sent policy is the `skipped` loop above — a `--person`
+      // re-send is deliberate — so the dispatcher's own idempotency skip is
+      // turned off here.
+      const sentAt = new Date().toISOString();
+      const delivery = await fastify.notifications.deliver({
         document: slug,
-        people: candidates.map((entry) => entry.record.person),
-        commit: commitHash ?? "",
+        eventKey: "invitation",
+        actor: adminActor(request),
+        requestId: request.requestId,
+        notifiedValue: sentAt,
+        isAlreadyNotified: () => false,
+        alsoSet: { sent_at: sentAt },
+        targets: candidates.map((entry) => ({
+          person: entry.record.person,
+          markNotified: true,
+          render: (ctx) => invitationTemplate(ctx),
+        })),
       });
 
       const response: Record<string, unknown> = {
-        queued: candidates.length,
+        sent: delivery.sent,
+        failed: delivery.failed,
         skipped,
-        commit: commitHash,
+        failures: delivery.failures,
+        commit: delivery.commit,
       };
       if (fastify.config.MAILER === "export") {
+        // The CSV mirrors the rows the export mailer actually wrote.
+        const sentPeople = new Set(delivery.sentPeople);
+        const rows = candidates
+          .filter((entry) => sentPeople.has(entry.record.person))
+          .map((entry) => {
+            const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
+            return [
+              personRecord?.name ?? entry.record.person,
+              personRecord?.email ?? "",
+              `[${document.record.title}] — You're invited to review`,
+              publicLink(fastify, entry.record.token),
+            ];
+          });
         response.csv = toCsv(["name", "email", "subject", "link"], rows);
       }
       return response;
@@ -608,43 +621,90 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       if (!document) throw notFoundDocument(request.params.slug);
       const slug = document.record.slug;
       const { target, dry_run } = request.body;
+      const minAgeHours = parseMinAgeHours(request.body.min_age_hours);
+      const cutoff = Date.now() - minAgeHours * 3_600_000;
 
-      const candidates = fastify.storage.readModel
+      const inTarget = fastify.storage.readModel
         .listParticipationsForDocument(slug)
         .filter((entry) => !entry.record.link_revoked)
-        .filter((entry) => prefOn(entry, "reminders"))
         .filter((entry) => {
           const status = participationStatus(fastify, entry);
           if (target === "unopened") return status === "unopened";
           return status === "opened";
         });
 
-      if (dry_run) {
-        return { targeted: candidates.length, dry_run: true };
+      // `specs/behaviors/notifications.md` § Sending: a reminder never goes
+      // to someone this document messaged within `min_age_hours`, and the
+      // two reasons for not nudging someone are counted apart so a run that
+      // sends nothing says which it was.
+      let skippedPref = 0;
+      let skippedRecent = 0;
+      const candidates: typeof inTarget = [];
+      for (const entry of inTarget) {
+        if (!prefOn(entry, "reminders")) {
+          skippedPref += 1;
+          continue;
+        }
+        const last = lastMessagedAt(entry);
+        if (last !== undefined && new Date(last).getTime() > cutoff) {
+          skippedRecent += 1;
+          continue;
+        }
+        candidates.push(entry);
       }
 
+      if (dry_run) {
+        return {
+          dry_run: true,
+          targeted: candidates.length,
+          skipped_recent: skippedRecent,
+          skipped_pref: skippedPref,
+          min_age_hours: minAgeHours,
+        };
+      }
+
+      // The reminder number is per person, so the count and its timestamp
+      // are written here from the people the mailer actually accepted
+      // rather than marked by the dispatcher — one commit, after delivery.
+      const reminderNumber = new Map<string, number>();
+      for (const entry of candidates) {
+        const prior =
+          typeof entry.record.notified?.reminder === "number" ? entry.record.notified.reminder : 0;
+        reminderNumber.set(entry.record.person, prior + 1);
+      }
+
+      const delivery = await fastify.notifications.deliver({
+        document: slug,
+        eventKey: "reminder",
+        actor: adminActor(request),
+        requestId: request.requestId,
+        targets: candidates.map((entry) => ({
+          person: entry.record.person,
+          markNotified: false,
+          render: (ctx) =>
+            reminderTemplate(ctx, { n: reminderNumber.get(entry.record.person) ?? 1 }),
+        })),
+      });
+
       let commitHash: string | null = null;
-      if (candidates.length > 0) {
+      if (delivery.sentPeople.length > 0) {
         const result = await fastify.storage.commit(
           "send",
           {
             actor: adminActor(request),
-            subject: `send: reminders for ${slug} (${candidates.length} recipients)`,
+            subject: `send: reminders for ${slug} (${delivery.sentPeople.length} recipients)`,
             document: slug,
             requestId: request.requestId,
           },
           async (tx) => {
-            for (const entry of candidates) {
-              const current = await tx.participations.queryFirst({
-                document: slug,
-                person: entry.record.person,
-              });
+            const at = new Date().toISOString();
+            for (const person of delivery.sentPeople) {
+              const current = await tx.participations.queryFirst({ document: slug, person });
               if (!current) continue;
-              const priorCount =
-                typeof current.notified?.reminder === "number" ? current.notified.reminder : 0;
+              const n = reminderNumber.get(person) ?? 1;
               await tx.participations.patch(
-                { document: slug, person: entry.record.person },
-                { notified: { ...current.notified, reminder: priorCount + 1 } },
+                { document: slug, person },
+                { notified: { ...current.notified, reminder: n, [`reminder-${n}`]: at } },
               );
             }
           },
@@ -652,14 +712,16 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         commitHash = result.commitHash;
       }
 
-      await fastify.events.publish({
-        type: "remind",
-        document: slug,
-        people: candidates.map((entry) => entry.record.person),
-        commit: commitHash ?? "",
-      });
-
-      return { targeted: candidates.length, dry_run: false, commit: commitHash };
+      return {
+        dry_run: false,
+        sent: delivery.sent,
+        failed: delivery.failed,
+        skipped_recent: skippedRecent,
+        skipped_pref: skippedPref,
+        min_age_hours: minAgeHours,
+        failures: delivery.failures,
+        commit: commitHash,
+      };
     },
   );
 };

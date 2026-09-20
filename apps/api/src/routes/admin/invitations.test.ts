@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { FakeMailer } from "../../lib/mailer/index.ts";
 import {
   adminHeaders,
   buildTestServer,
   commitCount,
   seedDocument,
+  seedParticipant,
   TEST_ACTOR,
 } from "../test-support.ts";
 
@@ -266,7 +268,7 @@ describe("staged invitations: import --dry-run, remove, send --dry-run", () => {
       headers: adminHeaders(),
       payload: {},
     });
-    expect(sent.json().queued).toBe(1);
+    expect(sent.json().sent).toBe(1);
     expect(sent.json().skipped).toEqual([]);
 
     const again = await server.inject({
@@ -285,6 +287,235 @@ describe("staged invitations: import --dry-run, remove, send --dry-run", () => {
     });
     expect(tooLate.statusCode).toBe(409);
     expect(tooLate.json().error).toBe("already_sent");
+
+    await server.close();
+  });
+});
+
+describe("POST /admin/api/documents/:slug/invitations/send", () => {
+  it("leaves a recipient the mailer rejected unsent, names them, and reaches them on the next run", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-send-truth" });
+    await seedParticipant(server, {
+      document: "doc-send-truth",
+      person: "samuel-park",
+      token: "samuelparktoken12345",
+      name: "Samuel Park, MD",
+      email: "samuel@example.org",
+    });
+    await seedParticipant(server, {
+      document: "doc-send-truth",
+      person: "rita-ok",
+      token: "ritaoktoken123456789",
+      email: "rita@example.org",
+    });
+
+    // The dispatcher makes 3 attempts before giving up on a recipient.
+    mailer.failNextFor("samuel@example.org", 3);
+
+    const first = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-send-truth/invitations/send",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    expect(first.json().sent).toBe(1);
+    expect(first.json().failed).toBe(1);
+    expect(first.json().failures).toEqual([
+      { person: "samuel-park", error: expect.stringContaining("samuel@example.org") },
+    ]);
+
+    const rejected = server.storage.readModel.getParticipation("doc-send-truth", "samuel-park");
+    expect(rejected?.record.sent_at).toBeUndefined();
+    expect(rejected?.record.notified?.invitation).toBeUndefined();
+    const delivered = server.storage.readModel.getParticipation("doc-send-truth", "rita-ok");
+    expect(delivered?.record.sent_at).toBeTruthy();
+    expect(delivered?.record.notified?.invitation).toBe(delivered!.record.sent_at!);
+
+    // The funnel reads `sent_at`, so the rejected invitee still reads as staged.
+    const listed = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-send-truth/invitations",
+      headers: adminHeaders(),
+    });
+    const statuses = Object.fromEntries(
+      (listed.json() as Array<{ person: string; status: string }>).map((r) => [r.person, r.status]),
+    );
+    expect(statuses["samuel-park"]).toBe("not_sent");
+    expect(statuses["rita-ok"]).toBe("unopened");
+
+    // …and the operator sees who and why.
+    const health = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-send-truth/notifications",
+      headers: adminHeaders(),
+    });
+    expect(health.json().failures).toEqual([
+      {
+        event: "invitation",
+        person: "samuel-park",
+        error: expect.stringContaining("samuel@example.org"),
+        at: expect.any(String),
+      },
+    ]);
+
+    const second = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-send-truth/invitations/send",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    expect(second.json().sent).toBe(1);
+    expect(second.json().failed).toBe(0);
+    expect(second.json().skipped).toEqual([{ person: "rita-ok", reason: "already_sent" }]);
+    const recovered = server.storage.readModel.getParticipation("doc-send-truth", "samuel-park");
+    expect(recovered?.record.sent_at).toBeTruthy();
+    expect(recovered?.record.notified?.invitation).toBe(recovered!.record.sent_at!);
+
+    await server.close();
+  });
+});
+
+describe("POST /admin/api/documents/:slug/invitations/remind", () => {
+  it("sends nothing to people invited moments ago and says why; a shorter interval lets it through", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-remind-age" });
+    await seedParticipant(server, {
+      document: "doc-remind-age",
+      person: "ivy",
+      token: "ivytoken123456789012",
+    });
+    await seedParticipant(server, {
+      document: "doc-remind-age",
+      person: "quinn",
+      token: "quinntoken1234567890",
+    });
+    await seedParticipant(server, {
+      document: "doc-remind-age",
+      person: "nora",
+      token: "noratoken12345678901",
+      notify: { reminders: false },
+    });
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-age/invitations/send",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    const invitations = mailer.sent.length;
+    expect(invitations).toBe(3);
+
+    // Ninety seconds later (this test's "immediately"), the default 48-hour
+    // interval refuses every one of them.
+    const tooSoon = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-age/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened" },
+    });
+    expect(tooSoon.json()).toMatchObject({
+      sent: 0,
+      failed: 0,
+      skipped_recent: 2,
+      skipped_pref: 1,
+      min_age_hours: 48,
+    });
+    expect(mailer.sent.length).toBe(invitations);
+
+    const dry = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-age/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", dry_run: true, min_age_hours: 0 },
+    });
+    expect(dry.json()).toMatchObject({
+      dry_run: true,
+      targeted: 2,
+      skipped_recent: 0,
+      skipped_pref: 1,
+      min_age_hours: 0,
+    });
+    expect(mailer.sent.length).toBe(invitations);
+
+    const forced = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-age/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", min_age_hours: 0 },
+    });
+    expect(forced.json()).toMatchObject({ sent: 2, failed: 0, skipped_recent: 0, skipped_pref: 1 });
+    expect(mailer.sent.length).toBe(invitations + 2);
+
+    const ivy = server.storage.readModel.getParticipation("doc-remind-age", "ivy");
+    expect(ivy?.record.notified?.reminder).toBe(1);
+    expect(ivy?.record.notified?.["reminder-1"]).toBeTruthy();
+    const nora = server.storage.readModel.getParticipation("doc-remind-age", "nora");
+    expect(nora?.record.notified?.reminder).toBeUndefined();
+
+    // The reminder itself is a message, so the interval now counts from it.
+    const again = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-age/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened" },
+    });
+    expect(again.json()).toMatchObject({ sent: 0, skipped_recent: 2, skipped_pref: 1 });
+
+    await server.close();
+  });
+
+  it("does not record a reminder the mailer rejected", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-remind-fail" });
+    await seedParticipant(server, {
+      document: "doc-remind-fail",
+      person: "pat",
+      token: "pattoken123456789012",
+      email: "pat@example.org",
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-fail/invitations/send",
+      headers: adminHeaders(),
+      payload: {},
+    });
+
+    mailer.failNextFor("pat@example.org", 3);
+    const reminded = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-fail/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", min_age_hours: 0 },
+    });
+    expect(reminded.json()).toMatchObject({ sent: 0, failed: 1, commit: null });
+    expect(reminded.json().failures).toEqual([
+      { person: "pat", error: expect.stringContaining("pat@example.org") },
+    ]);
+    const pat = server.storage.readModel.getParticipation("doc-remind-fail", "pat");
+    expect(pat?.record.notified?.reminder).toBeUndefined();
+
+    await server.close();
+  });
+
+  it("rejects a negative min_age_hours", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-remind-bad" });
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-bad/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", min_age_hours: -1 },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe("validation_failed");
 
     await server.close();
   });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { FakeMailer } from "../../lib/mailer/index.ts";
 import { adminHeaders, buildTestServer, seedDocument } from "../test-support.ts";
 
 const cleanups: Array<() => void> = [];
@@ -185,6 +186,86 @@ describe("POST /admin/api/documents/:slug/open deadline validation", () => {
     });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().comments_close_at).toBe("2036-09-22T23:00:00.000Z");
+
+    await server.close();
+  });
+});
+
+describe("POST /admin/api/documents/:slug/open counts the invitations it delivered", () => {
+  it("reports 7 of 8 sent when the mailer rejects one recipient, and leaves that one staged", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents",
+      headers: adminHeaders(),
+      payload: {
+        slug: "doc-blast",
+        title: "Doc Blast",
+        sender_name: "Team",
+        reply_to: "team@example.org",
+      },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-blast/versions",
+      headers: adminHeaders(),
+      payload: { body: "Initial text.", summary: "Initial draft" },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-blast/invitations/import",
+      headers: adminHeaders(),
+      payload: [
+        // A comma in the display name is what broke the header in #46; the
+        // count it produced is what this asserts.
+        { name: "Samuel Park, MD", email: "samuel@example.org" },
+        ...Array.from({ length: 7 }, (_, i) => ({
+          name: `Invitee ${i}`,
+          email: `invitee${i}@example.org`,
+        })),
+      ],
+    });
+
+    mailer.failNextFor("samuel@example.org", 3);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-blast/open",
+      headers: adminHeaders(),
+      payload: {
+        comments_close_at: new Date(Date.now() + 3_600_000).toISOString(),
+        signing_closes_at: new Date(Date.now() + 7_200_000).toISOString(),
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().state).toBe("open");
+    expect(response.json().invitations).toEqual({
+      sent: 7,
+      failed: 1,
+      failures: [
+        { person: "samuel-park-md", error: expect.stringContaining("samuel@example.org") },
+      ],
+    });
+
+    const rejected = server.storage.readModel.getParticipation("doc-blast", "samuel-park-md");
+    expect(rejected?.record.sent_at).toBeUndefined();
+    expect(rejected?.record.notified?.invitation).toBeUndefined();
+
+    const rows = (
+      await server.inject({
+        method: "GET",
+        url: "/admin/api/documents/doc-blast/invitations",
+        headers: adminHeaders(),
+      })
+    ).json() as Array<{ person: string; status: string }>;
+    expect(rows.filter((r) => r.status === "not_sent").map((r) => r.person)).toEqual([
+      "samuel-park-md",
+    ]);
+    expect(rows.filter((r) => r.status === "unopened").length).toBe(7);
 
     await server.close();
   });

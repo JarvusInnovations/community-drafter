@@ -8,15 +8,16 @@ import type { RecipientContext, TemplateResult } from "./types.ts";
 export interface DeliverTarget {
   person: string;
   /**
-   * `true`: this dispatcher owns the `notified` idempotency check-and-mark
-   * for this recipient (the "textbook" path — `signing-opened`, `closed`,
-   * `closing-soon`, `schedule-changed`, digest, sign/revoke/review-receipt
-   * confirmations, and `final-published` for commenters). `false`: the
-   * caller already checked/marked `notified` synchronously in the same
-   * commit that triggered this send (invitation, reminder, and
-   * publish-triggered `v<n>`/`disposition-v<n>`/`final-published` for
-   * signers — see `lib/notify.ts`) — the dispatcher only renders and sends,
-   * never re-marks.
+   * `true`: this dispatcher owns the `notified` check-and-mark for this
+   * recipient, writing it only for messages the mailer accepted — the
+   * normal path (`invitation`, `signing-opened`, `closed`, `closing-soon`,
+   * `schedule-changed`, digest, sign/revoke/review-receipt confirmations,
+   * `final-published` for commenters). `false`: the caller marked
+   * `notified` itself in the commit that triggered this send
+   * (publish-triggered `v<n>`/`disposition-v<n>`/`final-published` for
+   * signers — see `lib/notify.ts`) or records its own bookkeeping from the
+   * `sentPeople` this call returns (`remind`) — the dispatcher only renders
+   * and sends, never marks.
    */
   markNotified: boolean;
   render: (ctx: RecipientContext) => TemplateResult;
@@ -46,12 +47,26 @@ export interface DeliverOptions {
    * holds the last-sent date, not a boolean.
    */
   isAlreadyNotified?: (current: string | number | undefined) => boolean;
+  /**
+   * Extra `participations` fields patched alongside `notified` in the same
+   * success commit, for `markNotified` targets only. `specs/behaviors/
+   * notifications.md` § Sending: an invitation's `sent_at` "is written in
+   * the *same* commit as `notified.invitation`", so a person the mailer
+   * rejected is left genuinely unsent rather than merely unrecorded.
+   */
+  alsoSet?: Record<string, unknown>;
 }
 
 export interface DeliverSummary {
   sent: number;
   failed: number;
   skipped: number;
+  /** Who the mailer accepted a message for, so a caller can report names, not a queue depth. */
+  sentPeople: string[];
+  /** Who it rejected, with the error from the last attempt. */
+  failures: Array<{ person: string; error: string }>;
+  /** The `Action: send` commit that recorded the successes; `null` when nothing was marked. */
+  commit: string | null;
 }
 
 interface FailureRecord {
@@ -65,6 +80,7 @@ interface FailureRecord {
   notifiedField: string;
   notifiedValue: string;
   isAlreadyNotified: (current: string | number | undefined) => boolean;
+  alsoSet: Record<string, unknown> | undefined;
 }
 
 function delay(ms: number): Promise<void> {
@@ -174,47 +190,55 @@ export class NotificationDispatcher {
     const isAlreadyNotified = opts.isAlreadyNotified ?? ((current) => current !== undefined);
 
     const documentEntry = this.fastify.storage.readModel.getDocument(document);
-    if (!documentEntry) return { sent: 0, failed: 0, skipped: targets.length };
+    if (!documentEntry) {
+      return {
+        sent: 0,
+        failed: 0,
+        skipped: targets.length,
+        sentPeople: [],
+        failures: [],
+        commit: null,
+      };
+    }
 
-    let sent = 0;
-    let failed = 0;
-    let skipped = 0;
-    const toMark: string[] = [];
+    // Outcomes are collected by target index, not pushed as they resolve, so
+    // `sentPeople` and `failures` come back in the caller's own order however
+    // the concurrent sends interleave.
+    const outcomes = await Promise.all(
+      targets.map(
+        async (
+          target,
+        ): Promise<{
+          person: string;
+          state: "sent" | "failed" | "skipped";
+          error?: string;
+          mark: boolean;
+        }> => {
+          const participation = this.fastify.storage.readModel.getParticipation(
+            document,
+            target.person,
+          );
+          if (!participation) return { person: target.person, state: "skipped", mark: false };
+          if (
+            target.markNotified &&
+            isAlreadyNotified(participation.record.notified?.[notifiedField])
+          ) {
+            // `specs/behaviors/notifications.md` § Sending: "present means skip."
+            return { person: target.person, state: "skipped", mark: false };
+          }
 
-    await Promise.all(
-      targets.map(async (target) => {
-        const participation = this.fastify.storage.readModel.getParticipation(
-          document,
-          target.person,
-        );
-        if (!participation) {
-          skipped += 1;
-          return;
-        }
-        if (
-          target.markNotified &&
-          isAlreadyNotified(participation.record.notified?.[notifiedField])
-        ) {
-          // `specs/behaviors/notifications.md` § Sending: "present means skip."
-          skipped += 1;
-          return;
-        }
+          const ctx = buildRecipientContext(this.fastify, documentEntry, participation);
+          if (!ctx.personEmail) return { person: target.person, state: "skipped", mark: false };
 
-        const ctx = buildRecipientContext(this.fastify, documentEntry, participation);
-        if (!ctx.personEmail) {
-          skipped += 1;
-          return;
-        }
-        const rendered = target.render(ctx);
-        const message = this.toMessage(ctx, rendered);
-        const result = await this.attemptSend(message);
+          const rendered = target.render(ctx);
+          const message = this.toMessage(ctx, rendered);
+          const result = await this.attemptSend(message);
 
-        if (result.ok) {
-          sent += 1;
-          this.clearFailure(document, eventKey, target.person);
-          if (target.markNotified) toMark.push(target.person);
-        } else {
-          failed += 1;
+          if (result.ok) {
+            this.clearFailure(document, eventKey, target.person);
+            return { person: target.person, state: "sent", mark: target.markNotified };
+          }
+
           this.fastify.log.warn(
             { document, eventKey, person: target.person, error: result.error },
             "notifications: delivery failed after retries",
@@ -231,18 +255,43 @@ export class NotificationDispatcher {
               notifiedField,
               notifiedValue,
               isAlreadyNotified,
+              alsoSet: opts.alsoSet,
             },
             document,
           );
-        }
-      }),
+          return { person: target.person, state: "failed", error: result.error, mark: false };
+        },
+      ),
     );
 
+    const sentPeople = outcomes.filter((o) => o.state === "sent").map((o) => o.person);
+    const failures = outcomes
+      .filter((o) => o.state === "failed")
+      .map((o) => ({ person: o.person, error: o.error ?? "" }));
+    const skipped = outcomes.filter((o) => o.state === "skipped").length;
+    const toMark = outcomes.filter((o) => o.mark).map((o) => o.person);
+
+    let commit: string | null = null;
     if (toMark.length > 0) {
-      await this.markNotified(document, notifiedField, notifiedValue, toMark, actor, requestId);
+      commit = await this.markNotified(
+        document,
+        notifiedField,
+        notifiedValue,
+        toMark,
+        actor,
+        requestId,
+        opts.alsoSet,
+      );
     }
 
-    return { sent, failed, skipped };
+    return {
+      sent: sentPeople.length,
+      failed: failures.length,
+      skipped,
+      sentPeople,
+      failures,
+      commit,
+    };
   }
 
   private async markNotified(
@@ -252,8 +301,9 @@ export class NotificationDispatcher {
     people: string[],
     actor: Actor,
     requestId: string | undefined,
-  ): Promise<void> {
-    await this.fastify.storage.commit(
+    alsoSet: Record<string, unknown> | undefined,
+  ): Promise<string | null> {
+    const result = await this.fastify.storage.commit(
       "send",
       {
         actor,
@@ -267,11 +317,15 @@ export class NotificationDispatcher {
           if (!current) continue;
           await tx.participations.patch(
             { document, person },
-            { notified: { ...current.notified, [notifiedField]: notifiedValue } },
+            {
+              ...alsoSet,
+              notified: { ...current.notified, [notifiedField]: notifiedValue },
+            },
           );
         }
       },
     );
+    return result.commitHash ?? null;
   }
 
   /**
@@ -319,6 +373,10 @@ export class NotificationDispatcher {
         notifiedField: sample?.notifiedField,
         notifiedValue: sample?.notifiedValue,
         isAlreadyNotified: sample?.isAlreadyNotified,
+        // Carried so a retried invitation still lands `sent_at` with its
+        // `notified.invitation` — the two must never disagree about whether
+        // this person was reached.
+        alsoSet: sample?.alsoSet,
         targets: records.map((record) => ({
           person: record.person,
           markNotified: record.markNotified,
