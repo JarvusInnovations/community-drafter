@@ -1,4 +1,4 @@
-import type { Capacity, Judgement, Signature } from "@community-drafter/shared";
+import type { Capacity, Judgement, Signature, SignatureTrailer } from "@community-drafter/shared";
 import { JUDGEMENTS } from "@community-drafter/shared";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -136,11 +136,18 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
             existingSignature !== undefined && existingSignature.revoked !== true;
 
           let signatureUpdate: Signature | undefined;
+          // `specs/behaviors/signatures.md` § Signing: the `Signature`
+          // trailer is what makes a signature written here read back as the
+          // same sign/resign/revoke event as one written from the sign card
+          // — which is where `signed_at` and friends come from.
+          let signatureTrailer: SignatureTrailer | undefined;
 
           if (body.judgement === "sign" || body.judgement === "sign_conditional") {
             const conditional = body.judgement === "sign_conditional";
             if (hasLiveSignature && existingSignature) {
-              // "Keep my signature" / "Make my signature conditional".
+              // "Keep my signature" / "Make my signature conditional" — the
+              // signature already in force is unchanged as a signature, so
+              // this is not a new signature event.
               signatureUpdate = { ...existingSignature, conditional };
             } else {
               const sig = body.signature;
@@ -185,9 +192,11 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
                 signed_on_version: version,
                 revoked: false,
               };
+              signatureTrailer = existingSignature?.revoked === true ? "resign" : "sign";
             }
           } else if (body.judgement === "decline" && hasLiveSignature && existingSignature) {
             signatureUpdate = { ...existingSignature, revoked: true };
+            signatureTrailer = "revoke";
           }
 
           const id = draft?.record.id ?? mintSubmissionId(fastify, slug, person);
@@ -204,6 +213,7 @@ const submitRoute: FastifyPluginAsync = async (fastify) => {
               submission: id,
               version,
               judgement: body.judgement,
+              signature: signatureTrailer,
               reason,
               requestId: request.requestId,
             },

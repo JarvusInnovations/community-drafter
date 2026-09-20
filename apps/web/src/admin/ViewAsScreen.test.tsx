@@ -69,7 +69,9 @@ describe("ViewAsScreen", () => {
     expect(
       screen.getByText("I am authorized to sign this on behalf of Example Alliance."),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: /sign as jane doe/iu })).toBeTruthy();
+    // `specs/screens/document.md` § Display Rules 3: in official capacity
+    // the button names the organization, not the person.
+    expect(screen.getByRole("button", { name: /sign for example alliance/iu })).toBeTruthy();
 
     expectEverythingDisabled();
   });

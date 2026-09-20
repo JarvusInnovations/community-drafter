@@ -62,7 +62,7 @@ export function SignForm({
     setError(null);
 
     if (isOfficial && !authorized) {
-      setError(copy.signForm.attestation(org));
+      setError(copy.signForm.attestationError(org));
       return;
     }
 
@@ -197,7 +197,11 @@ export function SignForm({
         disabled={readOnly || submitting || displayName.trim().length === 0}
         className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:opacity-60"
       >
-        {submitting ? copy.signForm.signing : copy.signForm.signButton(displayName)}
+        {submitting
+          ? copy.signForm.signing
+          : isOfficial
+            ? copy.signForm.signButtonOfficial(org)
+            : copy.signForm.signButton(displayName)}
       </button>
 
       <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">

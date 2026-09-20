@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError, deleteSignature, patchSignature, postDecline } from "../api.ts";
-import { computeCardState, currentDraftSubmission } from "../cardState.ts";
+import { computeCardState, currentDraftSubmission, signatureTime } from "../cardState.ts";
 import { copy } from "../copy.ts";
 import { formatAbsolute } from "../format.ts";
 import { type Bundle } from "../types.ts";
@@ -63,11 +63,7 @@ export function StatusCard({
   function panelAnnouncement(): string {
     if (state === "signed" || state === "signed_conditional" || state === "signed_final_pending") {
       return signature
-        ? copy.signed.heading(
-            formatAbsolute(signature.signed_at ?? signature.resigned_at),
-            signature.display_name,
-            signature.descriptor,
-          )
+        ? copy.signed.heading(formatAbsolute(signatureTime(signature)), signature)
         : "";
     }
     if (state === "declined") {
@@ -243,11 +239,7 @@ export function StatusCard({
                 tabIndex={-1}
                 className="text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                {copy.signed.heading(
-                  formatAbsolute(signature.signed_at ?? signature.resigned_at),
-                  signature.display_name,
-                  signature.descriptor,
-                )}
+                {copy.signed.heading(formatAbsolute(signatureTime(signature)), signature)}
               </h2>
 
               {state === "signed_conditional" ? (
@@ -314,7 +306,7 @@ export function StatusCard({
           <p className="text-muted-foreground">
             {signature && !signature.revoked
               ? copy.closedCard.ownSigned(
-                  formatAbsolute(signature.signed_at),
+                  formatAbsolute(signatureTime(signature)),
                   signature.display_name,
                 )
               : bundle.position?.judgement === "decline"
@@ -330,17 +322,26 @@ export function StatusCard({
         </p>
       ) : null}
 
+      {/*
+       * § Design "Links and quiet actions": these two are real destinations
+       * on a touch screen, so they carry a 44 px tap target (issue #65 — a
+       * ~20 px anchor that a real finger tap kept missing).
+       */}
       {state === "not_signed" && canAct ? (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 text-sm">
           <button
             type="button"
             disabled={readOnly}
-            className="text-left font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
+            className="inline-flex min-h-11 items-center text-left font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
             onClick={() => setDeclineOpen(true)}
           >
             {copy.signForm.declineLink}
           </button>
-          <InertLink readOnly={readOnly} to={`/i/${token}/comment`} className="font-medium">
+          <InertLink
+            readOnly={readOnly}
+            to={`/i/${token}/comment`}
+            className="inline-flex min-h-11 items-center font-medium"
+          >
             {copy.signForm.commentLink}
           </InertLink>
         </div>

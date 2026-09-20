@@ -130,7 +130,7 @@ describe("notification templates", () => {
       signatoryCounts: { organizations: 2, individuals: 5, unlisted: 1 },
     });
     expect(result.text).toContain("Version 3");
-    expect(result.text).toContain("accepted");
+    expect(result.text).toContain("Accepted");
     expect(result.text).toContain("2 organizations and 5 individuals");
     expect(result.html).toContain("<ul");
     assertShape(result);
@@ -152,6 +152,30 @@ describe("notification templates", () => {
     }
   });
 
+  /**
+   * `specs/behaviors/notifications.md` § Content rules + issue #71:
+   * "`schedule-changed` says what changed: one line per deadline that moved,
+   * with its old and new time ... before the current clock."
+   */
+  it("schedule-changed names each deadline that moved with its old and new time", () => {
+    const result = scheduleChangedTemplate(ctx, {
+      changes: [
+        {
+          label: "Comments close",
+          from: "Thu, Sep 24 · 5:00 PM EDT",
+          to: "Sat, Sep 26 · 5:00 PM EDT",
+        },
+        { label: "Signatures are due", to: "Wed, Sep 30 · 5:00 PM EDT" },
+      ],
+    });
+    expect(result.text).toContain(
+      "Comments close moved from Thu, Sep 24 · 5:00 PM EDT to Sat, Sep 26 · 5:00 PM EDT.",
+    );
+    expect(result.text).toContain("Signatures are due is now Wed, Sep 30 · 5:00 PM EDT.");
+    assertShape(result);
+    assertNoLeakage(result);
+  });
+
   it("final-published uses the confirm/remove variant only for conditional signers", () => {
     const plain = finalPublishedTemplate(ctx, { version: 4, conditional: false });
     expect(plain.subject).toBe("Coalition Charter — final version published");
@@ -171,7 +195,10 @@ describe("notification templates", () => {
       version: 3,
       outcomes: [{ outcome: "partial", note: "we addressed part of this" }],
     });
-    expect(result.text).toContain("partial");
+    // `specs/behaviors/review-and-judgement.md` § Dispositions: the label,
+    // never the raw wire value.
+    expect(result.text).toContain("Partly addressed");
+    expect(result.text).not.toContain("partial");
     expect(result.text).toContain("we addressed part of this");
     assertShape(result);
     assertNoLeakage(result);

@@ -6,6 +6,7 @@ import type { Actor } from "../storage/actor.ts";
 import { ClosingSoonScheduler } from "./closing-soon.ts";
 import { NotificationDispatcher } from "./dispatcher.ts";
 import { DigestScheduler } from "./digest.ts";
+import { formatWhen } from "./format.ts";
 import {
   closedRecipients,
   scheduleChangedRecipients,
@@ -15,6 +16,7 @@ import {
   closedTemplate,
   reviewReceiptTemplate,
   revocationConfirmationTemplate,
+  type ScheduleChangeLine,
   scheduleChangedTemplate,
   signatureConfirmationTemplate,
   signingOpenedTemplate,
@@ -151,6 +153,23 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
       case "schedule-changed": {
         const recipients = scheduleChangedRecipients(fastify, event.document);
         if (recipients.length === 0) return;
+        // `specs/behaviors/notifications.md` § Content rules: the message
+        // names each deadline that moved with its old and new time. The
+        // absolute times are formatted here (one instance clock) so the
+        // templates keep taking plain strings.
+        const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+        const changes: ScheduleChangeLine[] = [];
+        for (const change of event.changes ?? []) {
+          const to = formatWhen(change.to, timezone);
+          if (!to) continue;
+          const from = formatWhen(change.from, timezone);
+          changes.push({
+            label:
+              change.deadline === "comments_close_at" ? "Comments close" : "Signatures are due",
+            ...(from ? { from } : {}),
+            to,
+          });
+        }
         await dispatcher.deliver({
           document: event.document,
           eventKey: "schedule-changed",
@@ -158,7 +177,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
           targets: recipients.map((person) => ({
             person,
             markNotified: true,
-            render: (ctx) => scheduleChangedTemplate(ctx),
+            render: (ctx) => scheduleChangedTemplate(ctx, { changes }),
           })),
         });
         return;

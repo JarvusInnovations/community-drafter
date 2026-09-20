@@ -13,4 +13,4 @@ export type { Block, BlockTag, RenderResult } from "./render/types.ts";
 // Pure string logic (NFC + whitespace collapse), browser-safe — needed by
 // `apps/web`'s comment-mode to reconstruct `Block[]`-shaped data from the
 // live DOM for `computeAnchor` (`render/normalize.ts`'s own doc comment).
-export { normalizeText } from "./render/normalize.ts";
+export { type NormalizedOffsets, normalizeOffsets, normalizeText } from "./render/normalize.ts";

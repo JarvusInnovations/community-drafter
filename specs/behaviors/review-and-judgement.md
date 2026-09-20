@@ -48,6 +48,8 @@ When the team publishes a version, they may attach a disposition to any pending 
 | `declined` | "Not incorporated" + note (note required) |
 | `noted` | "Read and noted; no text change" |
 
+Where there is no room for that sentence — an email line, a badge on the author's own submission — the outcome is labeled "Accepted", "Partly addressed", "Declined" or "Noted". The raw wire value is never shown to an author.
+
 Rules:
 
 - A comment receives at most one disposition. Once dispositioned it is closed; the author may raise the point again in a new comment.

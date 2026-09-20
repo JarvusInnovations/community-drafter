@@ -4,6 +4,7 @@ import { Link } from "react-router";
 
 import { type SubmitInput, getVersion, postSubmit } from "../api.ts";
 import { useParticipantBundle } from "../BundleContext.tsx";
+import { signatureTime } from "../cardState.ts";
 import { copy } from "../copy.ts";
 import { formatAbsolute } from "../format.ts";
 import { type VersionDetail } from "../types.ts";
@@ -124,11 +125,7 @@ export function CommentModeScreen(): JSX.Element {
 
   const signatureLine =
     bundle.signature && !bundle.signature.revoked
-      ? copy.signed.heading(
-          formatAbsolute(bundle.signature.signed_at),
-          bundle.signature.display_name,
-          bundle.signature.descriptor,
-        )
+      ? copy.signed.heading(formatAbsolute(signatureTime(bundle.signature)), bundle.signature)
       : bundle.position?.judgement === "decline"
         ? copy.declined.heading
         : copy.closedCard.ownNotSigned;

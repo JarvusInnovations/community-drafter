@@ -153,9 +153,11 @@ describe("GET /i/:token/api/bundle — signatories", () => {
 
     // Current signatories: zeta-org-rep, alpha-org-rep, early-bird,
     // late-comer, unlisted-person = 5. revoked-person and
-    // unapproved-person are excluded.
+    // unapproved-person are excluded. unlisted-person is counted once, in
+    // `unlisted` only (`specs/behaviors/signatures.md` § Display), so the
+    // three figures sum to the five current signatories.
     expect(signatories.organizations).toBe(2);
-    expect(signatories.individuals).toBe(3);
+    expect(signatories.individuals).toBe(2);
     expect(signatories.unlisted).toBe(1);
 
     const listNames = signatories.list.map((s: { display_name: string }) => s.display_name);

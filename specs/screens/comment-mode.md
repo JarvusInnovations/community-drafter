@@ -26,7 +26,7 @@ Layout: the document occupies the main column; a **review tray** is a side panel
 - **Inline comments** list in document order: each shows the quoted passage (truncated to two lines, expandable), the heading it sits under, the body (editable in place), and delete. Comments whose anchor could not be placed (draft written on an older version) show the badge "written on v2 · passage changed" and still render.
 - **General comment**: a labeled text area, "Anything about the document as a whole".
 - **Judgement**: radio group whose options depend on signature status (table in `behaviors/review-and-judgement.md`), with one-line explanations. Conditional options are disabled with a hint when there are no comments.
-- **Submit** button labeled by the judgement ("Sign and send comments", "Send comments", "Send and decline"). Disabled with reason when the phase is not commenting, when no judgement is selected, or when nothing has changed and the judgement is `comment`.
+- **Submit** button labeled by the judgement ("Sign and send comments", "Send comments", "Send and decline"). Disabled with reason when the phase is not commenting, when no judgement is selected, when nothing has changed and the judgement is `comment`, or when the judgement signs in official capacity and the authorization attestation is unchecked. A submission the server refuses is never swallowed: the refusal's message is shown as an alert next to the submit button and announced, so pressing the button always produces either a confirmation or a reason.
 - Beneath the tray: "Your earlier submissions" (collapsed), each shown whole (version, date, judgement, its comments with disposition badges).
 
 **Phase not commenting**: the tray shows the draft read-only with "Comments closed Sep 23 at 5:00 PM EDT. Your unsent comments are kept here." and the sign/revoke actions still available if the phase is signing.
@@ -48,7 +48,7 @@ Follows `screens/document.md` § Design (same tokens, top bar, cards, buttons, l
 | Select text → Comment → Add | adds an inline comment to the draft; autosaves |
 | Edit / delete inline comment; edit general comment | updates the draft; autosaves |
 | Choose judgement | stored provisionally on the draft |
-| Submit | POST review; on success shows a confirmation panel ("Sent. You signed as… / You'll hear back when a new version is published.") with "Back to document"; the tray resets to empty for a new draft |
+| Submit | POST review; on success shows a confirmation panel ("Sent. You signed as… / You'll hear back when a new version is published.") with "Back to document"; the tray resets to empty for a new draft. On failure the tray stays as it was and shows the server's message as an alert beneath the button |
 | Move my comments to v3 | re-anchors draft comments; updates draft version |
 | Back to document | returns to `/i/<token>` |
 

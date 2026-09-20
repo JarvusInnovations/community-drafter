@@ -31,8 +31,11 @@ describe("SignForm — capacity fields and the attestation gate", () => {
     render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
 
     const descriptor = screen.getByLabelText("How would you like to be described? (optional)");
+    // The hint is deliberately generic — it appears on every document on the
+    // instance, and naming one campaign's subject read as a phishing tell
+    // (issue #73).
     expect(descriptor.getAttribute("placeholder")).toBe(
-      "your neighborhood, profession, or connection to the Academy",
+      "your neighborhood, profession, or organization",
     );
     // Official-only fields are absent in personal capacity.
     expect(screen.queryByLabelText("Organization")).toBeNull();
@@ -47,11 +50,12 @@ describe("SignForm — capacity fields and the attestation gate", () => {
       target: { value: "Save the Academy Coalition" },
     });
     // Deliberately leave the attestation checkbox unchecked.
-    fireEvent.click(screen.getByRole("button", { name: /^Sign as/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^Sign for/u }));
 
+    // The error says what to do, rather than repeating the checkbox label.
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(
-      "I am authorized to sign this on behalf of Save the Academy Coalition.",
+      "Check the box confirming you're authorized to sign for Save the Academy Coalition before adding your name.",
     );
     expect(fetchCalled).toBe(false);
   });
@@ -86,9 +90,11 @@ describe("SignForm — capacity fields and the attestation gate", () => {
     fireEvent.click(
       screen.getByText("I am authorized to sign this on behalf of Save the Academy Coalition."),
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Sign as/u }));
+    // `specs/screens/document.md` § Display Rules 3: the official-capacity
+    // button names the organization.
+    fireEvent.click(screen.getByRole("button", { name: "Sign for Save the Academy Coalition" }));
 
-    await screen.findByText(/Signing…|Sign as/u);
+    await screen.findByText(/Signing…|Sign for/u);
     expect(posted?.capacity).toBe("official");
     expect(posted?.org).toBe("Save the Academy Coalition");
     expect(posted?.authorized).toBe(true);

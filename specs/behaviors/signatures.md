@@ -25,8 +25,9 @@ A signature is a person's name added to a specific document, in a stated capacit
 
 - Available in the commenting and signing phases. Signing writes the `signature` table on the participation (`Action: sign` commit, `Version` trailer = version seen), replaces a `decline` judgement, and triggers the confirmation. One commit.
 - Signing during the comment period is encouraged by the card copy: "Sign now. We'll email you when the final version is published, and you can remove your name any time until *Sep 30*." The date is `signing_closes_at`, updated live if extended.
-- Re-signing after revocation is an `Action: resign` commit setting `revoked = false`; the dates of signing, revoking and re-signing are those commits' dates.
+- Re-signing after revocation is an `Action: resign` commit setting `revoked = false`; the dates of signing, revoking and re-signing are those commits' dates. The re-signature is a new signature: everywhere a signature's time is shown to its signer or to the team, it is the time of the commit that put the signature currently in force — the `resign` commit, not the superseded `sign` one.
 - A signer who submits with `sign` or "keep" while a newer version exists produces a `submit` commit with the newer `Version` trailer; the dashboard derives from it which signers have seen the final version.
+- Signing through comment mode is the same signature by another door. A `submit` commit that writes, re-instates or revokes the `signature` table carries a `Signature` trailer (`sign` | `resign` | `revoke`) and is read back as that signature event, so a signature made with comments has the same dates and the same audit trail as one made from the sign card.
 
 ## Conditional signatures
 
@@ -44,10 +45,10 @@ A signature is a person's name added to a specific document, in a stated capacit
 
 - **Signatory list order**: organizations (official capacity) first, alphabetically by `org`; then individuals chronologically by `signed_at` (earliest first), because the list should show momentum and reward early signers.
 - **Counts**: "Signed by *N* organizations and *N* individuals" where the organization count is distinct `org` values among official signatures and the individual count is personal signatures plus any official signers counted once as people only when the copy says "people". Never blend with supporter or petition counts.
-- `listed = false` signers are counted but not named ("and 3 others who asked not to be listed").
+- `listed = false` signers are counted but not named ("and 3 others who asked not to be listed"). They are counted **once**, in that clause alone: an unlisted signer is excluded from the organizations and the individuals figures, so the three numbers in a counts line never overlap.
 - `display_approved = false` (**[phase 2]** public-source) signers are neither counted nor named until approved.
 - `show_signatories = count` shows only the counts; `none` shows nothing to participants and the public, though the admin dashboard always shows all.
-- Every participant page shows the participant's own status line prominently: "You signed on Sep 19 as Jane Doe (personal)" (the date is the `sign` commit's) with the change/remove actions, or "You haven't signed yet".
+- Every participant page shows the participant's own status line prominently: "You signed on Sep 19 as Jane Doe (personal)" (the date is that of the commit behind the signature in force — the `resign` commit after a removal and re-signature, else the `sign` commit) with the change/remove actions, or "You haven't signed yet".
 
 ## Principles
 

@@ -1,4 +1,4 @@
-import type { Action, Judgement, Trailers } from "@community-drafter/shared";
+import type { Action, Judgement, SignatureTrailer, Trailers } from "@community-drafter/shared";
 import type { StoreTx } from "gitsheets";
 
 import { actorIdentity, actorTrailerValue, type Actor } from "./actor.ts";
@@ -26,6 +26,12 @@ export interface CommitInput {
   notes?: string;
   submission?: string;
   judgement?: Judgement;
+  /**
+   * `specs/data-model.md` → `Signature` trailer: set on a `submit` commit
+   * that also writes the participation's `signature` table, so comment-mode
+   * signing reads back as the same sign/resign/revoke event as the sign card.
+   */
+  signature?: SignatureTrailer;
   disposed?: string;
   reason?: string;
   requestId?: string;
@@ -50,6 +56,7 @@ function buildTrailers(action: Action, input: CommitInput): Trailers {
   if (input.notes !== undefined) trailers.Notes = input.notes;
   if (input.submission !== undefined) trailers.Submission = input.submission;
   if (input.judgement !== undefined) trailers.Judgement = input.judgement;
+  if (input.signature !== undefined) trailers.Signature = input.signature;
   if (input.disposed !== undefined) trailers.Disposed = input.disposed;
   if (input.reason !== undefined) trailers.Reason = input.reason;
   if (input.requestId !== undefined) trailers["Request-Id"] = input.requestId;

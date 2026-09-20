@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
-import { ALWAYS_CONFIRM_NOTE, FORCED_EXPLANATION, TOGGLES, type ToggleKey } from "./toggles.ts";
+import {
+  ALWAYS_CONFIRM_NOTE,
+  BACK_TO_DOCUMENT,
+  FORCED_EXPLANATION,
+  TOGGLES,
+  type ToggleKey,
+} from "./toggles.ts";
 
 interface PrefsResponse {
   channel: string;
@@ -219,15 +225,27 @@ export default function PrefsRoute() {
 
         <p className="mt-6 text-sm text-muted-foreground">{ALWAYS_CONFIRM_NOTE}</p>
 
+        {/*
+         * The bulk opt-out is a real action but not this page's primary one
+         * — the toggles above are (issue #73). Quiet outline, not the blue
+         * primary button.
+         */}
         <button
           type="button"
           onClick={() => void stopOptional()}
           disabled={pending.has("stop-optional")}
-          className="mt-6 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:opacity-60"
+          className="mt-6 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-60"
         >
           Stop all optional messages
         </button>
       </div>
+
+      {/* `specs/screens/preferences.md` § Navigation: "Back to document." */}
+      <p className="mt-5 text-sm">
+        <Link to={`/i/${token}`} className="font-medium text-primary hover:underline">
+          {BACK_TO_DOCUMENT}
+        </Link>
+      </p>
     </main>
   );
 }

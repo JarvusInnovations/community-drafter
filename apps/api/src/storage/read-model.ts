@@ -32,6 +32,14 @@ const DOCUMENT_MUTATING_ACTIONS = new Set<Action>([
 
 const SIGNATURE_ACTIONS = new Set<Action>(["sign", "resign", "revoke", "admin-revoke"]);
 
+/**
+ * `specs/behaviors/signatures.md` § Signing: "Signing through comment mode is
+ * the same signature by another door. A `submit` commit that writes,
+ * re-instates or revokes the `signature` table carries a `Signature` trailer
+ * ... and is read back as that signature event."
+ */
+const SIGNATURE_TRAILER_ACTIONS = new Set<string>(["sign", "resign", "revoke"]);
+
 /** Actions whose commit patches one participation record directly (not a bulk sheet reload). */
 const PARTICIPATION_ACTIONS = new Set<Action>([
   "uninvite",
@@ -422,9 +430,16 @@ export class ReadModel {
     for (const logEntry of this.fullLog) {
       if (logEntry.trailers.Document !== document || logEntry.trailers.Person !== person) continue;
       const action = logEntry.trailers.Action as Action | undefined;
-      if (!action || !SIGNATURE_ACTIONS.has(action)) continue;
+      if (!action) continue;
+      const signatureTrailer = logEntry.trailers.Signature;
+      const eventAction = SIGNATURE_ACTIONS.has(action)
+        ? (action as SignatureEvent["action"])
+        : signatureTrailer && SIGNATURE_TRAILER_ACTIONS.has(signatureTrailer)
+          ? (signatureTrailer as SignatureEvent["action"])
+          : null;
+      if (!eventAction) continue;
       events.push({
-        action: action as SignatureEvent["action"],
+        action: eventAction,
         at: logEntry.committerDate,
         actor: logEntry.trailers.Actor ?? logEntry.authorName,
         commit: logEntry.hash,

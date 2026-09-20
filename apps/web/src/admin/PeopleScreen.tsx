@@ -36,17 +36,13 @@ const SOURCES = ["admin", "crm", "public"];
  * (unopened muted, opened blue soft, drafting amber soft, commented blue
  * soft, signed green soft, declined muted, revoked muted with strike)."
  *
- * Takes the raw string rather than the narrower `ParticipationStatus` type:
- * the API's own `participationStatus()` (`apps/api/src/lib/participation-status.ts`)
- * literally emits `"signed (conditional)"`, not this type's `signed_conditional`
- * — a pre-existing mismatch this restyle doesn't touch — so an unmatched
- * value falls back to a plain muted pill instead of throwing.
+ * Takes the raw string rather than the narrower `ParticipationStatus` type
+ * so a value this build doesn't know falls back to a plain muted pill
+ * instead of throwing. The wire values are snake_case
+ * (`specs/data-model.md`); the labels here are what people read.
  */
 function statusPill(status: string): { tone: PillTone; strike?: boolean; label: string } {
-  // The API's literal for a conditional signature (issue #38) gets the same pill.
-  const normalized: ParticipationStatus | string =
-    status === "signed (conditional)" ? "signed_conditional" : status;
-  switch (normalized as ParticipationStatus) {
+  switch (status as ParticipationStatus) {
     case "not_sent":
       return { tone: "muted", label: "not sent" };
     case "unopened":

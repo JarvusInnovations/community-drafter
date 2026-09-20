@@ -16,6 +16,27 @@ import type { RecipientContext, TemplateResult } from "./types.ts";
 
 const PRIVATE_LINK = "This link is yours alone; please don't forward it.";
 
+/**
+ * `specs/behaviors/review-and-judgement.md` § Dispositions: "Where there is
+ * no room for that sentence — an email line, a badge on the author's own
+ * submission — the outcome is labeled ... The raw wire value is never shown
+ * to an author."
+ */
+export function dispositionLabel(outcome: string): string {
+  switch (outcome) {
+    case "accepted":
+      return "Accepted";
+    case "partial":
+      return "Partly addressed";
+    case "declined":
+      return "Declined";
+    case "noted":
+      return "Noted";
+    default:
+      return outcome;
+  }
+}
+
 function greeting(ctx: RecipientContext): string {
   return `Hi ${ctx.firstName},`;
 }
@@ -173,7 +194,7 @@ export function digestTemplate(ctx: RecipientContext, extra: DigestData): Templa
   }
   for (const disposition of extra.dispositions) {
     body.push(
-      `- One of your comments was marked "${disposition.outcome}"${disposition.note ? `: ${disposition.note}` : ""}.`,
+      `- One of your comments: ${dispositionLabel(disposition.outcome)}${disposition.note ? ` — ${disposition.note}` : ""}.`,
     );
   }
   const unlisted =
@@ -247,13 +268,38 @@ export function closedTemplate(ctx: RecipientContext): TemplateResult {
   );
 }
 
-export function scheduleChangedTemplate(ctx: RecipientContext): TemplateResult {
-  return subscription(
-    ctx,
-    `${ctx.documentTitle} — schedule updated`,
-    [`${ctx.senderName} changed the schedule for ${quoted(ctx)}.`, clock(ctx)],
-    { label: "Open the document", url: ctx.personalLink },
-  );
+/** One deadline that moved, already formatted for the recipient's clock. */
+export interface ScheduleChangeLine {
+  /** "Comments close" / "Signatures due". */
+  label: string;
+  /** Absent when the deadline had none before (a reopening that sets one). */
+  from?: string;
+  to: string;
+}
+
+/**
+ * `specs/behaviors/notifications.md` § Content rules: "`schedule-changed`
+ * says what changed: one line per deadline that moved, with its old and new
+ * time ... before the current clock. A reopening that sets a deadline which
+ * had none states the new time alone."
+ */
+export function scheduleChangedTemplate(
+  ctx: RecipientContext,
+  extra: { changes?: ScheduleChangeLine[] } = {},
+): TemplateResult {
+  const body = [`${ctx.senderName} changed the schedule for ${quoted(ctx)}.`];
+  for (const change of extra.changes ?? []) {
+    body.push(
+      change.from
+        ? `${change.label} moved from ${change.from} to ${change.to}.`
+        : `${change.label} is now ${change.to}.`,
+    );
+  }
+  body.push(clock(ctx));
+  return subscription(ctx, `${ctx.documentTitle} — schedule updated`, body, {
+    label: "Open the document",
+    url: ctx.personalLink,
+  });
 }
 
 export function dispositionTemplate(
@@ -262,7 +308,7 @@ export function dispositionTemplate(
 ): TemplateResult {
   const body = [`Version ${extra.version} of ${quoted(ctx)} answers your comments:`];
   for (const outcome of extra.outcomes) {
-    body.push(`- Marked "${outcome.outcome}"${outcome.note ? `: ${outcome.note}` : ""}.`);
+    body.push(`- ${dispositionLabel(outcome.outcome)}${outcome.note ? ` — ${outcome.note}` : ""}.`);
   }
   body.push(clock(ctx));
   return subscription(

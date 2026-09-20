@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
  * "Remove my name" and "I'd rather not sign" (`specs/screens/document.md` §
  * Actions: both take "an optional reason"). Native `<dialog>` gives focus
  * trapping, `Escape`-to-cancel and a backdrop for free.
+ *
+ * `fixed inset-0 m-auto h-fit` restores the centering Tailwind's preflight
+ * strips off `<dialog>` — the same fix the admin `DialogShell` carries;
+ * without it the card renders in the top-left corner of the viewport.
  */
 export function ConfirmDialog({
   open,
@@ -53,7 +57,7 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       onClose={onCancel}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl backdrop:bg-black/40"
+      className="fixed inset-0 m-auto h-fit w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl backdrop:bg-black/40"
     >
       <h2 className="text-lg font-bold tracking-tight">{heading}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{body}</p>

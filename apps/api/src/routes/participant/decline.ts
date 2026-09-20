@@ -45,6 +45,9 @@ const declineRoute: FastifyPluginAsync = async (fastify) => {
           submission: id,
           version,
           judgement: "decline",
+          // `specs/data-model.md` → `Signature` trailer: this one commit is
+          // also the revocation, so it must read back as one.
+          signature: shouldRevokeSignature ? "revoke" : undefined,
           reason,
           requestId: request.requestId,
         },

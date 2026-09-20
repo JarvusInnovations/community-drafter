@@ -80,7 +80,7 @@ export function Signatories({
             {visible.map((item) => (
               <li
                 key={`${item.capacity}:${item.org ?? ""}:${item.display_name}:${item.descriptor ?? ""}`}
-                className="flex min-w-0 items-center gap-2.5 rounded-xl border border-border px-2.5 py-2 text-sm"
+                className="flex min-w-0 items-start gap-2.5 rounded-xl border border-border px-2.5 py-2 text-sm"
               >
                 <span
                   aria-hidden="true"
@@ -97,8 +97,13 @@ export function Signatories({
                   <span className="block truncate font-semibold text-foreground">
                     {primary(item)}
                   </span>
+                  {/*
+                   * § Design "Signatories card": "A chip's name may
+                   * truncate; its second line ... wraps instead, so a
+                   * signer's role is never cut off."
+                   */}
                   {secondary(item) ? (
-                    <span className="block truncate text-xs text-muted-foreground">
+                    <span className="block text-xs break-words text-muted-foreground">
                       {secondary(item)}
                     </span>
                   ) : null}
