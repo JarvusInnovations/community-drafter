@@ -60,6 +60,10 @@ resource "google_cloud_run_v2_service" "community_drafter" {
         value = var.instance_name
       }
       env {
+        name  = "AUTH_LOGIN_RATE_LIMIT"
+        value = tostring(var.auth_login_rate_limit)
+      }
+      env {
         name  = "INSTANCE_FROM_EMAIL"
         value = var.instance_from_email
       }

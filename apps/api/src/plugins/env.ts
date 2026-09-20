@@ -53,6 +53,10 @@ const schema = {
     // session directly for this email (`auth/routes.ts`'s `GET /auth/login`
     // dev shortcut). Ignored when NODE_ENV=production (`auth/plugin.ts`).
     DEV_ADMIN_EMAIL: { type: "string" },
+    // `api/auth.md` § POST /auth/login: "5 per address and 5 per source IP
+    // per 15 minutes by default". Configurable so a test run from one
+    // machine can sign many operators in; production keeps the default.
+    AUTH_LOGIN_RATE_LIMIT: { type: "integer", default: 5, minimum: 1 },
 
     // --- Outbound messaging (specs/architecture.md § Outbound messaging) ---
     MAILER: {
@@ -99,6 +103,7 @@ declare module "fastify" {
       AUTH_SECRET?: string;
       BOOTSTRAP_OPERATOR_EMAIL?: string;
       DEV_ADMIN_EMAIL?: string;
+      AUTH_LOGIN_RATE_LIMIT: number;
 
       MAILER: "postmark" | "smtp" | "export";
       POSTMARK_API_KEY?: string;
