@@ -41,6 +41,11 @@ export async function signaturesCommand(args: string[]): Promise<string> {
                 computed("capacity", (r) => r.signature?.capacity ?? ""),
                 computed("conditional", (r) => r.signature?.conditional ?? false),
                 computed("revoked", (r) => r.signature?.revoked ?? false),
+                // `specs/api/admin-cli.md`: each signature carries the
+                // version it is attached to and whether that version is
+                // behind the document's current one.
+                computed("version", (r) => r.signature?.signed_on_version ?? ""),
+                computed("behind", (r) => r.behind ?? false),
                 computed("signed_at", (r) => r.signature?.signed_at ?? ""),
               ]),
         ),
