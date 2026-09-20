@@ -38,7 +38,14 @@ export const DocumentRecordSchema = z.object({
   capacities: z.array(CapacitySchema).optional(),
   public_access: PublicAccessSchema.optional(),
   show_signatories: ShowSignatoriesSchema.optional(),
-  owner: z.string().optional(),
+  // `specs/behaviors/operators.md`: the operator who created the document,
+  // always also present in `operators`. Optional here (not `.default()`)
+  // because gitsheets "validation is on writes only" — a legacy record
+  // read before the boot migration patches it in still parses. Every
+  // record on disk after boot has both set; `POST /documents` always sets
+  // them from the caller.
+  created_by: z.email().optional(),
+  operators: z.array(z.email()).optional(),
   sender_name: z.string().optional(),
   reply_to: z.string().optional(),
   withdraw_reason: z.string().optional(),

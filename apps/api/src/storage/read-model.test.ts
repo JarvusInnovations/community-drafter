@@ -15,7 +15,7 @@ describe("ReadModel — version derivation", () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = { kind: "operator" as const, email: "team@example.org" };
 
     // Creating the record with its initial text is version 1 — the version
     // trailers (Version/Summary) belong on this commit, since it's the one
@@ -36,6 +36,8 @@ describe("ReadModel — version derivation", () => {
           title: "Coalition Charter",
           state: "draft",
           body: "v1 text",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
         });
       },
     );
@@ -98,14 +100,21 @@ describe("ReadModel — version derivation", () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = { kind: "operator" as const, email: "team@example.org" };
 
     await commit(
       store,
       "publish",
       { actor, subject: "publish: doc-a v1", document: "doc-a", version: 1 },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc-a", title: "Doc A", state: "draft", body: "text" });
+        await tx.documents.upsert({
+          slug: "doc-a",
+          title: "Doc A",
+          state: "draft",
+          body: "text",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
       },
     );
 
@@ -126,14 +135,21 @@ describe("ReadModel — version derivation", () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = { kind: "operator" as const, email: "team@example.org" };
 
     await commit(
       store,
       "create",
       { actor, subject: "create: doc-c", document: "doc-c" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc-c", title: "Doc C", state: "open", body: "text" });
+        await tx.documents.upsert({
+          slug: "doc-c",
+          title: "Doc C",
+          state: "open",
+          body: "text",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
       },
     );
 
@@ -178,14 +194,21 @@ describe("ReadModel — participations, positions, token index", () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = { kind: "operator" as const, email: "team@example.org" };
 
     await commit(
       store,
       "create",
       { actor, subject: "create: doc-b", document: "doc-b" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc-b", title: "Doc B", state: "open", body: "text" });
+        await tx.documents.upsert({
+          slug: "doc-b",
+          title: "Doc B",
+          state: "open",
+          body: "text",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
       },
     );
 
@@ -324,7 +347,7 @@ describe("ReadModel — golden fixture", () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
-    const actor = { kind: "cli" as const, label: "fixture" };
+    const actor = { kind: "system" as const };
 
     const documentSlugs = ["doc-one", "doc-two", "doc-three"];
     for (const slug of documentSlugs) {
@@ -333,7 +356,14 @@ describe("ReadModel — golden fixture", () => {
         "create",
         { actor, subject: `create: ${slug}`, document: slug },
         async (tx) => {
-          await tx.documents.upsert({ slug, title: slug, state: "open", body: `${slug} v1` });
+          await tx.documents.upsert({
+            slug,
+            title: slug,
+            state: "open",
+            body: `${slug} v1`,
+            created_by: "team@example.org",
+            operators: ["team@example.org"],
+          });
         },
       );
     }
@@ -434,7 +464,13 @@ describe("ReadModel — golden fixture", () => {
     const totalVersions = readModel.listDocuments().reduce((sum, d) => sum + d.versions.length, 0);
 
     const summary = readModel.summary();
-    expect(summary).toEqual({ documents: 3, people: 50, participations: 50, submissions: 20 });
+    expect(summary).toEqual({
+      documents: 3,
+      operators: 0,
+      people: 50,
+      participations: 50,
+      submissions: 20,
+    });
     expect(totalVersions).toBe(5);
 
     // Spot-check per-document version counts against the plan above.

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -16,7 +16,7 @@ interface ActivityQuery {
 const activityRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams; Querystring: ActivityQuery }>(
     "/documents/:slug/activity",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

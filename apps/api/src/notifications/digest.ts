@@ -5,7 +5,7 @@ import { computeSignatories } from "../lib/signatories.ts";
 import { digestTemplate } from "./templates.ts";
 import { dateInTimezone, hourInTimezone } from "./format.ts";
 
-const OBSERVER_ACTOR = { kind: "cli", label: "digest-scheduler" } as const;
+const OBSERVER_ACTOR = { kind: "system" } as const;
 
 /**
  * `specs/behaviors/notifications.md` § Sending: "The digest job runs once

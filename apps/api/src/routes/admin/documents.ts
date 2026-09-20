@@ -2,7 +2,7 @@ import type { Capacity, PublicAccess, ShowSignatories } from "@community-drafter
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts";
 import { documentSummary } from "../../lib/document-summary.ts";
 import { versionListView } from "../../lib/versions.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
@@ -17,7 +17,6 @@ interface CreateDocumentBody {
   capacities?: Capacity[];
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
-  owner: string;
   sender_name: string;
   reply_to: string;
   revocation_window_hours?: number;
@@ -29,7 +28,6 @@ interface PatchDocumentBody {
   capacities?: Capacity[];
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
-  owner?: string;
   sender_name?: string;
   reply_to?: string;
   revocation_window_hours?: number;
@@ -57,20 +55,24 @@ interface WithdrawBody {
 }
 
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/documents", { config: ADMIN_ROUTE }, async () => {
+  fastify.get("/documents", { config: OPERATOR_ROUTE }, async (request) => {
+    const principal = request.principal!;
+    const email = principal.kind === "operator" ? principal.email : "";
+    // `specs/api/admin.md`: "List documents → returns only the caller's documents."
     return fastify.storage.readModel
       .listDocuments()
+      .filter((entry) => entry.record.operators?.includes(email))
       .map((entry) => documentSummary(fastify, entry));
   });
 
   fastify.post<{ Body: CreateDocumentBody }>(
     "/documents",
     {
-      config: ADMIN_ROUTE,
+      config: OPERATOR_ROUTE,
       schema: {
         body: {
           type: "object",
-          required: ["slug", "title", "owner", "sender_name", "reply_to"],
+          required: ["slug", "title", "sender_name", "reply_to"],
           properties: {
             slug: { type: "string" },
             title: { type: "string", minLength: 1 },
@@ -80,7 +82,6 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             },
             public_access: { type: "string", enum: ["none", "read", "participate"] },
             show_signatories: { type: "string", enum: ["list", "count", "none"] },
-            owner: { type: "string" },
             sender_name: { type: "string" },
             reply_to: { type: "string" },
             revocation_window_hours: { type: "integer", minimum: 1 },
@@ -97,10 +98,16 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const actor = adminActor(request);
+      // `specs/behaviors/operators.md`: "Any active operator may create a
+      // document. The creator becomes its first operator
+      // (`documents.created_by`) and is listed in `documents.operators`."
+      const callerEmail = actor.kind === "operator" ? actor.email : "";
+
       const result = await fastify.storage.commit(
         "create",
         {
-          actor: adminActor(request),
+          actor,
           subject: `create: ${body.slug}`,
           document: body.slug,
           requestId: request.requestId,
@@ -113,7 +120,8 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             capacities: body.capacities,
             public_access: body.public_access,
             show_signatories: body.show_signatories,
-            owner: body.owner,
+            created_by: callerEmail,
+            operators: [callerEmail],
             sender_name: body.sender_name,
             reply_to: body.reply_to,
             revocation_window_hours: body.revocation_window_hours,
@@ -134,7 +142,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: DocumentParams }>(
     "/documents/:slug",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -144,7 +152,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.patch<{ Params: DocumentParams; Body: PatchDocumentBody }>(
     "/documents/:slug",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -155,7 +163,6 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         "capacities",
         "public_access",
         "show_signatories",
-        "owner",
         "sender_name",
         "reply_to",
         "revocation_window_hours",
@@ -189,7 +196,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: OpenBody }>(
     "/documents/:slug/open",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -255,7 +262,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: ScheduleBody }>(
     "/documents/:slug/schedule",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -332,7 +339,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams }>(
     "/documents/:slug/close",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -366,7 +373,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: ReopenBody }>(
     "/documents/:slug/reopen",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
@@ -422,7 +429,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: WithdrawBody }>(
     "/documents/:slug/withdraw",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);

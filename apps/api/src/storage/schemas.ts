@@ -1,5 +1,6 @@
 import {
   DocumentRecordSchema,
+  OperatorRecordSchema,
   ParticipationRecordSchema,
   PersonRecordSchema,
   SubmissionRecordSchema,
@@ -12,6 +13,7 @@ import type { Store } from "gitsheets";
  */
 export const validators = {
   documents: DocumentRecordSchema,
+  operators: OperatorRecordSchema,
   people: PersonRecordSchema,
   participations: ParticipationRecordSchema,
   submissions: SubmissionRecordSchema,
@@ -22,6 +24,7 @@ export type DataStore = Store<typeof validators>;
 /** `<root>` + storage extension per sheet, for building git-relative file paths. */
 export const SHEET_LOCATIONS = {
   documents: { root: "documents", ext: "md" },
+  operators: { root: "operators", ext: "toml" },
   people: { root: "people", ext: "toml" },
   participations: { root: "participations", ext: "toml" },
   submissions: { root: "submissions", ext: "toml" },

@@ -2,6 +2,7 @@ import type {
   Action,
   DocumentRecord,
   Judgement,
+  OperatorRecord,
   ParticipationRecord,
   PersonRecord,
   SubmissionRecord,
@@ -50,6 +51,9 @@ const PARTICIPATION_ACTIONS = new Set<Action>([
 ]);
 
 const SUBMISSION_ACTIONS = new Set<Action>(["comment", "submit"]);
+
+/** Actions that write the `operators` sheet. */
+const OPERATOR_ACTIONS = new Set<Action>(["operator-add", "operator-update", "operator-remove"]);
 
 /** `specs/screens/admin-dashboard.md` § Recent activity: "the last 50 commits on this document". */
 const ACTIVITY_LIMIT = 50;
@@ -161,6 +165,8 @@ function toActivityEntry(entry: CommitLogEntry): ActivityEntry {
  */
 export class ReadModel {
   private readonly documents = new Map<string, DocumentEntry>();
+  private readonly operators = new Map<string, OperatorRecord>();
+  private readonly operatorsByEmail = new Map<string, string>();
   private readonly people = new Map<string, PersonRecord>();
   private readonly participations = new Map<string, ParticipationEntry>();
   private readonly participationsByToken = new Map<string, string>();
@@ -176,6 +182,7 @@ export class ReadModel {
   ) {}
 
   async build(): Promise<void> {
+    await this.refreshOperators();
     await this.refreshPeople();
     await this.refreshLog();
 
@@ -205,6 +212,16 @@ export class ReadModel {
     const people = await this.store.people.queryAll();
     this.people.clear();
     for (const person of people) this.people.set(person.id, person);
+  }
+
+  async refreshOperators(): Promise<void> {
+    const operators = await this.store.operators.queryAll();
+    this.operators.clear();
+    this.operatorsByEmail.clear();
+    for (const operator of operators) {
+      this.operators.set(operator.id, operator);
+      this.operatorsByEmail.set(operator.email.toLowerCase(), operator.id);
+    }
   }
 
   async refreshDocument(slug: string): Promise<void> {
@@ -238,6 +255,20 @@ export class ReadModel {
   async applyCommit(trailers: Trailers): Promise<void> {
     const { Action: action, Document: document, Person: person, Submission: submission } = trailers;
     await this.refreshLog();
+
+    if (OPERATOR_ACTIONS.has(action)) {
+      await this.refreshOperators();
+    }
+
+    // `doc-operator-add`/`doc-operator-remove` name their document via the
+    // `Document` trailer, so the unconditional `if (document) ...reloadDocument`
+    // below already covers them. `operator-remove` (`DELETE /operators/:email`)
+    // additionally drops the email from every document's `operators` list in
+    // the *same* commit, with no per-document `Document` trailer to key off —
+    // reload every document the read model knows about instead.
+    if (action === "operator-remove") {
+      for (const slug of this.documents.keys()) await this.reloadDocument(slug);
+    }
 
     if (action === "invite") {
       await this.refreshPeople();
@@ -481,6 +512,20 @@ export class ReadModel {
     return this.people.get(id);
   }
 
+  /** Case-insensitive — every operator lookup keys off the lowercase email. */
+  getOperatorByEmail(email: string): OperatorRecord | undefined {
+    const id = this.operatorsByEmail.get(email.toLowerCase());
+    return id ? this.operators.get(id) : undefined;
+  }
+
+  listOperators(): OperatorRecord[] {
+    return [...this.operators.values()];
+  }
+
+  operatorCount(): number {
+    return this.operators.size;
+  }
+
   getParticipation(document: string, person: string): ParticipationEntry | undefined {
     return this.participations.get(participationKey(document, person));
   }
@@ -509,9 +554,16 @@ export class ReadModel {
   }
 
   /** Snapshot summary for readiness reporting (`/_health`). */
-  summary(): { documents: number; people: number; participations: number; submissions: number } {
+  summary(): {
+    documents: number;
+    operators: number;
+    people: number;
+    participations: number;
+    submissions: number;
+  } {
     return {
       documents: this.documents.size,
+      operators: this.operators.size,
       people: this.people.size,
       participations: this.participations.size,
       submissions: this.submissions.size,

@@ -70,34 +70,14 @@ variable "mailer" {
   default     = "export"
 }
 
-# --- Google OAuth (optional — not configured yet) ---
+# --- Operators (specs/behaviors/operators.md) ---
 #
-# No community-drafter-google-client-id/-secret exist in Secret Manager yet.
-# Leave both null (the default) to skip creating the secrets and wiring the
-# env vars entirely; admin auth falls back to ADMIN_TOKEN only. Set both to
-# turn OAuth on in a later apply.
-variable "google_client_id" {
-  description = "Google OAuth web client ID for admin-user sessions (optional; null skips OAuth entirely)"
+# The only way the first operator comes into existence: set on the first
+# apply against a fresh data repo (empty `operators` sheet), then safe to
+# leave set or clear on later applies — the storage layer only bootstraps
+# once the sheet is non-empty (`plans/operators-auth.md`).
+variable "bootstrap_operator_email" {
+  description = "Email of the first operator, created at boot when the operators sheet is empty (null skips bootstrap entirely)"
   type        = string
   default     = null
-  sensitive   = true
-}
-
-variable "google_client_secret" {
-  description = "Google OAuth client secret (optional; null skips OAuth entirely)"
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "oauth_allowed_emails" {
-  description = "Comma-separated allowlisted admin emails (only used when Google OAuth is configured)"
-  type        = string
-  default     = ""
-}
-
-variable "oauth_allowed_domains" {
-  description = "Comma-separated allowlisted admin email domains (only used when Google OAuth is configured)"
-  type        = string
-  default     = ""
 }

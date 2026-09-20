@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 
 import { derivePhase, type Phase } from "../phase/phase.ts";
 
-const OBSERVER_ACTOR = { kind: "cli", label: "phase-observer" } as const;
+const OBSERVER_ACTOR = { kind: "system" } as const;
 
 /**
  * `specs/behaviors/document-lifecycle.md`: "closed (state is also flipped

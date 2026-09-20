@@ -12,6 +12,7 @@ export type ErrorCode =
   | "judgement_requires_comments"
   | "attestation_required"
   | "unauthenticated"
+  | "operator_inactive"
   | "forbidden"
   | "csrf_required"
   | "not_found"
@@ -22,6 +23,11 @@ export type ErrorCode =
   | "unsaved_items"
   | "no_change"
   | "no_version"
+  | "already_exists"
+  | "last_operator"
+  | "refresh_busy"
+  | "refresh_diverged"
+  | "device_pending"
   | "validation_failed"
   | "rate_limited"
   | "internal_error";
@@ -32,6 +38,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   judgement_requires_comments: 400,
   attestation_required: 400,
   unauthenticated: 401,
+  operator_inactive: 401,
   forbidden: 403,
   csrf_required: 403,
   not_found: 404,
@@ -41,12 +48,21 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   stale_edit: 409,
   unsaved_items: 409,
   no_change: 409,
+  last_operator: 409,
+  refresh_busy: 409,
+  refresh_diverged: 409,
+  device_pending: 409,
   // `specs/api/admin.md` § Documents → `POST .../open`: "Errors:
   // `validation_failed` (order), `no_version`." Not in `conventions.md`'s
   // status table (which predates this endpoint's detail); grouped with the
   // other 409 preconditions since it's the same shape — a well-formed
   // request the current record state can't satisfy.
   no_version: 409,
+  // `specs/api/admin.md` § Operators: "409 when the email exists." Generic
+  // conflict-on-create, distinct from `validation_failed` (which the
+  // documents-create route uses for its own slug conflict — a pre-existing
+  // inconsistency this plan doesn't relitigate, see the plan's Notes).
+  already_exists: 409,
   validation_failed: 422,
   rate_limited: 429,
   internal_error: 500,
@@ -80,4 +96,14 @@ export const LINK_NOT_FOUND = new ApiError(
 
 export function forbidden(required: string): ApiError {
   return new ApiError("forbidden", `This action requires ${required} access.`, { required });
+}
+
+/**
+ * `specs/api/admin.md`: "a caller who is not one of the document's
+ * operators gets 404 `not_found`, identical to an unknown slug." One
+ * function so the gateway's document-scoping check (`gateway.ts`) and every
+ * route's own "no such document" branch produce byte-identical bodies.
+ */
+export function notFoundDocument(slug: string): ApiError {
+  return new ApiError("not_found", `No document '${slug}'.`);
 }

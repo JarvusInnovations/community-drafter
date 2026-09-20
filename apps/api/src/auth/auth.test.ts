@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { buildTestServer, fakeGoogleAuth } from "../routes/test-support.ts";
+import {
+  buildTestServer,
+  TEST_ACTOR,
+  TEST_ADMIN_TOKEN,
+  TEST_AUTH_SECRET,
+  adminHeaders,
+} from "../routes/test-support.ts";
+import { FixedWindowLimiter } from "../gateway/rate-limit.ts";
+import { FakeMailer } from "../lib/mailer/index.ts";
+import { mintOperatorToken, verifyOperatorToken } from "./tokens.ts";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
   while (cleanups.length) cleanups.pop()?.();
   delete process.env.DEV_ADMIN_EMAIL;
-  delete process.env.GOOGLE_CLIENT_ID;
-  delete process.env.GOOGLE_CLIENT_SECRET;
-  delete process.env.COOKIE_SECRET;
-  delete process.env.OAUTH_ALLOWED_EMAILS;
-  delete process.env.OAUTH_ALLOWED_DOMAINS;
+  delete process.env.BOOTSTRAP_OPERATOR_EMAIL;
 });
 
 function setCookieHeader(response: { headers: { "set-cookie"?: string | string[] } }): string {
@@ -20,97 +25,107 @@ function setCookieHeader(response: { headers: { "set-cookie"?: string | string[]
   return value.split(";")[0] as string;
 }
 
-function stateFromLoginRedirect(location: string): string {
-  const url = new URL(location);
-  const state = url.searchParams.get("state");
-  if (!state) throw new Error("no state param on login redirect");
-  return state;
+function extractMagicToken(text: string): string {
+  const match = /token=([^\s"&]+)/.exec(text);
+  if (!match?.[1]) throw new Error(`no magic token found in: ${text}`);
+  return decodeURIComponent(match[1]);
 }
 
-describe("GET /auth/login", () => {
-  it("503s a clear page when Google/cookie secret aren't configured", async () => {
-    const { server, cleanup } = await buildTestServer();
+describe("POST /auth/login", () => {
+  it("always 202s, whether or not the address is an operator", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
     cleanups.push(cleanup);
 
-    const response = await server.inject({ method: "GET", url: "/auth/login" });
-    expect(response.statusCode).toBe(503);
-    expect(response.body).toContain("isn't configured");
+    const nonOperator = await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "nobody@example.org" },
+    });
+    expect(nonOperator.statusCode).toBe(202);
+    expect(nonOperator.json<{ ok: boolean }>()).toEqual({ ok: true });
+    expect(mailer.sent).toHaveLength(0);
+
+    const known = await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: TEST_ACTOR.email },
+    });
+    expect(known.statusCode).toBe(202);
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]?.subject).toContain("Sign in to");
+    expect(mailer.sent[0]?.to.email).toBe(TEST_ACTOR.email);
 
     await server.close();
   });
 
-  it("dev bypass mints a session directly, skipping Google", async () => {
-    const { server, cleanup } = await buildTestServer({
-      env: { DEV_ADMIN_EMAIL: "dev@example.org", COOKIE_SECRET: "a".repeat(32) },
-    });
+  it("does not email an inactive operator", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
     cleanups.push(cleanup);
 
-    const response = await server.inject({ method: "GET", url: "/auth/login" });
-    expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("/admin");
-    const cookie = setCookieHeader(response);
-
-    const session = await server.inject({
-      method: "GET",
-      url: "/auth/session",
-      headers: { cookie },
+    // Self-deactivation is refused (422), so create and deactivate a
+    // *different* operator instead of `TEST_ACTOR`.
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "inactive-op@example.org", name: "Inactive Op" },
     });
-    expect(session.statusCode).toBe(200);
-    expect(session.json().email).toBe("dev@example.org");
+    const deactivate = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/inactive-op@example.org",
+      headers: adminHeaders(),
+      payload: { active: false },
+    });
+    expect(deactivate.statusCode).toBe(200);
+
+    const login = await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "inactive-op@example.org" },
+    });
+    expect(login.statusCode).toBe(202);
+    expect(mailer.sent).toHaveLength(0);
+
+    await server.close();
+  });
+
+  it("rate-limits at 5 per address and 5 per source IP per 15 minutes", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    let last = 0;
+    for (let i = 0; i < 6; i++) {
+      const response = await server.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: `rate-limit-${i}@example.org` },
+      });
+      last = response.statusCode;
+    }
+    expect(last).toBe(429);
 
     await server.close();
   });
 });
 
 describe("GET /auth/callback", () => {
-  it("refuses an email outside the allowlist", async () => {
-    const { server, cleanup } = await buildTestServer({
-      env: {
-        GOOGLE_CLIENT_ID: "client-id",
-        GOOGLE_CLIENT_SECRET: "client-secret",
-        COOKIE_SECRET: "b".repeat(32),
-        OAUTH_ALLOWED_EMAILS: "team@example.org",
-      },
-      auth: { googleAuth: fakeGoogleAuth({ email: "outsider@evil.example", name: "Outsider" }) },
-    });
+  it("verifies the magic token, sets a session cookie, and redirects to the return path", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
     cleanups.push(cleanup);
 
-    const login = await server.inject({ method: "GET", url: "/auth/login" });
-    expect(login.statusCode).toBe(302);
-    const state = stateFromLoginRedirect(login.headers.location as string);
+    await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: TEST_ACTOR.email, return: "/admin/d/x" },
+    });
+    const token = extractMagicToken(mailer.sent[0]!.text);
 
     const callback = await server.inject({
       method: "GET",
-      url: `/auth/callback?code=fake-code&state=${encodeURIComponent(state)}`,
-    });
-    expect(callback.statusCode).toBe(403);
-    expect(callback.body).toContain("not on the admin allowlist");
-    expect(callback.headers["set-cookie"]).toBeUndefined();
-
-    await server.close();
-  });
-
-  it("mints a 24h session for an allowed email", async () => {
-    const { server, cleanup } = await buildTestServer({
-      env: {
-        GOOGLE_CLIENT_ID: "client-id",
-        GOOGLE_CLIENT_SECRET: "client-secret",
-        COOKIE_SECRET: "c".repeat(32),
-        OAUTH_ALLOWED_EMAILS: "team@example.org",
-      },
-      auth: { googleAuth: fakeGoogleAuth({ email: "team@example.org", name: "Team" }) },
-    });
-    cleanups.push(cleanup);
-
-    const login = await server.inject({
-      method: "GET",
-      url: "/auth/login?return=%2Fadmin%2Fd%2Fx",
-    });
-    const state = stateFromLoginRedirect(login.headers.location as string);
-
-    const callback = await server.inject({
-      method: "GET",
-      url: `/auth/callback?code=fake-code&state=${encodeURIComponent(state)}`,
+      url: `/auth/callback?token=${encodeURIComponent(token)}`,
     });
     expect(callback.statusCode).toBe(302);
     expect(callback.headers.location).toBe("/admin/d/x");
@@ -123,33 +138,124 @@ describe("GET /auth/callback", () => {
     });
     expect(session.statusCode).toBe(200);
     const body = session.json();
-    expect(body.email).toBe("team@example.org");
+    expect(body.email).toBe(TEST_ACTOR.email);
+    expect(body.transport).toBe("cookie");
     const expiresAt = new Date(body.expires_at).getTime();
-    const expectedTtlMs = 24 * 60 * 60 * 1000;
-    expect(Math.abs(expiresAt - (Date.now() + expectedTtlMs))).toBeLessThan(5_000);
+    expect(Math.abs(expiresAt - (Date.now() + 24 * 60 * 60 * 1000))).toBeLessThan(5_000);
 
     await server.close();
   });
 
-  it("an allowed domain (@example.org wildcard) also passes", async () => {
+  it("a used token cannot be replayed", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+
+    await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: TEST_ACTOR.email },
+    });
+    const token = extractMagicToken(mailer.sent[0]!.text);
+
+    const first = await server.inject({ method: "GET", url: `/auth/callback?token=${token}` });
+    expect(first.statusCode).toBe(302);
+
+    const second = await server.inject({ method: "GET", url: `/auth/callback?token=${token}` });
+    expect(second.statusCode).toBe(400);
+    expect(second.body).toContain("isn't valid any more");
+
+    await server.close();
+  });
+
+  it("an unknown/garbage token fails with the friendly page", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const response = await server.inject({ method: "GET", url: "/auth/callback?token=garbage" });
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toContain("isn't valid any more");
+
+    await server.close();
+  });
+});
+
+describe("operator_inactive", () => {
+  it("401s a bearer token for a deactivated operator", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "soon-inactive@example.org", name: "Soon Inactive" },
+    });
+    const minted = await mintOperatorToken({
+      purpose: "cli",
+      email: "soon-inactive@example.org",
+      name: "Soon Inactive",
+      kind: "person",
+      secret: TEST_AUTH_SECRET,
+    });
+
+    const stillActive = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents",
+      headers: { authorization: `Bearer ${minted.token}` },
+    });
+    expect(stillActive.statusCode).toBe(200);
+
+    const deactivate = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/soon-inactive@example.org",
+      headers: adminHeaders(),
+      payload: { active: false },
+    });
+    expect(deactivate.statusCode).toBe(200);
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents",
+      headers: { authorization: `Bearer ${minted.token}` },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error).toBe("operator_inactive");
+
+    await server.close();
+  });
+
+  it("401s an existing session cookie for a deactivated operator too", async () => {
     const { server, cleanup } = await buildTestServer({
-      env: {
-        GOOGLE_CLIENT_ID: "client-id",
-        GOOGLE_CLIENT_SECRET: "client-secret",
-        COOKIE_SECRET: "d".repeat(32),
-        OAUTH_ALLOWED_DOMAINS: "example.org",
-      },
-      auth: { googleAuth: fakeGoogleAuth({ email: "anyone@example.org" }) },
+      env: { DEV_ADMIN_EMAIL: "cookie-inactive@example.org" },
     });
     cleanups.push(cleanup);
 
     const login = await server.inject({ method: "GET", url: "/auth/login" });
-    const state = stateFromLoginRedirect(login.headers.location as string);
-    const callback = await server.inject({
+    const cookie = setCookieHeader(login);
+
+    const stillActive = await server.inject({
       method: "GET",
-      url: `/auth/callback?code=fake-code&state=${encodeURIComponent(state)}`,
+      url: "/admin/api/documents",
+      headers: { cookie },
     });
-    expect(callback.statusCode).toBe(302);
+    expect(stillActive.statusCode).toBe(200);
+
+    const deactivate = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/cookie-inactive@example.org",
+      headers: adminHeaders(),
+      payload: { active: false },
+    });
+    expect(deactivate.statusCode).toBe(200);
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents",
+      headers: { cookie },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error).toBe("operator_inactive");
 
     await server.close();
   });
@@ -163,23 +269,10 @@ describe("cookie-authenticated writes require the CSRF header", () => {
 
   it("403s a cookie POST without X-Requested-With, 200s with it", async () => {
     const { server, cleanup } = await buildTestServer({
-      env: { DEV_ADMIN_EMAIL: "dev@example.org", COOKIE_SECRET: "e".repeat(32) },
+      env: { DEV_ADMIN_EMAIL: "dev@example.org" },
     });
     cleanups.push(cleanup);
     const cookie = await signedInCookie(server);
-
-    await server.inject({
-      method: "POST",
-      url: "/admin/api/documents",
-      headers: { cookie },
-      payload: {
-        slug: "doc-csrf",
-        title: "Doc CSRF",
-        owner: "team",
-        sender_name: "Team",
-        reply_to: "team@example.org",
-      },
-    });
 
     const withoutHeader = await server.inject({
       method: "POST",
@@ -188,7 +281,6 @@ describe("cookie-authenticated writes require the CSRF header", () => {
       payload: {
         slug: "doc-csrf-2",
         title: "Doc CSRF 2",
-        owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
       },
@@ -203,7 +295,6 @@ describe("cookie-authenticated writes require the CSRF header", () => {
       payload: {
         slug: "doc-csrf-3",
         title: "Doc CSRF 3",
-        owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
       },
@@ -228,11 +319,10 @@ describe("cookie-authenticated writes require the CSRF header", () => {
     const response = await server.inject({
       method: "POST",
       url: "/admin/api/documents",
-      headers: { authorization: "Bearer s3cr3t-admin-token" },
+      headers: adminHeaders(),
       payload: {
         slug: "doc-bearer",
         title: "Doc Bearer",
-        owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
       },
@@ -246,14 +336,11 @@ describe("cookie-authenticated writes require the CSRF header", () => {
    * `specs/api/conventions.md`: "a present `Authorization` header is
    * decisive" — a request presenting both a bearer token and a session
    * cookie resolves via bearer only, never falling back to (or even
-   * consulting) the cookie. Proven here by presenting a *valid* cookie
-   * alongside an *invalid* bearer token: if the cookie were consulted at
-   * all, this would 200 (the CSRF header is also present); it must 401
-   * instead, exactly as a bearer-only request with a bad token would.
+   * consulting) the cookie.
    */
   it("a request presenting both a session cookie and a bearer header resolves via bearer only", async () => {
     const { server, cleanup } = await buildTestServer({
-      env: { DEV_ADMIN_EMAIL: "dev@example.org", COOKIE_SECRET: "g".repeat(32) },
+      env: { DEV_ADMIN_EMAIL: "dev@example.org" },
     });
     cleanups.push(cleanup);
     const cookie = await signedInCookie(server);
@@ -265,7 +352,6 @@ describe("cookie-authenticated writes require the CSRF header", () => {
       payload: {
         slug: "doc-both-transports",
         title: "Doc Both Transports",
-        owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
       },
@@ -278,24 +364,177 @@ describe("cookie-authenticated writes require the CSRF header", () => {
 });
 
 describe("POST /auth/logout", () => {
-  it("revokes the session so the old cookie no longer authenticates", async () => {
+  it("clears the session cookie", async () => {
     const { server, cleanup } = await buildTestServer({
-      env: { DEV_ADMIN_EMAIL: "dev@example.org", COOKIE_SECRET: "f".repeat(32) },
+      env: { DEV_ADMIN_EMAIL: "dev@example.org" },
     });
     cleanups.push(cleanup);
 
     const login = await server.inject({ method: "GET", url: "/auth/login" });
     const cookie = setCookieHeader(login);
 
-    await server.inject({ method: "POST", url: "/auth/logout", headers: { cookie } });
+    const logout = await server.inject({
+      method: "POST",
+      url: "/auth/logout",
+      headers: { cookie, "x-requested-with": "drafter" },
+    });
+    expect(logout.statusCode).toBe(200);
+    expect(logout.headers["set-cookie"]).toContain("Max-Age=0");
+
+    await server.close();
+  });
+});
+
+describe("POST /auth/refresh", () => {
+  it("mints a new 90-day CLI token for the bearer-presented operator", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      headers: adminHeaders(),
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.email).toBe(TEST_ACTOR.email);
+    expect(body.token).not.toBe(TEST_ADMIN_TOKEN);
+
+    await server.close();
+  });
+
+  it("refuses a cookie-only request (bearer only)", async () => {
+    const { server, cleanup } = await buildTestServer({
+      env: { DEV_ADMIN_EMAIL: "dev@example.org" },
+    });
+    cleanups.push(cleanup);
+    const login = await server.inject({ method: "GET", url: "/auth/login" });
+    const cookie = login.headers["set-cookie"];
+    const cookieHeader = Array.isArray(cookie) ? cookie[0]!.split(";")[0] : cookie?.split(";")[0];
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      headers: { cookie: cookieHeader!, "x-requested-with": "drafter" },
+    });
+    expect(response.statusCode).toBe(401);
+
+    await server.close();
+  });
+});
+
+describe("device-code flow", () => {
+  it("202s a device/user code pair, and 409s device/token until approved", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({
+      mailer,
+      env: { DEV_ADMIN_EMAIL: TEST_ACTOR.email },
+    });
+    cleanups.push(cleanup);
+
+    const device = await server.inject({
+      method: "POST",
+      url: "/auth/device",
+      payload: { email: TEST_ACTOR.email },
+    });
+    expect(device.statusCode).toBe(202);
+    const { device_code, user_code, expires_in, interval } = device.json();
+    expect(user_code).toHaveLength(8);
+    expect(expires_in).toBe(900);
+    expect(interval).toBe(3);
+    // The device return path travels inside the signed magic token's
+    // `return` claim, not in the visible email text.
+    const magicToken = extractMagicToken(mailer.sent[0]!.text);
+    const verified = await verifyOperatorToken(magicToken, TEST_AUTH_SECRET, "magic");
+    expect(verified?.returnPath).toBe(`/auth/device?code=${user_code}`);
+
+    const pending = await server.inject({
+      method: "POST",
+      url: "/auth/device/token",
+      payload: { device_code },
+    });
+    expect(pending.statusCode).toBe(409);
+    expect(pending.json().error).toBe("device_pending");
+
+    // Sign in (dev shortcut) and approve.
+    const login = await server.inject({ method: "GET", url: "/auth/login" });
+    const cookie = setCookieHeader(login);
+
+    const approve = await server.inject({
+      method: "POST",
+      url: "/auth/device/approve",
+      headers: { cookie, "x-requested-with": "drafter" },
+      payload: { user_code },
+    });
+    expect(approve.statusCode).toBe(200);
+
+    const approved = await server.inject({
+      method: "POST",
+      url: "/auth/device/token",
+      payload: { device_code },
+    });
+    expect(approved.statusCode).toBe(200);
+    const body = approved.json();
+    expect(body.email).toBe(TEST_ACTOR.email);
+    expect(typeof body.token).toBe("string");
+
+    await server.close();
+  });
+
+  it("404s an unknown device code", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/auth/device/token",
+      payload: { device_code: "does-not-exist" },
+    });
+    expect(response.statusCode).toBe(404);
+
+    await server.close();
+  });
+});
+
+describe("GET /auth/login (dev shortcut)", () => {
+  it("404s when DEV_ADMIN_EMAIL is unset", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const response = await server.inject({ method: "GET", url: "/auth/login" });
+    expect(response.statusCode).toBe(404);
+
+    await server.close();
+  });
+
+  it("mints a session for a brand-new email, creating the operator on the fly", async () => {
+    const { server, cleanup } = await buildTestServer({
+      env: { DEV_ADMIN_EMAIL: "fresh-dev@example.org" },
+    });
+    cleanups.push(cleanup);
+
+    const login = await server.inject({ method: "GET", url: "/auth/login" });
+    expect(login.statusCode).toBe(302);
+    const cookie = setCookieHeader(login);
 
     const session = await server.inject({
       method: "GET",
       url: "/auth/session",
       headers: { cookie },
     });
-    expect(session.statusCode).toBe(401);
+    expect(session.json().email).toBe("fresh-dev@example.org");
 
     await server.close();
+  });
+});
+
+describe("rate limiter unit", () => {
+  it("resets independently per instance", () => {
+    const limiter = new FixedWindowLimiter(2, 1000);
+    expect(limiter.hit("a")).toBe(true);
+    expect(limiter.hit("a")).toBe(true);
+    expect(limiter.hit("a")).toBe(false);
+    limiter.reset();
+    expect(limiter.hit("a")).toBe(true);
   });
 });

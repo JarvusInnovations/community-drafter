@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
@@ -24,7 +24,7 @@ interface RevokeBody {
 const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams; Querystring: ListSignaturesQuery }>(
     "/documents/:slug/signatures",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -47,7 +47,7 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: PersonParams; Body: RevokeBody }>(
     "/documents/:slug/signatures/:person/revoke",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

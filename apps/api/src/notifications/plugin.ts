@@ -22,11 +22,20 @@ import {
   signingOpenedTemplate,
 } from "./templates.ts";
 
-const DISPATCHER_ACTOR: Actor = { kind: "cli", label: "notifications-dispatcher" };
+const DISPATCHER_ACTOR: Actor = { kind: "system" };
 
 declare module "fastify" {
   interface FastifyInstance {
     notifications: NotificationDispatcher;
+    /**
+     * The raw `Mailer` behind `fastify.notifications` — decorated
+     * separately so a caller that isn't participation-shaped (the
+     * `operator-magic-link` send: `specs/behaviors/notifications.md`: "not
+     * a participation message: no `notified` mark, no preference link")
+     * can send without going through the dispatcher's document/
+     * participation/`notified` machinery.
+     */
+    mailer: Mailer;
   }
 }
 
@@ -58,6 +67,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
   const mailer = opts.mailer ?? createMailer(fastify.config);
   const dispatcher = new NotificationDispatcher(fastify, mailer);
   fastify.decorate("notifications", dispatcher);
+  fastify.decorate("mailer", mailer);
 
   fastify.events.on(async (event) => {
     switch (event.type) {

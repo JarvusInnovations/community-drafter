@@ -102,7 +102,7 @@ describe("GET /d/:slug/api/bundle", () => {
     await server.storage.commit(
       "publish",
       {
-        actor: { kind: "admin", email: "team@example.org" },
+        actor: { kind: "operator", email: "team@example.org" },
         subject: "publish v2",
         document: "doc-public-versions",
       },

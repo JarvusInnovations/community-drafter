@@ -30,7 +30,7 @@ describe("commit()", () => {
       store,
       "sign",
       {
-        actor: { kind: "admin", email: "jane@example.org" },
+        actor: { kind: "operator", email: "jane@example.org" },
         subject: "sign: jane-doe on coalition-charter",
         document: "coalition-charter",
         person: "jane-doe",
@@ -49,6 +49,8 @@ describe("commit()", () => {
           title: "Coalition Charter",
           state: "open",
           body: "The charter text.",
+          created_by: "jane@example.org",
+          operators: ["jane@example.org"],
         });
         await tx.participations.upsert({
           document: "coalition-charter",
@@ -108,7 +110,7 @@ describe("commit()", () => {
     const result = await commit(
       store,
       "track",
-      { actor: { kind: "cli", label: "tracker" }, subject: "track: no-op" },
+      { actor: { kind: "system" }, subject: "track: no-op" },
       async () => {
         // no mutation
       },
@@ -119,20 +121,20 @@ describe("commit()", () => {
     expect(after).toBe(before);
   });
 
-  it("uses cli:<label> and participant actor forms", async () => {
+  it("uses system and participant actor forms", async () => {
     const { dataDir, cleanup } = await createTestDataRepo();
     cleanups.push(cleanup);
     const { store } = await openDataRepo({ dataDir });
 
-    const cliResult = await commit(
+    const systemResult = await commit(
       store,
       "invite",
-      { actor: { kind: "cli", label: "import" }, subject: "invite: 1 person on doc" },
+      { actor: { kind: "system" }, subject: "invite: 1 person on doc" },
       async (tx) => {
         await tx.people.upsert({ id: "p1", name: "P1", email: "p1@x.org", source: "crm" });
       },
     );
-    expect(cliResult.trailers.Actor).toBe("cli:import");
+    expect(systemResult.trailers.Actor).toBe("system");
 
     const participantResult = await commit(
       store,

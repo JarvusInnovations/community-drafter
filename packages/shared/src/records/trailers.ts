@@ -35,6 +35,13 @@ export const ACTIONS = [
   // Follow-up: fold these two into that table.
   "link-export",
   "link-expire",
+  // `specs/behaviors/operators.md`: operator lifecycle and per-document
+  // membership changes are ordinary admin actions, each one commit.
+  "operator-add",
+  "operator-update",
+  "operator-remove",
+  "doc-operator-add",
+  "doc-operator-remove",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];

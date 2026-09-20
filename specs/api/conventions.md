@@ -33,7 +33,7 @@ Success bodies are the resource or a domain-shaped object; no generic envelope. 
 | 401 | `unauthenticated` (operator routes only; participant tokens never 401), `operator_inactive` |
 | 403 | `forbidden`, `csrf_required` |
 | 404 | `not_found` (also used for unknown/revoked/expired tokens and non-public documents) |
-| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
+| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `already_exists`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
 | 422 | `validation_failed` with field errors |
 | 429 | `rate_limited` |
 
@@ -54,4 +54,5 @@ Token-resolution failures: 30 per minute per source address. Participant writes:
 ## Principles
 
 **Inherited**
+
 - [The clock is real](../principles.md#the-clock-is-real): `phase_closed` is computed from the document's timestamps on every write; there is no admin override flag on the request.

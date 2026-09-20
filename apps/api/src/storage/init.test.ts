@@ -27,11 +27,11 @@ async function runGitsheetsCli(
 }
 
 describe("initDataRepo", () => {
-  it("commits the four sheet configs into an empty (cloned) data repo", async () => {
+  it("commits the five sheet configs into an empty (cloned) data repo", async () => {
     const { dataDir, cleanup } = await createTestDataRepoWithRemote();
     cleanups.push(cleanup);
 
-    for (const name of ["documents", "people", "participations", "submissions"]) {
+    for (const name of ["documents", "operators", "people", "participations", "submissions"]) {
       expect(existsSync(join(dataDir, ".gitsheets", `${name}.toml`))).toBe(true);
     }
 

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { dispatchPublishNotifications } from "../../lib/notify.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
 import {
@@ -83,7 +83,7 @@ function requireDocument(fastify: FastifyInstance, slug: string): DocumentEntry 
 const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams }>(
     "/documents/:slug/versions",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = requireDocument(fastify, request.params.slug);
       return versionListView(fastify, entry);
@@ -92,7 +92,7 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: VersionParams }>(
     "/documents/:slug/versions/:n",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = requireDocument(fastify, request.params.slug);
       return adminVersionView(fastify, entry, Number(request.params.n));
@@ -102,7 +102,7 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: DocumentParams; Body: PublishBody }>(
     "/documents/:slug/versions",
     {
-      config: ADMIN_ROUTE,
+      config: DOCUMENT_SCOPED_ROUTE,
       schema: {
         body: {
           type: "object",
@@ -334,7 +334,7 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: DocumentParams; Querystring: CompareQuery }>(
     "/documents/:slug/compare",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const entry = requireDocument(fastify, request.params.slug);
       const latest = resolveVersion(entry);

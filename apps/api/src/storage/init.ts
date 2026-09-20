@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SHEET_NAMES = ["documents", "people", "participations", "submissions"] as const;
+const SHEET_NAMES = ["documents", "operators", "people", "participations", "submissions"] as const;
 
 /**
  * `specs/architecture.md` repo layout: ".gitsheets/ sheet configs, copied
@@ -84,7 +84,7 @@ export async function initDataRepo(opts: InitDataRepoOptions): Promise<InitDataR
       `user.email=${author.email}`,
       "commit",
       "-m",
-      "chore(gitsheets): initialize documents, people, participations, submissions sheets",
+      "chore(gitsheets): initialize documents, operators, people, participations, submissions sheets",
     ],
     dataDir,
   );
