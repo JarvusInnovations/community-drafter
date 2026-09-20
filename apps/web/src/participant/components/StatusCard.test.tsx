@@ -239,6 +239,58 @@ describe("StatusCard — the six states", () => {
     expect(status.textContent ?? "").toMatch(/You removed your name on/u);
   });
 
+  /**
+   * Issue #63 — `specs/behaviors/signatures.md` § Signing: the date shown is
+   * "the time of the commit that put the signature currently in force — the
+   * `resign` commit, not the superseded `sign` one."
+   */
+  it("signed again after a removal: shows the re-signature's time, not the first one's", () => {
+    const bundle = makeBundle({
+      signature: {
+        capacity: "personal",
+        display_name: "Jane Doe",
+        conditional: false,
+        listed: true,
+        signed_on_version: 1,
+        revoked: false,
+        signed_at: "2026-09-19T12:00:00Z",
+        resigned_at: "2026-09-20T17:34:00Z",
+      },
+    });
+    renderCard(bundle);
+
+    const line = screen.getByText(/^You signed on /u).textContent ?? "";
+    expect(line).toContain("Sep 20");
+    expect(line).not.toContain("Sep 19");
+  });
+
+  /**
+   * `specs/screens/document.md` § Display Rules 3: "In official capacity the
+   * line names the organization."
+   */
+  it("signed in official capacity: names the organization and the title", () => {
+    const bundle = makeBundle({
+      signature: {
+        capacity: "official",
+        display_name: "Sr. Margaret Doyle",
+        org: "St. Brigid Parish Council",
+        title: "Chair",
+        conditional: false,
+        listed: true,
+        signed_on_version: 1,
+        revoked: false,
+        signed_at: "2026-09-19T12:00:00Z",
+      },
+    });
+    renderCard(bundle);
+
+    expect(
+      screen.getByText(
+        /You signed on .* for St\. Brigid Parish Council as Sr\. Margaret Doyle, Chair\./u,
+      ),
+    ).toBeTruthy();
+  });
+
   it("draft line: shows the unsent-comments line alongside whatever the primary state is", () => {
     const bundle = makeBundle({
       submissions: [

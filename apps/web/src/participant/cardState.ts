@@ -1,4 +1,4 @@
-import { type Bundle } from "./types.ts";
+import { type Bundle, type SignatureView } from "./types.ts";
 
 export type CardState =
   | "not_signed"
@@ -47,6 +47,23 @@ export function computeCardState(bundle: Bundle): CardState {
   }
 
   return "not_signed";
+}
+
+/**
+ * When a signature was given, as the signer should read it:
+ * `specs/behaviors/signatures.md` § Signing — "it is the time of the commit
+ * that put the signature currently in force — the `resign` commit, not the
+ * superseded `sign` one." A signature that was never revoked has no
+ * `resigned_at`, so this is just `signed_at` in the ordinary case (issue
+ * #63: the card reported the first signature's time after a removal and a
+ * re-signature).
+ */
+export function signatureTime(signature: SignatureView): string | undefined {
+  const { signed_at: signedAt, resigned_at: resignedAt } = signature;
+  if (resignedAt && (!signedAt || resignedAt >= signedAt)) {
+    return resignedAt;
+  }
+  return signedAt ?? resignedAt;
 }
 
 export function currentDraftSubmission(bundle: Bundle) {
