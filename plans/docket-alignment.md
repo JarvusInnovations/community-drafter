@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 35
 depends: []
 specs:
   - specs/screens/document.md
@@ -27,10 +28,10 @@ Close the visible gaps between the live participant surfaces and the chosen "Doc
 
 ## Validation
 
-- [ ] Live app renders in Inter with the cool neutral page in both OS color schemes.
-- [ ] Identity line sits between the title and the timeline; dates match the spec's form; no default-underlined dark links remain on participant routes.
-- [ ] Homepage uses no warm color and no third-party request; screenshots show the aligned app.
-- [ ] Existing web tests pass; participant entry stays under the 120 KB budget (the font is a separate asset, not JS).
+- [x] Live app renders in Inter with the cool neutral page in both OS color schemes.
+- [x] Identity line sits between the title and the timeline; dates match the spec's form; no default-underlined dark links remain on participant routes.
+- [x] Homepage uses no warm color and no third-party request; screenshots show the aligned app.
+- [x] Existing web tests pass; participant entry stays under the 120 KB budget (the font is a separate asset, not JS).
 
 ## Risks / unknowns
 

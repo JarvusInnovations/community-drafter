@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 35
 depends: []
 specs:
   - specs/behaviors/notifications.md
@@ -25,9 +26,9 @@ Give every participant message the shape the operator sign-in email already has 
 
 ## Validation
 
-- [ ] Every template's text part contains the greeting, the button label with its URL, the small print, and (subscription messages) both preference links.
-- [ ] The sign-in email still yields a 24-character code to the CLI login test.
-- [ ] A rendered invitation and a rendered version notice, sent through Postmark to the maintainer, read as described in the spec.
+- [x] Every template's text part contains the greeting, the button label with its URL, the small print, and (subscription messages) both preference links.
+- [x] The sign-in email still yields a 24-character code to the CLI login test.
+- [ ] A rendered invitation and a rendered version notice, sent through Postmark to the maintainer, read as described in the spec. (Not done: no admin action on the live instance sends one without also mailing the demo participants; the template tests assert the shape instead.)
 
 ## Risks / unknowns
 
