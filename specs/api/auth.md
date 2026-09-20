@@ -12,7 +12,9 @@ Resolves the code to its magic token (unknown or expired code → failure page),
 
 ## `GET /auth/session`
 
-Cookie or bearer. Returns `{ email, name, kind, superadmin, expires_at, transport }` or 401 `unauthenticated` / `operator_inactive`.
+Cookie or bearer. Returns `{ email, name, kind, superadmin, expires_at, transport, instance_name }` or 401 `unauthenticated` / `operator_inactive`.
+
+`instance_name` is the configured `INSTANCE_NAME` (falling back to `Community Drafter` when it is unset) — the same value the participant bundle and outbound email carry. It rides on the session because the admin frame needs it on every page and already resolves the session there (`screens/admin-dashboard.md` § Design "Frame"); a separate instance endpoint would be a second round trip for one string. It is not a secret and not operator-specific.
 
 ## `POST /auth/logout`
 
