@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 32
 depends: []
 specs:
   - specs/screens/document.md
@@ -24,16 +25,16 @@ Restyle the live participant document screen (and the public read view, which sh
 6. Re-run the existing component tests (copy unchanged), bundle-size check, browser check at 390 and 1280, deploy, re-capture `site/img/*.png`, republish Pages.
 
 ## Validation
-- [ ] Phone (390 px): action panel above the document, sticky bottom bar appears only after the panel scrolls away, no horizontal overflow.
-- [ ] Desktop (1280 px): document card left, sticky panel right, timeline chips + rail above both.
-- [ ] Existing tests pass unchanged; participant entry stays under the bundle budget.
-- [ ] Homepage screenshots re-captured from the live app and Pages republished.
+- [x] Phone (390 px): action panel above the document, sticky bottom bar appears only after the panel scrolls away (IntersectionObserver), no horizontal overflow (scrollWidth 390).
+- [x] Desktop (1280 px): document card left, sticky panel right, timeline chips + rail above both (live screenshot).
+- [x] Existing tests pass unchanged (70 web tests); participant entry 95 KB gzip of 120.
+- [x] Homepage screenshots re-captured from the live app and Pages republished.
 
 ## Risks / unknowns
 - **Dark scheme** gets the same roles but was not mocked; keep contrast honest rather than pretty.
 
 ## Notes
-(closeout)
+- Shipped as PR #32 plus a follow-up (separator dots in the version line). Dark scheme tokens are defined but were not visually reviewed.
 
 ## Follow-ups
-(closeout)
+- Tracked as: comment mode's tray and the admin dashboard still use the pre-design classes; they inherit the tokens but not the card language.
