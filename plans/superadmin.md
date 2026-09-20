@@ -1,5 +1,6 @@
 ---
-status: in-progress
+status: done
+pr: 47
 depends: []
 specs:
   - specs/behaviors/operators.md
@@ -35,9 +36,9 @@ A `superadmin` flag on the operator record that lets its holder see every docume
 
 ## Validation
 
-- [ ] A non-superadmin still gets 404 on a document they are not on; a superadmin gets 200 and sees every document in `GET /documents`.
-- [ ] `PATCH /operators/:email { superadmin }` is 403 for non-superadmins, 422 on oneself, 200 for a superadmin on another.
-- [ ] Boot on a data repo with a stale `operators.toml` commits the updated config and then succeeds in writing the flag.
+- [x] A non-superadmin still gets 404 on a document they are not on; a superadmin gets 200 and sees every document in `GET /documents`.
+- [x] `PATCH /operators/:email { superadmin }` is 403 for non-superadmins, 422 on oneself, 200 for a superadmin on another.
+- [x] Boot on a data repo with a stale `operators.toml` commits the updated config and then succeeds in writing the flag.
 - [ ] The live instance's bootstrap operator shows the pill and sees all documents after deploy.
 
 ## Risks / unknowns
