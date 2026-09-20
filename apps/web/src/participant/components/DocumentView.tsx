@@ -8,6 +8,7 @@ import { StatusCard } from "./StatusCard.tsx";
 import { StickySignBar } from "./StickySignBar.tsx";
 import { SubmissionsSection } from "./SubmissionsSection.tsx";
 import { VersionLabel } from "./VersionLabel.tsx";
+import { copy } from "../copy.ts";
 import { type Bundle } from "../types.ts";
 
 /**
@@ -23,6 +24,13 @@ import { type Bundle } from "../types.ts";
  * § Design "Layout": the action panel is first in DOM order (so it comes
  * first on phones, per "Sign first"), and moves to a sticky right column
  * at `lg` widths; the document and signatories are cards on the left.
+ *
+ * `## Principles` (#72): the panel staying first in DOM order at `lg`
+ * means keyboard users tab through the whole sign form before reaching the
+ * document even though it renders on the left. Phones get no such link —
+ * the panel-first order there is the intended "Sign first" reading order,
+ * not a mismatch — so the skip link is `lg`-only (`max-lg:hidden`),
+ * visually hidden until focused like any skip link.
  */
 export function DocumentView({
   bundle,
@@ -52,11 +60,21 @@ export function DocumentView({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <aside ref={panelRef} className="min-w-0 lg:sticky lg:top-16 lg:order-2">
+          <a
+            href="#document-card"
+            className="sr-only max-lg:hidden focus-visible:not-sr-only focus-visible:mb-3 focus-visible:block focus-visible:w-fit focus-visible:rounded-lg focus-visible:bg-primary focus-visible:px-4 focus-visible:py-2 focus-visible:text-sm focus-visible:font-semibold focus-visible:text-white"
+          >
+            {copy.skipToDocument}
+          </a>
           <StatusCard bundle={bundle} token={token} refetch={refetch} readOnly={readOnly} />
         </aside>
 
         <div className="min-w-0">
-          <section className="rounded-2xl border border-border bg-card p-5">
+          <section
+            id="document-card"
+            tabIndex={-1}
+            className="rounded-2xl border border-border bg-card p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
             <VersionLabel
               token={token}
               number={version.number}
@@ -66,7 +84,7 @@ export function DocumentView({
               currentNumber={bundle.version.number}
               readOnly={readOnly}
             />
-            <DocumentBody html={version.html} />
+            <DocumentBody html={version.html} demoteFirstHeading={readOnly} />
           </section>
           <SubmissionsSection submissions={bundle.submissions} />
           <Signatories signatories={bundle.signatories} />

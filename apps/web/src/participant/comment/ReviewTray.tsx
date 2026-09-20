@@ -341,7 +341,13 @@ export function ReviewTray({
   }
 
   return (
-    <div className="flex max-h-[70vh] flex-col lg:max-h-none">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSubmit();
+      }}
+      className="flex max-h-[70vh] flex-col lg:max-h-none"
+    >
       {dragHandle}
       <div className="flex flex-none items-center gap-3 border-b border-border px-4 py-3 lg:px-5">
         <div className="min-w-0">
@@ -399,8 +405,7 @@ export function ReviewTray({
         {needsNewSignature ? <SignatureFields bundle={bundle} onChange={setSignature} /> : null}
 
         <button
-          type="button"
-          onClick={() => void handleSubmit()}
+          type="submit"
           disabled={Boolean(disabledReason) || submitting}
           className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
         >
@@ -414,6 +419,6 @@ export function ReviewTray({
 
         <EarlierSubmissions submissions={earlierSubmissions} />
       </div>
-    </div>
+    </form>
   );
 }

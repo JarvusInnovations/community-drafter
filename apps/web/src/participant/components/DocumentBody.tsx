@@ -14,8 +14,25 @@ import { useEffect, useRef } from "react";
  * Server rendering (`remark`/`rehype-slug`) gives every heading a stable
  * `id` but no visible anchor link; this adds one client-side per heading so
  * "headings with anchor links" holds without a heavier rehype plugin.
+ *
+ * Two participant accessibility fixes (#72) live here:
+ * - Each anchor's accessible name is "Link to <heading text>", not a
+ *   generic string repeated on every heading — and the heading itself gets
+ *   an explicit `aria-label` set to its own visible text, so the anchor
+ *   (prepended as the heading's first child) can never contribute to, or
+ *   otherwise swallow, the heading's own accessible name.
+ * - `demoteFirstHeading` (admin "view as" only, via `DocumentView`'s
+ *   `readOnly`) retags a leading `<h1>` to `<h2>` so the read-only preview
+ *   never has two `<h1>`s on the page (`specs/screens/admin-dashboard.md`
+ *   § "View as").
  */
-export function DocumentBody({ html }: { html: string }): JSX.Element {
+export function DocumentBody({
+  html,
+  demoteFirstHeading = false,
+}: {
+  html: string;
+  demoteFirstHeading?: boolean;
+}): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,17 +42,36 @@ export function DocumentBody({ html }: { html: string }): JSX.Element {
     }
     container.innerHTML = html;
 
+    if (demoteFirstHeading) {
+      const firstHeading = container.querySelector("h1");
+      if (firstHeading) {
+        const replacement = document.createElement("h2");
+        replacement.id = firstHeading.id;
+        while (firstHeading.firstChild) {
+          replacement.append(firstHeading.firstChild);
+        }
+        firstHeading.replaceWith(replacement);
+      }
+    }
+
     for (const heading of container.querySelectorAll<HTMLElement>(
       "h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]",
     )) {
+      const headingText = heading.textContent?.trim();
       const anchor = document.createElement("a");
       anchor.href = `#${heading.id}`;
       anchor.className = "doc-heading-anchor";
-      anchor.setAttribute("aria-label", "Link to this section");
+      anchor.setAttribute(
+        "aria-label",
+        headingText ? `Link to ${headingText}` : "Link to this section",
+      );
       anchor.textContent = "#";
+      if (headingText) {
+        heading.setAttribute("aria-label", headingText);
+      }
       heading.prepend(anchor);
     }
-  }, [html]);
+  }, [html, demoteFirstHeading]);
 
   return <div ref={ref} className="doc-body mt-4" />;
 }

@@ -1,4 +1,4 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, type RefObject, useId, useState } from "react";
 
 import { cn } from "../../lib/utils.ts";
 import { ApiError, postSignature } from "../api.ts";
@@ -22,18 +22,21 @@ import { type Bundle, type Capacity } from "../types.ts";
 const FIELD =
   "rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground disabled:opacity-60";
 const CAPACITY_OPTION =
-  "rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm has-disabled:opacity-70";
+  "rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm has-disabled:opacity-70 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary has-[:focus-visible]:outline-offset-2";
 
 export function SignForm({
   bundle,
   token,
   onSigned,
   readOnly = false,
+  headingRef,
 }: {
   bundle: Bundle;
   token: string;
   onSigned: () => void | Promise<void>;
   readOnly?: boolean;
+  /** Focus target for `StatusCard`'s post-action focus management (`## Principles`: "every action moves focus somewhere sensible"). */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
 }): JSX.Element {
   const document = bundle.document;
   const prefill = bundle.prefill;
@@ -84,7 +87,13 @@ export function SignForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
-      <h2 className="text-xl font-bold tracking-tight text-foreground">{copy.signForm.heading}</h2>
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl font-bold tracking-tight text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
+        {copy.signForm.heading}
+      </h2>
       <p className="-mt-2 text-sm text-muted-foreground">{copy.signForm.sub}</p>
 
       {showCapacityChoice ? (

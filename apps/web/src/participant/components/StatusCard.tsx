@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError, deleteSignature, patchSignature, postDecline } from "../api.ts";
@@ -46,6 +46,65 @@ export function StatusCard({
   const [actionError, setActionError] = useState<string | null>(null);
   const canAct = bundle.document.phase === "commenting" || bundle.document.phase === "signing";
   const canComment = bundle.document.phase === "commenting";
+  const signature = bundle.signature;
+
+  // `## Principles`: "every action moves focus somewhere sensible and
+  // announces its result in a live region". `headingRef` is attached to
+  // whichever panel heading the current `state` renders (only one is
+  // mounted at a time); the two effects below move focus there and set the
+  // live-region text whenever `state` or `editing` actually changes after
+  // the initial render — never on mount, so loading the page never steals
+  // focus.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [liveMessage, setLiveMessage] = useState("");
+  const stateMounted = useRef(false);
+  const editingMounted = useRef(false);
+
+  function panelAnnouncement(): string {
+    if (state === "signed" || state === "signed_conditional" || state === "signed_final_pending") {
+      return signature
+        ? copy.signed.heading(
+            formatAbsolute(signature.signed_at ?? signature.resigned_at),
+            signature.display_name,
+            signature.descriptor,
+          )
+        : "";
+    }
+    if (state === "declined") {
+      return copy.declined.heading;
+    }
+    if (state === "not_signed") {
+      return signature?.revoked && signature.revoked_at
+        ? copy.signForm.removedOn(formatAbsolute(signature.revoked_at))
+        : copy.signForm.heading;
+    }
+    if (state === "closed") {
+      return copy.closedCard.heading(formatAbsolute(bundle.document.signing_closes_at));
+    }
+    return "";
+  }
+
+  useEffect(() => {
+    if (!stateMounted.current) {
+      stateMounted.current = true;
+      return;
+    }
+    setLiveMessage(panelAnnouncement());
+    headingRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  useEffect(() => {
+    if (!editingMounted.current) {
+      editingMounted.current = true;
+      return;
+    }
+    if (!editing) {
+      setLiveMessage(panelAnnouncement());
+      headingRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   async function handleRemove(reason: string | undefined) {
     setBusy(true);
@@ -88,13 +147,15 @@ export function StatusCard({
     }
   }
 
-  const signature = bundle.signature;
-
   return (
     <section
       className="rounded-2xl border border-border bg-card p-5"
       aria-label={copy.signForm.heading}
     >
+      <div role="status" aria-live="polite" className="sr-only">
+        {liveMessage}
+      </div>
+
       {draft ? (
         <p className="mb-2 text-sm text-muted-foreground">
           {copy.draftLine(draft.version)} ·{" "}
@@ -112,7 +173,13 @@ export function StatusCard({
                 {copy.signForm.removedOn(formatAbsolute(signature.revoked_at))}
               </p>
             ) : null}
-            <SignForm bundle={bundle} token={token} onSigned={refetch} readOnly={readOnly} />
+            <SignForm
+              bundle={bundle}
+              token={token}
+              onSigned={refetch}
+              readOnly={readOnly}
+              headingRef={headingRef}
+            />
           </>
         ) : (
           <p className="text-foreground">{copy.closedCard.ownNotSigned}</p>
@@ -121,9 +188,21 @@ export function StatusCard({
 
       {state === "declined" ? (
         <div className="flex flex-col gap-2">
-          <p className="text-foreground">{copy.declined.heading}</p>
+          <h2
+            ref={resigning ? undefined : headingRef}
+            tabIndex={resigning ? undefined : -1}
+            className="text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            {copy.declined.heading}
+          </h2>
           {resigning ? (
-            <SignForm bundle={bundle} token={token} onSigned={refetch} readOnly={readOnly} />
+            <SignForm
+              bundle={bundle}
+              token={token}
+              onSigned={refetch}
+              readOnly={readOnly}
+              headingRef={headingRef}
+            />
           ) : canAct ? (
             <div>
               <span className="text-muted-foreground">{copy.declined.changedMind} </span>
@@ -148,20 +227,28 @@ export function StatusCard({
               signature={signature}
               token={token}
               onSaved={async () => {
-                setEditing(false);
+                // Refetch before closing the form so the heading and live
+                // region that appear the instant `editing` flips back to
+                // false already reflect the saved values, not the stale
+                // pre-save ones.
                 await refetch();
+                setEditing(false);
               }}
               onCancel={() => setEditing(false)}
             />
           ) : (
             <>
-              <p className="text-foreground">
+              <h2
+                ref={headingRef}
+                tabIndex={-1}
+                className="text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
                 {copy.signed.heading(
                   formatAbsolute(signature.signed_at ?? signature.resigned_at),
                   signature.display_name,
                   signature.descriptor,
                 )}
-              </p>
+              </h2>
 
               {state === "signed_conditional" ? (
                 <p className="text-sm text-muted-foreground">{copy.signed.conditionalNote}</p>
@@ -182,7 +269,7 @@ export function StatusCard({
                       type="button"
                       onClick={() => void handleConfirmSignature()}
                       disabled={busy || readOnly}
-                      className="font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
+                      className="inline-flex min-h-8 items-center font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     >
                       {copy.signed.confirmButton}
                     </button>
@@ -190,7 +277,7 @@ export function StatusCard({
                   <button
                     type="button"
                     disabled={readOnly}
-                    className="font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
+                    className="inline-flex min-h-8 items-center font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     onClick={() => setEditing(true)}
                   >
                     {copy.signed.changeListing}
@@ -198,7 +285,7 @@ export function StatusCard({
                   <button
                     type="button"
                     disabled={readOnly}
-                    className="font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
+                    className="inline-flex min-h-8 items-center font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     onClick={() => setRemoveOpen(true)}
                   >
                     {copy.signed.remove}
@@ -207,7 +294,7 @@ export function StatusCard({
                     <InertLink
                       readOnly={readOnly}
                       to={`/i/${token}/comment`}
-                      className="font-medium"
+                      className="inline-flex min-h-8 items-center font-medium"
                     >
                       {copy.signed.addComments}
                     </InertLink>

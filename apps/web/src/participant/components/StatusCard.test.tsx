@@ -162,6 +162,83 @@ describe("StatusCard — the six states", () => {
     expect(screen.getByText(/You signed on .* as Jane Doe\./u)).toBeTruthy();
   });
 
+  it("focus and the live region: signing moves focus to the new heading and announces it (#72)", () => {
+    const { rerender } = renderCard(makeBundle({}));
+
+    // Signing itself is `SignForm` POSTing and calling `onSigned` (the
+    // parent's `refetch`); the observable effect on `StatusCard` is that
+    // its `bundle` prop is re-supplied with the now-signed state, exactly
+    // what this `rerender` simulates.
+    rerender(
+      <MemoryRouter>
+        <StatusCard
+          bundle={makeBundle({
+            signature: {
+              capacity: "personal",
+              display_name: "Jane Doe",
+              conditional: false,
+              listed: true,
+              signed_on_version: 1,
+              revoked: false,
+              signed_at: "2026-09-19T12:00:00Z",
+            },
+          })}
+          token="test-token"
+          refetch={noop}
+        />
+      </MemoryRouter>,
+    );
+
+    const heading = screen.getByRole("heading", { name: /You signed on .* as Jane Doe\./u });
+    expect(document.activeElement).toBe(heading);
+
+    const status = screen.getByRole("status");
+    expect(status.textContent ?? "").toMatch(/You signed on .* as Jane Doe\./u);
+  });
+
+  it("focus and the live region: removing a signature moves focus back to the sign form heading (#72)", () => {
+    const { rerender } = renderCard(
+      makeBundle({
+        signature: {
+          capacity: "personal",
+          display_name: "Jane Doe",
+          conditional: false,
+          listed: true,
+          signed_on_version: 1,
+          revoked: false,
+          signed_at: "2026-09-19T12:00:00Z",
+        },
+      }),
+    );
+
+    rerender(
+      <MemoryRouter>
+        <StatusCard
+          bundle={makeBundle({
+            signature: {
+              capacity: "personal",
+              display_name: "Jane Doe",
+              conditional: false,
+              listed: true,
+              signed_on_version: 1,
+              revoked: true,
+              signed_at: "2026-09-19T12:00:00Z",
+              revoked_at: "2026-09-19T14:00:00Z",
+            },
+          })}
+          token="test-token"
+          refetch={noop}
+        />
+      </MemoryRouter>,
+    );
+
+    const heading = screen.getByRole("heading", { name: "Add your name" });
+    expect(document.activeElement).toBe(heading);
+
+    const status = screen.getByRole("status");
+    expect(status.textContent ?? "").toMatch(/You removed your name on/u);
+  });
+
   it("draft line: shows the unsent-comments line alongside whatever the primary state is", () => {
     const bundle = makeBundle({
       submissions: [

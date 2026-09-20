@@ -50,6 +50,7 @@ export function EditSignatureForm({
         {copy.signForm.nameLabel}
         <input
           type="text"
+          autoFocus
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"

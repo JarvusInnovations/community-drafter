@@ -15,6 +15,8 @@ import { type Phase } from "./types.ts";
 export const copy = {
   instanceBar: (name: string) => name,
 
+  skipToDocument: "Skip to document",
+
   notFound: {
     heading: "This link isn't available",
     body: "If you believe this is a mistake, please contact the team that sent it to you.",
@@ -263,6 +265,8 @@ export const copy = {
   commentMode: {
     backToDocument: "Back to document",
     commentButton: "Comment",
+    composerDialogLabel: "Comment on selected passage",
+    composerFieldLabel: "Your comment on this passage",
     composerAdd: "Add",
     composerCancel: "Cancel",
     generalLabel: "Anything about the document as a whole",

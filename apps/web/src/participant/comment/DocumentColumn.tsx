@@ -1,5 +1,5 @@
 import { type Anchor, type SelectionInfo, computeAnchor } from "@community-drafter/shared/browser";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { copy } from "../copy.ts";
 import { blocksFromDom } from "./blocks.ts";
@@ -28,6 +28,7 @@ export function DocumentColumn({
   const [pending, setPending] = useState<PendingSelection | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerBody, setComposerBody] = useState("");
+  const composerFieldId = useId();
   // Clicking "Comment" collapses the browser's own text selection (any
   // click outside it does), which fires `selectionchange` — read here so
   // the capture callback below (set up once per `html`, not per render)
@@ -98,6 +99,12 @@ export function DocumentColumn({
     window.getSelection()?.removeAllRanges();
   }
 
+  function closeComposer(): void {
+    setComposerOpen(false);
+    setPending(null);
+    setComposerBody("");
+  }
+
   // § Design "Document column": the floating "Comment" button is "anchored
   // just above the selection" — position it by its bottom edge so it grows
   // upward from the selection's top rather than downward from its bottom.
@@ -122,10 +129,22 @@ export function DocumentColumn({
 
       {pending && composerOpen ? (
         <div
+          role="dialog"
+          aria-label={copy.commentMode.composerDialogLabel}
           className="fixed z-20 flex w-72 flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)]"
           style={anchorStyle}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              closeComposer();
+            }
+          }}
         >
+          <label htmlFor={composerFieldId} className="sr-only">
+            {copy.commentMode.composerFieldLabel}
+          </label>
           <textarea
+            id={composerFieldId}
             autoFocus
             value={composerBody}
             onChange={(event) => setComposerBody(event.target.value)}
@@ -141,11 +160,7 @@ export function DocumentColumn({
             <button
               type="button"
               className="font-medium text-muted-foreground"
-              onClick={() => {
-                setComposerOpen(false);
-                setPending(null);
-                setComposerBody("");
-              }}
+              onClick={closeComposer}
             >
               {copy.commentMode.composerCancel}
             </button>
