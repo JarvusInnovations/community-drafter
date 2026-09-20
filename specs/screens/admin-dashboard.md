@@ -21,6 +21,7 @@ Everything: document, versions (from body-changing commits), participations with
 **Operators** (`/admin/operators`): every operator (name, email, kind, active, a superadmin pill where set, title, org) with add / edit / deactivate / remove, each requiring a confirmation and showing the resulting commit subject. The signed-in operator cannot deactivate or remove themself here.
 
 **Dashboard** (`/admin/d/<slug>`):
+
 - Header with title, state, phase, both deadlines, and buttons: "Extend deadline…", "Copy public link" (if enabled), "Export feedback" (downloads the bundle from `behaviors/review-and-judgement.md`), "Export links" (CSV; recorded).
 - **Operators of this document**: the list with add (choose from active operators) and remove (refused for the last one), per `behaviors/operators.md`.
 - **Funnel**: invited → sent → opened → acted (commented, signed, declined) as counts and a bar; signed split into organizations and individuals; conditional signers count; revoked count.
@@ -34,7 +35,7 @@ Everything: document, versions (from body-changing commits), participations with
 
 **Versions** (`/admin/d/<slug>/versions`): as the participant history plus publisher identity, notes, raw markdown download, dispositions list per version.
 
-**View as** (`/admin/d/<slug>/view-as/<person>`): renders the participant document screen for that person read-only with a persistent banner "Viewing as Jane Doe (read-only)". Every action control is disabled. **The action panel is the participant's own card, not a summary of it**: an unsigned person's view shows the whole sign card — capacity choice, the prefilled name, org and title, the official-capacity attestation in its exact wording, the sign button and the reassurance line — with every input, checkbox, button and link disabled; a signed person's view shows the signed state with its "change how you're listed" / "remove my name" actions disabled. The operator is checking the screen a participant will actually be sent, so replacing it with a sentence like "You didn't sign this document" hides the one thing view-as exists to show. Nothing on the page issues a request.
+**View as** (`/admin/d/<slug>/view-as/<person>`): renders the participant document screen for that person read-only with a persistent banner "Viewing as Jane Doe (read-only)". Every action control is disabled. **The action panel is the participant's own card, not a summary of it**: an unsigned person's view shows the whole sign card — capacity choice, the prefilled name, org and title, the official-capacity attestation in its exact wording, the sign button and the reassurance line — with every input, checkbox, button and link disabled; a signed person's view shows the signed state with its "change how you're listed" / "remove my name" actions disabled. The operator is checking the screen a participant will actually be sent, so replacing it with a sentence like "You didn't sign this document" hides the one thing view-as exists to show. Nothing on the page issues a request. The page has exactly one `h1` (the admin document title above the tabs); the participant header's title and, if the document's own rendered text opens with a top-level heading, that heading each render one level down here so neither duplicates the page title.
 
 ## Design
 
@@ -47,7 +48,6 @@ Follows `screens/document.md` § Design (tokens, top bar, cards, buttons, links)
 - **Dialogs** (extend deadline, revoke, reissue, operator forms): centered modal cards with a bold title, labeled inputs in the rounded style, a required reason where the spec says so, a primary confirm and a quiet cancel; success shows the resulting commit subject in a green soft banner.
 - **Sign-in and device pages**: a single centered card at 420 px with the same input and button styles.
 - **View as**: the participant screen unchanged — including its sign card — with a full-width amber banner pinned under the top bar. Disabled controls keep their own shape at reduced opacity rather than being replaced by text.
-
 
 | Action | Effect |
 | --- | --- |
@@ -67,8 +67,10 @@ Publishing, creating documents, importing invitees and sending are CLI/API only 
 ## Principles
 
 **Inherited**
+
 - [Nothing pending is lost; pending is labeled](../principles.md#nothing-pending-is-lost-pending-is-labeled): unsubmitted comments are readable here but always in their own labeled group.
 - [The record is a git repo the team can read without the app](../principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app): every table here is a view of records; nothing shown exists only in the app.
 
 **Local**
+
 - **Admin actions on participants are attributed and explained.** Any admin change to a person's link, signature or listing carries the admin's identity and a reason, and the person is told by email when it affects their signature.
