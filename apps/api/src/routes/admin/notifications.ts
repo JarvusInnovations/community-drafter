@@ -15,8 +15,11 @@ interface RetryBody {
 /**
  * `specs/api/admin.md` § Notifications. `sent` is a live tally of every
  * `participations.notified` key on the document (works for every event
- * kind, including the pre-marked ones `lib/notify.ts`/`invitations.ts`
- * write synchronously); `pending` stays `0` — sends aren't queued, the
+ * kind, including the ones a route writes itself — `lib/notify.ts`'s
+ * publish marks and `invitations.ts`'s reminder count). Every key there is
+ * a message the mailer accepted (`specs/behaviors/notifications.md` §
+ * Sending), so the tally counts deliveries. `pending` stays `0` — sends
+ * aren't queued, the
  * dispatcher renders and delivers them inline (with its own retry/backoff)
  * as soon as the triggering commit lands, so nothing is ever "waiting to
  * start"; `failed` is `notifications.failedCount`, the dispatcher's
