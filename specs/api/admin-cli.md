@@ -8,7 +8,7 @@ This is the **primary admin interface** of the system, and it ships as a **skill
 
 ## Configuration
 
-The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. `--profile <name>` selects a profile; the default is `default`. There is no actor label: every write is attributed to the signed-in operator.
+The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. The profile is selected by `--profile <name>`, else the `DRAFTER_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `DRAFTER_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
 
 ## Commands
 

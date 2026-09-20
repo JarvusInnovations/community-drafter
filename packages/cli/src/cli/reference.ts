@@ -214,7 +214,7 @@ export function renderCommandHelp(name: string): string | null {
     "",
     doc.summary,
     "",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
   ];
   // The SDK writes this string verbatim, so the trailing newline is ours.
   return `${lines.join("\n")}\n`;
@@ -235,7 +235,7 @@ export function renderTopLevelHelp(): string {
   lines.push(
     "",
     "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
     "Run `drafter-axi <command> --help` for usage on any command.",
     "Run `drafter-axi` with no arguments to see every open document's status.",
   );
