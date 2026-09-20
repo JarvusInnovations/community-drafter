@@ -73,7 +73,7 @@ Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (
 
 ## `GET /i/:token/api/compare?from=&to=`
 
-Response: `{ from, to, summary: { changed, added, removed }, blocks: [{ status: "same"|"changed"|"added"|"removed", id, html }] }` where `changed` blocks' `html` contains the redline markup.
+Response: `{ from, to, summary: { changed, added, removed, items: [{ kind: "paragraph"|"heading"|"list item"|"table", change: "changed"|"added"|"removed", count }] }, blocks: [{ status: "same"|"changed"|"added"|"removed", id, html }] }` where `changed` blocks' `html` contains the redline markup. Counts are per comparison unit, not per HTML element: a table is one (`behaviors/versioning.md` § Diff), and `items` is what the summary line is built from.
 
 ## `GET /i/:token/api/prefs` / `PUT /i/:token/api/prefs`
 

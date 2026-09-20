@@ -22,13 +22,14 @@ A document's text exists only as **published versions**, numbered v1, v2, v3 …
 
 **Diff.** A comparison between two versions is computed server-side as a block-aligned redline:
 
-1. Split each version's rendered text into blocks (the same blocks that carry `data-block` ids).
-2. Align blocks by id, then by best textual match (normalized-text similarity above a threshold) for blocks whose text changed, using a longest-common-subsequence alignment so moved blocks are shown as removed and added rather than mismatched.
-3. Within an aligned pair whose text differs, compute a word-level diff and render deletions as struck text and insertions as underlined/highlighted text inside the block.
-4. Whole added or removed blocks are rendered whole with the same styling.
-5. Formatting-only changes (heading level, list marker) are shown as a small marginal note, not as a redline of the whole block.
+1. Split each version's rendered text into the units a reader would name: paragraphs, headings, list items, and whole tables. A table is one unit, not a loose run of cells; its cells are only ever compared against the cells of the table it aligns with.
+2. Align units by id, then by best textual match (normalized-text similarity above a threshold) for units whose text changed, using a longest-common-subsequence alignment so moved units are shown as removed and added rather than mismatched.
+3. Within an aligned pair whose text differs, compute a word-level diff and render deletions as struck text and insertions as underlined/highlighted text inside the unit. Words never run together: where a deletion and the insertion replacing it meet, a space separates them, so "four" becoming "five" reads as two words and not as "fourfive".
+4. A changed table keeps its shape wherever it can. If both versions have the same rows and the same cells in each row, the table is shown once — the new table, with each changed cell redlined in place. If the shape changed, the table is shown twice and stacked: the whole old table struck through and labelled as removed, above the whole new table underlined and labelled as added. Detail inside a restructured table is not redlined.
+5. Whole added or removed units are rendered whole with the same styling.
+6. Formatting-only changes (heading level, list marker) are shown as a small marginal note, not as a redline of the whole unit.
 
-The comparison view carries a summary line ("4 paragraphs changed, 1 added, 0 removed") and a toggle to hide unchanged blocks. Default comparison is latest vs previous; any pair may be selected.
+The comparison view carries a summary line and a toggle to hide unchanged units. The summary counts changes the way a reader would: one reworded paragraph is one change, and one edited table is one change however many cells it touched. It names the kinds involved rather than reporting bare totals — "2 paragraphs changed, 1 table changed", "1 heading changed, 2 list items added" — listing changed kinds first, then added, then removed, omitting any kind with nothing to report, and reading "No changes" when the two versions render identically. Default comparison is latest vs previous; any pair may be selected.
 
 **What participants never see.** Commit hashes, branch names, the data repository, the word "commit", raw markdown (except when an admin exports it).
 
