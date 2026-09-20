@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { FakeMailer } from "../../lib/mailer/index.ts";
 import { adminHeaders, buildTestServer, seedDocument, seedParticipant } from "../test-support.ts";
 
 const cleanups: Array<() => void> = [];
@@ -10,7 +11,8 @@ afterEach(() => {
 const TOKEN = "parishtoken123456789";
 
 async function seedSignedParish(slug: string) {
-  const built = await buildTestServer();
+  const mailer = new FakeMailer();
+  const built = await buildTestServer({ mailer });
   cleanups.push(built.cleanup);
   await seedDocument(built.server, {
     slug,
@@ -36,7 +38,7 @@ async function seedSignedParish(slug: string) {
     },
   });
   expect(signed.statusCode).toBe(200);
-  return built;
+  return { ...built, mailer };
 }
 
 /** `specs/behaviors/signatures.md` § Capacity — "Official capacity requires a title" (issue #81). */
