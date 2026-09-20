@@ -1,38 +1,54 @@
+import type { OperatorKind } from "@community-drafter/shared";
 import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
+import { FixedWindowLimiter } from "../gateway/rate-limit.ts";
 import {
   buildClearCookie,
   buildSetCookie,
   isSecureContext,
   parseCookies,
   sessionCookieName,
-  sign,
-  unsign,
 } from "./cookie.ts";
-import { createGoogleAuth, type GoogleAuth } from "./google.ts";
-import { SESSION_TTL_MS, SessionStore, type Session } from "./session-store.ts";
+import { DeviceCodeStore } from "./device.ts";
+import {
+  CLI_TTL_SECONDS,
+  mintOperatorToken,
+  SESSION_TTL_SECONDS,
+  verifyBearerOperatorToken,
+  verifyOperatorToken,
+  type MintedToken,
+  type TokenPurpose,
+  type VerifiedOperatorToken,
+} from "./tokens.ts";
+import { UsedJtiStore } from "./used-jti-store.ts";
 
-export interface AuthPluginOptions {
-  /**
-   * Test-only substitute for the real Google verifier — lets
-   * `/auth/callback` tests exercise allowlist accept/refuse without a
-   * network call to Google (`plans/admin-dashboard.md` § Approach).
-   */
-  googleAuth?: GoogleAuth;
+export interface OperatorIdentity {
+  email: string;
+  name: string;
+  kind: OperatorKind;
 }
 
 export interface AuthDecoration {
-  sessions: SessionStore;
-  /** `null` when Google isn't configured (`GOOGLE_CLIENT_ID`/`_SECRET` unset and no test override). */
-  google: GoogleAuth | null;
   /** Whether the session cookie carries the `__Secure-` prefix (`PUBLIC_URL` is https). */
   secure: boolean;
   cookieName: string;
-  /** Set only outside production (`env.ts`'s `DEV_ADMIN_EMAIL`, honored only when `NODE_ENV !== "production"`). */
-  devAdminEmail: string | null;
-  resolveSession(cookieHeader: string | undefined): Session | null;
-  mintSession(email: string, name?: string): { session: Session; setCookieHeader: string };
+  /** Set only outside production (`env.ts`'s `DEV_ADMIN_EMAIL`) — the local-dev sign-in shortcut. */
+  devEmail: string | null;
+  deviceCodes: DeviceCodeStore;
+  usedMagicJti: UsedJtiStore;
+  /** `specs/api/auth.md`: 5 per address and 5 per source IP per 15 minutes, on `/auth/login` and `/auth/device`. */
+  loginRateLimiters: { perEmail: FixedWindowLimiter; perIp: FixedWindowLimiter };
+  mint(
+    purpose: TokenPurpose,
+    operator: OperatorIdentity,
+    opts?: { returnPath?: string },
+  ): Promise<MintedToken>;
+  verifyBearer(token: string): Promise<VerifiedOperatorToken | null>;
+  verifyMagic(token: string): Promise<VerifiedOperatorToken | null>;
+  /** Reads the session cookie off a `Cookie` header and verifies it (`purpose: session` only). */
+  resolveCookie(cookieHeader: string | undefined): Promise<VerifiedOperatorToken | null>;
+  sessionSetCookieHeader(token: string): string;
   clearCookieHeader(): string;
 }
 
@@ -43,66 +59,69 @@ declare module "fastify" {
 }
 
 /**
- * `specs/behaviors/access-and-identity.md` § Admin access + `jarvus-fastify`
- * authentication reference. Decorates `fastify.auth` with the session store
- * and cookie helpers the gateway's cookie-resolution branch
- * (`gateway.ts`'s `resolveAdmin`) and `auth/routes.ts` both read. Must
- * register after `envPlugin` (reads `fastify.config`) and before
- * `gatewayPlugin` (see `app.ts`'s numbered comments).
+ * `specs/behaviors/operators.md` + `specs/api/auth.md`. Decorates
+ * `fastify.auth` with token mint/verify helpers, cookie plumbing, and the
+ * in-memory device-code + used-magic-jti stores the auth routes and the
+ * gateway's operator resolution both read. Must register after `envPlugin`
+ * (reads `fastify.config`) and before `gatewayPlugin` (see `app.ts`'s
+ * numbered comments).
  */
-const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (fastify, opts) => {
+const authPlugin: FastifyPluginAsync = async (fastify) => {
   const secure = isSecureContext(fastify.config.PUBLIC_URL);
   const cookieName = sessionCookieName(secure);
-  const sessions = new SessionStore();
 
-  const devAdminEmail =
+  const devEmail =
     fastify.config.NODE_ENV !== "production" && fastify.config.DEV_ADMIN_EMAIL
       ? fastify.config.DEV_ADMIN_EMAIL
       : null;
   if (fastify.config.DEV_ADMIN_EMAIL && fastify.config.NODE_ENV === "production") {
     fastify.log.warn(
-      "DEV_ADMIN_EMAIL is set but ignored in production (NODE_ENV=production); configure Google OAuth instead.",
+      "DEV_ADMIN_EMAIL is set but ignored in production (NODE_ENV=production); use magic-link sign-in instead.",
     );
   }
 
-  if (
-    fastify.config.GOOGLE_CLIENT_ID &&
-    !fastify.config.OAUTH_ALLOWED_EMAILS &&
-    !fastify.config.OAUTH_ALLOWED_DOMAINS
-  ) {
-    fastify.log.warn(
-      "Google OAuth is configured but OAUTH_ALLOWED_EMAILS/OAUTH_ALLOWED_DOMAINS are empty; every sign-in will be refused.",
-    );
+  function requireSecret(): string {
+    const secret = fastify.config.AUTH_SECRET;
+    if (!secret) {
+      throw new Error("AUTH_SECRET must be configured to mint or verify operator tokens.");
+    }
+    return secret;
   }
 
-  const google: GoogleAuth | null =
-    opts.googleAuth ??
-    (fastify.config.GOOGLE_CLIENT_ID && fastify.config.GOOGLE_CLIENT_SECRET
-      ? createGoogleAuth(fastify.config.GOOGLE_CLIENT_ID, fastify.config.GOOGLE_CLIENT_SECRET)
-      : null);
+  async function mint(
+    purpose: TokenPurpose,
+    operator: OperatorIdentity,
+    opts?: { returnPath?: string },
+  ): Promise<MintedToken> {
+    return mintOperatorToken({
+      purpose,
+      email: operator.email,
+      name: operator.name,
+      kind: operator.kind,
+      secret: requireSecret(),
+      returnPath: opts?.returnPath,
+    });
+  }
 
-  function resolveSession(cookieHeader: string | undefined): Session | null {
-    const secret = fastify.config.COOKIE_SECRET;
-    if (!secret) return null;
+  async function verifyBearer(token: string): Promise<VerifiedOperatorToken | null> {
+    return verifyBearerOperatorToken(token, requireSecret());
+  }
+
+  async function verifyMagic(token: string): Promise<VerifiedOperatorToken | null> {
+    return verifyOperatorToken(token, requireSecret(), "magic");
+  }
+
+  async function resolveCookie(
+    cookieHeader: string | undefined,
+  ): Promise<VerifiedOperatorToken | null> {
     const cookies = parseCookies(cookieHeader);
     const raw = cookies[cookieName];
     if (!raw) return null;
-    const sessionId = unsign(raw, secret);
-    if (!sessionId) return null;
-    return sessions.get(sessionId);
+    return verifyOperatorToken(raw, requireSecret(), "session");
   }
 
-  function mintSession(email: string, name?: string) {
-    const secret = fastify.config.COOKIE_SECRET;
-    if (!secret) {
-      throw new Error("COOKIE_SECRET must be configured to mint an admin session.");
-    }
-    const session = sessions.create(email, name);
-    const setCookieHeader = buildSetCookie(cookieName, sign(session.id, secret), {
-      secure,
-      maxAgeSeconds: Math.floor(SESSION_TTL_MS / 1000),
-    });
-    return { session, setCookieHeader };
+  function sessionSetCookieHeader(token: string): string {
+    return buildSetCookie(cookieName, token, { secure, maxAgeSeconds: SESSION_TTL_SECONDS });
   }
 
   function clearCookieHeader(): string {
@@ -110,15 +129,24 @@ const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (fastify, opts) 
   }
 
   fastify.decorate("auth", {
-    sessions,
-    google,
     secure,
     cookieName,
-    devAdminEmail,
-    resolveSession,
-    mintSession,
+    devEmail,
+    deviceCodes: new DeviceCodeStore(),
+    usedMagicJti: new UsedJtiStore(),
+    loginRateLimiters: {
+      // `specs/api/auth.md`: "5 per address and 5 per source IP per 15 minutes".
+      perEmail: new FixedWindowLimiter(5, 15 * 60_000),
+      perIp: new FixedWindowLimiter(5, 15 * 60_000),
+    },
+    mint,
+    verifyBearer,
+    verifyMagic,
+    resolveCookie,
+    sessionSetCookieHeader,
     clearCookieHeader,
-  });
+  } satisfies AuthDecoration);
 };
 
+export { CLI_TTL_SECONDS, SESSION_TTL_SECONDS };
 export default fp(authPlugin, "5.x");

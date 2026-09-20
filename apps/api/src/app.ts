@@ -1,7 +1,7 @@
 import type { FastifyError, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
-import authPlugin, { type AuthPluginOptions } from "./auth/plugin.ts";
+import authPlugin from "./auth/plugin.ts";
 import authRoutes from "./auth/routes.ts";
 import { ApiError } from "./errors.ts";
 import eventsPlugin from "./events/bus.ts";
@@ -31,8 +31,6 @@ export interface AppOptions {
   notifications?: NotificationsPluginOptions;
   /** Test-only override for where the built SPA lives (`routes/static.ts`). */
   static?: StaticRoutesOptions;
-  /** Test-only overrides for admin OAuth (`auth/plugin.ts`) — e.g. a fake Google verifier. */
-  auth?: AuthPluginOptions;
 }
 
 declare module "fastify" {
@@ -64,10 +62,10 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   //     `fastify.notifications`, so this must land before routes register.
   await fastify.register(notificationsPlugin, opts.notifications ?? {});
 
-  // 3c. Admin OAuth sessions (`admin-dashboard`): the in-memory session
-  //     store + cookie helpers. Must land before the gateway below — its
-  //     cookie-resolution branch reads `fastify.auth`.
-  await fastify.register(authPlugin, opts.auth ?? {});
+  // 3c. Operator auth (`operators-auth`): token mint/verify, device codes,
+  //     used-magic-jti store. Must land before the gateway below — its
+  //     operator-resolution branch reads `fastify.auth`.
+  await fastify.register(authPlugin);
 
   // 4. The deny-by-default gateway. Must come after storage/config (token
   //    resolution and the admin bearer compare both read them) and after

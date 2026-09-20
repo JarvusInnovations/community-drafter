@@ -34,20 +34,24 @@ const schema = {
     // --- Data repository (specs/architecture.md § Storage) ---
     DATA_REPO_URL: { type: "string" },
     DATA_REPO_BRANCH: { type: "string" },
+    // `behaviors/operators.md` § Data-repository refresh (webhook):
+    // HMAC-SHA256 over the raw body, GitHub's `X-Hub-Signature-256` shape.
+    DATA_REPO_WEBHOOK_SECRET: { type: "string" },
 
     // --- Public identity ---
     PUBLIC_URL: { type: "string" },
 
-    // --- Admin auth (specs/architecture.md § Authentication) ---
-    ADMIN_TOKEN: { type: "string" },
-    GOOGLE_CLIENT_ID: { type: "string" },
-    GOOGLE_CLIENT_SECRET: { type: "string" },
-    COOKIE_SECRET: { type: "string" },
-    OAUTH_ALLOWED_EMAILS: { type: "string" },
-    OAUTH_ALLOWED_DOMAINS: { type: "string" },
-    // `admin-dashboard`: bypasses Google entirely for local dev/tests. Only
-    // honored when NODE_ENV !== "production" (`auth/plugin.ts`) — a value
-    // left set in a deployed environment is ignored, not a foothold.
+    // --- Operator auth (specs/architecture.md § Authentication) ---
+    // Signs sessions, CLI tokens and magic links (`api/auth.md` § Token
+    // shape). Required in production — checked by hand below (JSON Schema
+    // can't express "required only when NODE_ENV=production").
+    AUTH_SECRET: { type: "string" },
+    // `behaviors/operators.md` § Bootstrap: the only way the first operator
+    // comes into existence, when the `operators` sheet is empty at boot.
+    BOOTSTRAP_OPERATOR_EMAIL: { type: "string" },
+    // Local/test only: bypasses magic-link sign-in entirely, minting a
+    // session directly for this email (`auth/routes.ts`'s `GET /auth/login`
+    // dev shortcut). Ignored when NODE_ENV=production (`auth/plugin.ts`).
     DEV_ADMIN_EMAIL: { type: "string" },
 
     // --- Outbound messaging (specs/architecture.md § Outbound messaging) ---
@@ -88,15 +92,12 @@ declare module "fastify" {
 
       DATA_REPO_URL?: string;
       DATA_REPO_BRANCH?: string;
+      DATA_REPO_WEBHOOK_SECRET?: string;
 
       PUBLIC_URL?: string;
 
-      ADMIN_TOKEN?: string;
-      GOOGLE_CLIENT_ID?: string;
-      GOOGLE_CLIENT_SECRET?: string;
-      COOKIE_SECRET?: string;
-      OAUTH_ALLOWED_EMAILS?: string;
-      OAUTH_ALLOWED_DOMAINS?: string;
+      AUTH_SECRET?: string;
+      BOOTSTRAP_OPERATOR_EMAIL?: string;
       DEV_ADMIN_EMAIL?: string;
 
       MAILER: "postmark" | "smtp" | "export";
@@ -120,4 +121,15 @@ export default fp(async (fastify) => {
     schema,
     dotenv: true,
   });
+
+  // `jarvus-fastify` authentication reference § Security Considerations:
+  // "Strong signing keys — HS256 needs ≥32 bytes; validate the length at
+  // boot." Also the cross-field contract JSON Schema can't express: required
+  // in production, optional in dev/test (where `DEV_ADMIN_EMAIL` stands in).
+  if (fastify.config.NODE_ENV === "production" && !fastify.config.AUTH_SECRET) {
+    throw new Error("AUTH_SECRET must be set in production (signs operator sessions and tokens).");
+  }
+  if (fastify.config.AUTH_SECRET && Buffer.byteLength(fastify.config.AUTH_SECRET, "utf8") < 32) {
+    throw new Error("AUTH_SECRET must be at least 32 bytes.");
+  }
 });
