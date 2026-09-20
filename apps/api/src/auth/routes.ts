@@ -258,6 +258,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       email: principal.email,
       name: principal.name,
       kind: principal.operatorKind,
+      superadmin: principal.superadmin,
       expires_at: new Date(principal.exp * 1000).toISOString(),
       transport: principal.transport,
     };

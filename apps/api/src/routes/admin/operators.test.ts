@@ -107,6 +107,70 @@ describe("PATCH /admin/api/operators/:email", () => {
     await server.close();
   });
 
+  it("superadmin: only a superadmin may grant it, never on themself; the grantee can then grant", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    for (const email of ["alpha@example.org", "bravo@example.org"]) {
+      await server.inject({
+        method: "POST",
+        url: "/admin/api/operators",
+        headers: adminHeaders(),
+        payload: { email, name: email },
+      });
+    }
+    const aAuth = await bearerFor(server, "alpha@example.org");
+
+    const byPlain = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/bravo@example.org",
+      headers: aAuth,
+      payload: { superadmin: true },
+    });
+    expect(byPlain.statusCode).toBe(403);
+    expect(byPlain.json().error).toBe("forbidden");
+
+    const onSelf = await server.inject({
+      method: "PATCH",
+      url: `/admin/api/operators/${TEST_ACTOR.email}`,
+      headers: adminHeaders(),
+      payload: { superadmin: false },
+    });
+    expect(onSelf.statusCode).toBe(422);
+
+    const grant = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/alpha@example.org",
+      headers: adminHeaders(),
+      payload: { superadmin: true },
+    });
+    expect(grant.statusCode).toBe(200);
+    expect(grant.json().superadmin).toBe(true);
+
+    const byNewSuperadmin = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/operators/bravo@example.org",
+      headers: aAuth,
+      payload: { superadmin: true },
+    });
+    expect(byNewSuperadmin.statusCode).toBe(200);
+
+    const list = await server.inject({
+      method: "GET",
+      url: "/admin/api/operators",
+      headers: aAuth,
+    });
+    const flags = Object.fromEntries(
+      list
+        .json<Array<{ email: string; superadmin: boolean }>>()
+        .map((o) => [o.email, o.superadmin]),
+    );
+    expect(flags["alpha@example.org"]).toBe(true);
+    expect(flags["bravo@example.org"]).toBe(true);
+
+    await server.close();
+  });
+
   it("a different operator CAN deactivate you (self-check is only about the caller)", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
@@ -208,8 +272,9 @@ describe("GET /admin/api/documents scoping", () => {
       headers: adminHeaders(),
     });
     const slugs = mine.json<Array<{ slug: string }>>().map((d) => d.slug);
+    // The bootstrap operator is a superadmin and therefore sees every document.
     expect(slugs).toContain("mine");
-    expect(slugs).not.toContain("theirs");
+    expect(slugs).toContain("theirs");
 
     const otherAuth = await bearerFor(server, "other@example.org");
     const theirs = await server.inject({

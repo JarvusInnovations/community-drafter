@@ -45,6 +45,7 @@ export const copy = {
   operators: {
     heading: "Operators",
     empty: "No operators yet.",
+    superadminPill: "superadmin",
     add: "Add operator",
     edit: "Edit",
     deactivate: "Deactivate",
@@ -76,6 +77,7 @@ export const copy = {
   documentList: {
     heading: "Documents",
     empty: "No documents yet.",
+    superadminNote: "You're a superadmin, so this list shows every document on this instance.",
     newDocumentHint: "New documents are created from the CLI (you become its first operator):",
     newDocumentCommand: 'drafter-axi docs create <slug> --title "…" --sender-name … --reply-to …',
   },

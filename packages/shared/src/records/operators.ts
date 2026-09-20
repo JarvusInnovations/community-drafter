@@ -19,6 +19,8 @@ export const OperatorRecordSchema = z.object({
   title: z.string().optional(),
   org: z.string().optional(),
   notes: z.string().optional(),
+  /** `behaviors/operators.md` § Superadmins: sees and may act on every document. */
+  superadmin: z.boolean().optional(),
 });
 
 export type OperatorRecord = z.infer<typeof OperatorRecordSchema>;

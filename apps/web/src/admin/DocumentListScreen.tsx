@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { ApiError, listDocuments } from "./api.ts";
 import { Card } from "./components/Card.tsx";
 import { copy } from "./copy.ts";
+import { useAdminSession } from "./SessionContext.tsx";
 import { type DocumentSummary } from "./types.ts";
 
 function formatDeadline(doc: DocumentSummary): string {
@@ -18,6 +19,7 @@ function formatDeadline(doc: DocumentSummary): string {
 
 /** `/admin` — the document list, `specs/screens/admin-dashboard.md` § "Document list". */
 export function DocumentListScreen(): JSX.Element {
+  const { session } = useAdminSession();
   const [docs, setDocs] = useState<DocumentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,9 @@ export function DocumentListScreen(): JSX.Element {
       <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
         {copy.documentList.heading}
       </h1>
+      {session?.superadmin ? (
+        <p className="mt-1 text-sm text-muted-foreground">{copy.documentList.superadminNote}</p>
+      ) : null}
 
       <p className="mt-3 rounded-xl border-l-[3px] border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
         {copy.documentList.newDocumentHint}{" "}

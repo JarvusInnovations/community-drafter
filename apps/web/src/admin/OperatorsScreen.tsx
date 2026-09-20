@@ -122,7 +122,14 @@ export function OperatorsScreen(): JSX.Element {
                 <tr key={operator.email} className="border-b border-border last:border-0">
                   <td className="px-4 py-2.5 font-semibold text-foreground">{operator.name}</td>
                   <td className="px-4 py-2.5 text-foreground">{operator.email}</td>
-                  <td className="px-4 py-2.5 text-foreground">{operator.kind}</td>
+                  <td className="px-4 py-2.5 text-foreground">
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {operator.kind}
+                      {operator.superadmin ? (
+                        <Pill tone="primary">{copy.operators.superadminPill}</Pill>
+                      ) : null}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5">
                     <Pill tone={operator.active ? "ok" : "muted"}>
                       {operator.active ? "active" : "inactive"}

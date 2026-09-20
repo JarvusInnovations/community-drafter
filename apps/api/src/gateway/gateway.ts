@@ -48,7 +48,7 @@ function hasCsrfHeader(request: FastifyRequest): boolean {
 function loadActiveOperator(
   fastify: FastifyInstance,
   email: string,
-): { email: string; name: string; kind: "person" | "bot" } {
+): { email: string; name: string; kind: "person" | "bot"; superadmin: boolean } {
   const record = fastify.storage.readModel.getOperatorByEmail(email);
   if (!record) {
     throw new ApiError("unauthenticated", "No operator record for this token.");
@@ -56,7 +56,12 @@ function loadActiveOperator(
   if (!record.active) {
     throw new ApiError("operator_inactive", "This operator account has been deactivated.");
   }
-  return { email: record.email, name: record.name, kind: record.kind };
+  return {
+    email: record.email,
+    name: record.name,
+    kind: record.kind,
+    superadmin: record.superadmin === true,
+  };
 }
 
 /**
@@ -83,6 +88,7 @@ async function resolveOperator(request: FastifyRequest, fastify: FastifyInstance
       email: operator.email,
       name: operator.name,
       operatorKind: operator.kind,
+      superadmin: operator.superadmin,
       transport: "bearer",
       exp: verified.exp,
     };
@@ -105,6 +111,7 @@ async function resolveOperator(request: FastifyRequest, fastify: FastifyInstance
     email: operator.email,
     name: operator.name,
     operatorKind: operator.kind,
+    superadmin: operator.superadmin,
     transport: "cookie",
     exp: verified.exp,
   };
@@ -126,8 +133,10 @@ function enforceDocumentScope(request: FastifyRequest, fastify: FastifyInstance)
   if (!slug) {
     throw new Error("documentScoped route reached with no :slug param");
   }
+  // `behaviors/operators.md` § Superadmins: a superadmin passes document
+  // scoping everywhere; an unknown slug is still a 404 for everyone.
   const entry = fastify.storage.readModel.getDocument(slug);
-  if (!entry || !entry.record.operators?.includes(principal.email)) {
+  if (!entry || (!principal.superadmin && !entry.record.operators?.includes(principal.email))) {
     throw notFoundDocument(slug);
   }
 }

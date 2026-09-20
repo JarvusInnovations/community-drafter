@@ -128,6 +128,8 @@ describe("gateway: operator bearer", () => {
       // "authorization comes from live state, never token claims."
       name: TEST_ACTOR.email,
       operatorKind: "person",
+      // The bootstrap operator is seeded as a superadmin (`behaviors/operators.md`).
+      superadmin: true,
       transport: "bearer",
       exp: expect.any(Number),
     });
@@ -161,15 +163,43 @@ describe("gateway: document scoping", () => {
   it("404s a document-scoped route for an operator not on the document", async () => {
     const { server } = await buildServer();
 
+    // A plain (non-superadmin) operator; the bootstrap operator would pass.
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "plain@example.org", name: "Plain Op" },
+    });
+    const plain = await mintOperatorToken({
+      purpose: "cli",
+      email: "plain@example.org",
+      name: "Plain Op",
+      kind: "person",
+      secret: TEST_AUTH_SECRET,
+    });
     await seedDocument(server, { slug: "scoped-doc", operators: ["someone-else@example.org"] });
 
     const response = await server.inject({
       method: "GET",
       url: "/__test/scoped/scoped-doc",
-      headers: adminHeaders(),
+      headers: { authorization: `Bearer ${plain.token}` },
     });
     expect(response.statusCode).toBe(404);
     expect(response.json().error).toBe("not_found");
+
+    await server.close();
+  });
+
+  it("200s a document-scoped route for a superadmin who is not on the document", async () => {
+    const { server } = await buildServer();
+    await seedDocument(server, { slug: "not-mine", operators: ["someone-else@example.org"] });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__test/scoped/not-mine",
+      headers: adminHeaders(),
+    });
+    expect(response.statusCode).toBe(200);
 
     await server.close();
   });

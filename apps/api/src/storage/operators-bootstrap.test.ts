@@ -58,11 +58,15 @@ describe("operator bootstrap", () => {
     expect(operator).toBeDefined();
     expect(operator?.active).toBe(true);
     expect(operator?.kind).toBe("person");
+    // `behaviors/operators.md` § Superadmins: the bootstrap operator is seeded with the flag.
+    expect(operator?.superadmin).toBe(true);
 
-    const body = await runGit(["log", "-1", "--format=%B"], dataDir);
-    const trailers = trailersOf(body);
-    expect(trailers.Action).toBe("operator-add");
-    expect(trailers.Actor).toBe("system");
+    const latest = trailersOf(await runGit(["log", "-1", "--format=%B"], dataDir));
+    expect(latest.Action).toBe("operator-update");
+    expect(latest.Actor).toBe("system");
+    const previous = trailersOf(await runGit(["log", "-1", "--skip=1", "--format=%B"], dataDir));
+    expect(previous.Action).toBe("operator-add");
+    expect(previous.Actor).toBe("system");
   });
 
   it("does nothing when BOOTSTRAP_OPERATOR_EMAIL is unset", async () => {

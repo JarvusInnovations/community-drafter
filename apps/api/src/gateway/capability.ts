@@ -46,6 +46,8 @@ export interface OperatorPrincipal {
   email: string;
   name: string;
   operatorKind: OperatorKind;
+  /** `behaviors/operators.md` § Superadmins — re-read from the operator record on every request. */
+  superadmin: boolean;
   transport: "bearer" | "cookie";
   exp: number;
 }

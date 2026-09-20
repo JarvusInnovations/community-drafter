@@ -12,7 +12,7 @@ Resolves the code to its magic token (unknown or expired code → failure page),
 
 ## `GET /auth/session`
 
-Cookie or bearer. Returns `{ email, name, kind, expires_at, transport }` or 401 `unauthenticated` / `operator_inactive`.
+Cookie or bearer. Returns `{ email, name, kind, superadmin, expires_at, transport }` or 401 `unauthenticated` / `operator_inactive`.
 
 ## `POST /auth/logout`
 
