@@ -161,8 +161,9 @@ export function resolveLoginUrl(flagUrl: string | undefined): string {
 }
 
 /** Whether the environment carries enough to talk to an instance — used by the SessionStart hook and the home view. */
-export function isConfigured(): boolean {
+/** Whether a session exists for the selected profile (`--profile`, `DRAFTER_PROFILE`, else `default`) or the env pair. */
+export function isConfigured(options: ResolveConfigOptions = {}): boolean {
   if (process.env.DRAFTER_URL && process.env.DRAFTER_TOKEN) return true;
-  const stored = readProfile("default");
+  const stored = readProfile(resolveProfileName(options.profile));
   return Boolean(stored.url && stored.token);
 }

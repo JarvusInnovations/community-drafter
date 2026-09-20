@@ -44,3 +44,14 @@ export interface Mailer {
   readonly kind: "postmark" | "smtp" | "export";
   send(message: OutboundMessage): Promise<void>;
 }
+
+/**
+ * RFC 5322 mailbox: the display name is always quoted (with `"` and `\`
+ * escaped) so a name like `Samuel Park, MD` or `O"Brien` cannot split or
+ * break the header. An empty name yields the bare address.
+ */
+export function formatAddress(address: MailAddress): string {
+  const name = address.name.trim();
+  if (!name) return address.email;
+  return `"${name.replace(/(["\\])/g, "\\$1")}" <${address.email}>`;
+}

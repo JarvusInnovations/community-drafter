@@ -25,7 +25,7 @@ export async function homeCommand(args: string[]): Promise<string> {
   const ifConfigured = bool(parsed, "--if-configured");
   const cli = cliInvocation();
 
-  if (!isConfigured()) {
+  if (!isConfigured({ profile: str(parsed, "--profile") })) {
     if (ifConfigured) return ""; // hook: stay silent when unconfigured (spec: "when DRAFTER_URL is set")
     return joinBlocks(
       renderObject({ documents: "not signed in" }),

@@ -68,7 +68,7 @@ Set when the participation is created, editable by the participant at any time:
 
 ## Sending
 
-- Sends are derived, not stored: the commit that causes them (a publish, a phase change, an admin `send`/`remind`) is the trigger; the dispatcher computes recipients from preferences and `notified`, and dispatches with retries (3 attempts, exponential backoff). Failures after the last attempt are logged and shown in the dashboard from memory.
+- Sends are derived, not stored: the commit that causes them (a publish, a phase change, an admin `send`/`remind`) is the trigger; the dispatcher computes recipients from preferences and `notified`, and dispatches with retries (3 attempts, exponential backoff). Failures after the last attempt are logged (person, event, error) and shown, with the same detail, in the dashboard and `notifications list`, from memory.
 - Idempotency: the event key is checked against `participations.notified` before dispatch; present means skip. Because recipients are derived from record state, a restart re-derives outstanding sends and the `notified` check keeps them from repeating.
 - Preference-suppressed sends are simply not sent; coverage is computed from preferences on demand.
 - After a batch (invitation blast, revision alerts) the successes are recorded in **one commit** (`Action: send`, `Comments`-style list of persons in the body) patching each recipient's `notified`, never one commit per recipient.

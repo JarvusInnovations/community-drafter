@@ -120,9 +120,48 @@ export function renderEmail(parts: EmailParts): RenderedEmail {
   return { text, html };
 }
 
-/** "Jane" from "Jane Doe"; an email address or a single word comes back unchanged. */
+const HONORIFICS = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "mx",
+  "miss",
+  "dr",
+  "prof",
+  "rev",
+  "fr",
+  "sr",
+  "br",
+  "hon",
+  "sir",
+  "dame",
+  "rabbi",
+  "imam",
+  "pastor",
+  "deacon",
+  "bishop",
+  "elder",
+  "canon",
+  "dean",
+  "capt",
+  "col",
+  "sgt",
+]);
+
+/**
+ * "Jane" from "Jane Doe". A leading honorific ("Rev. Tomás Ferreira",
+ * "Dr Priya Raman") keeps the honorific and the surname ("Rev. Ferreira"),
+ * since "Hi Rev.," is not a greeting; an email address or a single word
+ * comes back unchanged.
+ */
 export function firstName(name: string): string {
   const trimmed = name.trim();
   if (trimmed.length === 0 || trimmed.includes("@")) return trimmed;
-  return trimmed.split(/\s+/u)[0] ?? trimmed;
+  const parts = trimmed.split(/\s+/u);
+  const first = parts[0] ?? trimmed;
+  if (parts.length >= 2 && HONORIFICS.has(first.replace(/\.$/u, "").toLowerCase())) {
+    const last = parts[parts.length - 1] ?? "";
+    return `${first} ${last}`;
+  }
+  return first;
 }

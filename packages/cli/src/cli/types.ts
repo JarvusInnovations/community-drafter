@@ -214,6 +214,7 @@ export interface NotificationsSummary {
   sent: Record<string, number>;
   pending: number;
   failed: number;
+  failures?: Array<{ event: string; person: string; error: string; at: string }>;
 }
 
 export interface NotificationsRetryResult {

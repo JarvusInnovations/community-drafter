@@ -91,6 +91,24 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
       });
       return;
     }
+    // A record that fails the store's schema (gitsheets `ValidationError`)
+    // is the caller's input problem, not a server fault: 422
+    // `validation_failed` with the field issues (`specs/api/conventions.md`).
+    if (err.name === "ValidationError" && Array.isArray((err as { issues?: unknown }).issues)) {
+      const issues = (err as unknown as { issues: Array<{ path?: unknown; message?: string }> })
+        .issues;
+      reply.status(422).send({
+        error: "validation_failed",
+        message:
+          issues
+            .map((i) =>
+              `${Array.isArray(i.path) ? i.path.join(".") : ""}: ${i.message ?? ""}`.trim(),
+            )
+            .join("; ") || "The record failed validation.",
+        details: { issues },
+      });
+      return;
+    }
     request.log.error(err);
     reply.status(err.statusCode ?? 500).send({
       error: "internal_error",

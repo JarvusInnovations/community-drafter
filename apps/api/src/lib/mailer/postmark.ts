@@ -1,4 +1,4 @@
-import { MailerError, type Mailer, type OutboundMessage } from "./types.ts";
+import { formatAddress, MailerError, type Mailer, type OutboundMessage } from "./types.ts";
 
 /**
  * Postmark's HTTP API (`POST https://api.postmarkapp.com/email`), plain
@@ -25,8 +25,8 @@ export class PostmarkMailer implements Mailer {
           "X-Postmark-Server-Token": this.serverToken,
         },
         body: JSON.stringify({
-          From: `${message.from.name} <${message.from.email}>`,
-          To: `${message.to.name} <${message.to.email}>`,
+          From: formatAddress(message.from),
+          To: formatAddress(message.to),
           ReplyTo: message.replyTo,
           Subject: message.subject,
           TextBody: message.text,

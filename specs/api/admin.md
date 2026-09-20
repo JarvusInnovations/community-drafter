@@ -11,7 +11,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 - `DELETE /documents/:slug/operators/:email` → removes (`Action: doc-operator-remove`); 409 `last_operator` when it would leave none.
 - `GET /documents/:slug` → document + versions (from content history) + counts.
 - `PATCH /documents/:slug` → settings fields only (not `state`, not deadlines).
-- `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; queues invitations. Errors: `validation_failed` (order), `no_version`.
+- `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; queues invitations. Deadlines are ISO 8601 with a zone (offset or `Z`), stored as UTC. Errors: `validation_failed` (format, order, `comments_close_at` already past), `no_version`.
 - `POST /documents/:slug/schedule` `{ comments_close_at?, signing_closes_at? }` → extension only; `deadline_not_later` otherwise; records and announces.
 - `POST /documents/:slug/close` → closes now (sets `signing_closes_at = now`); rare, recorded.
 - `POST /documents/:slug/reopen` `{ comments_close_at?, signing_closes_at }`.
@@ -50,7 +50,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## Notifications
 
-- `GET /documents/:slug/notifications` → per event: sent count (from `notified`), pending and failed (from the dispatcher's memory).
+- `GET /documents/:slug/notifications` → per event: sent count (from `notified`), pending and failed (from the dispatcher's memory), plus `failures: [{ event, person, error, at }]` so the operator can see who did not get what and why.
 - `POST /documents/:slug/notifications/retry` `{ event?, person? }` → re-derives and re-dispatches anything not in `notified`.
 
 ## Activity
