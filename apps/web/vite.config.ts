@@ -35,6 +35,36 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: true,
       },
+      // Operator sign-in (`specs/api/auth.md`): the real server routes the
+      // admin SPA fetches directly (not full-page navigations), proxied
+      // individually rather than as a blanket `/auth` prefix — `GET
+      // /auth/device?code=` is deliberately *not* here: it's the SPA's own
+      // `DeviceApprovalScreen` route (`specs/api/auth.md`: "(SPA page)"),
+      // and proxying it would hand the page load to the API instead of Vite.
+      "/auth/session": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/auth/login": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/auth/logout": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/auth/refresh": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/auth/callback": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/auth/device/approve": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
     },
   },
 });

@@ -9,6 +9,7 @@ import {
   getNotifications,
 } from "./api.ts";
 import { copy } from "./copy.ts";
+import { DocumentOperatorsPanel } from "./components/DocumentOperatorsPanel.tsx";
 import { ExtendDeadlineDialog } from "./components/ExtendDeadlineDialog.tsx";
 import { useAdminDocument } from "./DocumentContext.tsx";
 import { type ActivityEntry, type InvitationRow, type NotificationsHealth } from "./types.ts";
@@ -198,6 +199,8 @@ export function DashboardScreen(): JSX.Element {
         onClose={() => setExtendOpen(false)}
         onExtended={() => void refetch()}
       />
+
+      <DocumentOperatorsPanel slug={document.slug} />
 
       <section className="mt-6">
         <h2 className="font-semibold">{copy.dashboard.funnel}</h2>

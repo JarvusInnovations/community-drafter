@@ -9,7 +9,12 @@ import {
 } from "../flags.js";
 import { cliInvocation } from "../invocation.js";
 import { compact, computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
-import type { DocumentDetail, DocumentSummary } from "../types.js";
+import type {
+  DocOperatorAddResult,
+  DocumentDetail,
+  DocumentSummary,
+  OperatorRecord,
+} from "../types.js";
 import { clientFrom, render } from "./common.js";
 
 const DOCS_FLAGS: Record<string, FlagSpec> = {
@@ -17,7 +22,6 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
     positionals: 1,
     value: [
       "--title",
-      "--owner",
       "--sender-name",
       "--reply-to",
       "--capacities",
@@ -33,19 +37,24 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   close: { positionals: 1 },
   reopen: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
+  operators: { positionals: 3 },
 };
 
-export const DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw> ...
+export const DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
 
-create <slug> --title <text> --owner <email> --sender-name <text> --reply-to <email>
+create <slug> --title <text> --sender-name <text> --reply-to <email>
        [--capacities personal,official] [--public none|read|participate]
        [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
+       (the caller becomes the document's first operator)
 show <slug>
 open <slug> --comments-close <iso> --signing-closes <iso>
 extend <slug> [--comments-close <iso>] [--signing-closes <iso>]
 close <slug>
 reopen <slug> [--comments-close <iso>] --signing-closes <iso>
 withdraw <slug> --reason <text> [--public]
+operators <slug>
+operators add <slug> <email>
+operators remove <slug> <email>
 
 Every mutation prints the document's key fields and the commit subject.`;
 
@@ -55,7 +64,8 @@ function detailObject(doc: DocumentSummary): Record<string, unknown> {
     title: doc.title,
     state: doc.state,
     phase: doc.phase,
-    owner: doc.owner,
+    created_by: doc.created_by,
+    operators: doc.operators,
     sender_name: doc.sender_name,
     reply_to: doc.reply_to,
     opened_at: doc.opened_at,
@@ -81,14 +91,13 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi docs create <slug> --title "..." --owner <email> --sender-name "..." --reply-to <email>',
+        'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>',
       );
       const capacities = csv(str(parsed, "--capacities"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
         title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
-        owner: requireStr(parsed, "--owner", "drafter-axi docs create <slug> --owner <email> ..."),
         sender_name: requireStr(
           parsed,
           "--sender-name",
@@ -242,6 +251,52 @@ export async function docsCommand(args: string[]): Promise<string> {
         body,
       );
       return render(parsed, doc, () => renderObject(detailObject(doc)));
+    }
+
+    case "operators": {
+      const first = parsed.positional[0];
+      if (first === "add" || first === "remove") {
+        const slug = requirePositional(
+          parsed,
+          1,
+          "slug",
+          `drafter-axi docs operators ${first} <slug> <email>`,
+        );
+        const email = requirePositional(
+          parsed,
+          2,
+          "email",
+          `drafter-axi docs operators ${first} <slug> <email>`,
+        );
+        if (first === "add") {
+          const result = await client.post<DocOperatorAddResult>(
+            `/documents/${encodeURIComponent(slug)}/operators`,
+            { email },
+          );
+          return render(parsed, result, () => renderObject(compact(result)));
+        }
+        const result = await client.delete<{
+          ok: boolean;
+          removed: boolean;
+          commit?: string | null;
+        }>(`/documents/${encodeURIComponent(slug)}/operators/${encodeURIComponent(email)}`);
+        return render(parsed, result, () => renderObject(result));
+      }
+
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs operators <slug>");
+      const operators = await client.get<OperatorRecord[]>(
+        `/documents/${encodeURIComponent(slug)}/operators`,
+      );
+      return render(parsed, operators, () =>
+        operators.length === 0
+          ? renderObject({ operators: "no operators found" })
+          : renderList("operators", operators, [
+              computed("email", (o) => o.email),
+              computed("name", (o) => o.name),
+              computed("kind", (o) => o.kind),
+              computed("active", (o) => o.active),
+            ]),
+      );
     }
 
     default:

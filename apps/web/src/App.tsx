@@ -33,8 +33,17 @@ const CommentModeScreen = lazy(() =>
 const AdminLayout = lazy(() =>
   import("./admin/AdminLayout.tsx").then((m) => ({ default: m.AdminLayout })),
 );
+const LoginScreen = lazy(() =>
+  import("./admin/LoginScreen.tsx").then((m) => ({ default: m.LoginScreen })),
+);
+const DeviceApprovalScreen = lazy(() =>
+  import("./admin/DeviceApprovalScreen.tsx").then((m) => ({ default: m.DeviceApprovalScreen })),
+);
 const DocumentListScreen = lazy(() =>
   import("./admin/DocumentListScreen.tsx").then((m) => ({ default: m.DocumentListScreen })),
+);
+const OperatorsScreen = lazy(() =>
+  import("./admin/OperatorsScreen.tsx").then((m) => ({ default: m.OperatorsScreen })),
 );
 const DocumentLayout = lazy(() =>
   import("./admin/DocumentLayout.tsx").then((m) => ({ default: m.DocumentLayout })),
@@ -199,7 +208,25 @@ function App(): JSX.Element {
       </Route>
 
       {/* `admin-dashboard`: the read-mostly `/admin/*` family — grouped here as
-          its own block, same convention as `/d/:slug/*` above. */}
+          its own block, same convention as `/d/:slug/*` above. `/admin/login`
+          and `/auth/device` sit outside `AdminLayout`'s session gate — they
+          are how a signed-out visitor gets a session in the first place. */}
+      <Route
+        path="/admin/login"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <LoginScreen />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/auth/device"
+        element={
+          <Suspense fallback={<LazyFallback />}>
+            <DeviceApprovalScreen />
+          </Suspense>
+        }
+      />
       <Route
         path="/admin"
         element={
@@ -213,6 +240,14 @@ function App(): JSX.Element {
           element={
             <Suspense fallback={<LazyFallback />}>
               <DocumentListScreen />
+            </Suspense>
+          }
+        />
+        <Route
+          path="operators"
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <OperatorsScreen />
             </Suspense>
           }
         />

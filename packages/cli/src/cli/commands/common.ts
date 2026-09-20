@@ -7,16 +7,14 @@ import { renderJson } from "../output.js";
 
 /**
  * Build the API client from a parsed command's globally-allowed
- * `--actor`/`--profile` flags. Deliberately called from *inside* each
- * command handler (not from `resolveContext`) — `runAxiCli` does not wrap
- * `resolveContext` in the same try/catch as the handler body, so a config
- * error raised there would crash uncaught instead of rendering as a
- * structured error (AXI §6).
+ * `--profile` flag. Deliberately called from *inside* each command handler
+ * (not from `resolveContext`) — `runAxiCli` does not wrap `resolveContext`
+ * in the same try/catch as the handler body, so a config error raised
+ * there would crash uncaught instead of rendering as a structured error
+ * (AXI §6).
  */
 export function clientFrom(parsed: Parsed): DrafterClient {
-  return new DrafterClient(
-    resolveConfig({ actor: str(parsed, "--actor"), profile: str(parsed, "--profile") }),
-  );
+  return new DrafterClient(resolveConfig({ profile: str(parsed, "--profile") }));
 }
 
 export function wantsJson(parsed: Parsed): boolean {

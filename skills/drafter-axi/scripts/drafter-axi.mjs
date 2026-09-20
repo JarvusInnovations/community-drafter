@@ -624,9 +624,229 @@ function computeSessionStartHookUpdate(settings, spec) {
   return [updated, true];
 }
 
+// src/cli/config.ts
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join } from "node:path";
+var STRING_KEYS = ["url", "email", "token", "expires_at"];
+function configDir() {
+  return join(process.env.HOME || homedir2(), ".config", "drafter");
+}
+function profilePath(profile) {
+  return join(configDir(), `${profile}.toml`);
+}
+function parseFlatToml(text) {
+  const result = {};
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || line.startsWith("[")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    if (STRING_KEYS.includes(key)) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+function readProfile(profile) {
+  const path = profilePath(profile);
+  if (!existsSync(path)) return {};
+  try {
+    return parseFlatToml(readFileSync(path, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function tomlQuote(value) {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+function writeProfile(profile, data) {
+  mkdirSync(configDir(), { recursive: true });
+  const lines = [];
+  for (const key of STRING_KEYS) {
+    const value = data[key];
+    if (value !== void 0) lines.push(`${key} = ${tomlQuote(value)}`);
+  }
+  const path = profilePath(profile);
+  writeFileSync(path, `${lines.join("\n")}
+`, { mode: 384 });
+  chmodSync(path, 384);
+}
+function clearProfileToken(profile) {
+  const existing = readProfile(profile);
+  if (existing.token === void 0 && existing.expires_at === void 0) return false;
+  writeProfile(profile, { url: existing.url, email: existing.email });
+  return true;
+}
+var LOGIN_HINT = "Run `drafter-axi login <email> --url <instance>` to sign in";
+function resolveConfig(options = {}) {
+  const profile = options.profile ?? "default";
+  const stored = readProfile(profile);
+  const url = process.env.DRAFTER_URL ?? stored.url;
+  if (!url) {
+    throw new AxiError("Not signed in: no instance URL is configured", "USAGE", [LOGIN_HINT]);
+  }
+  const envToken = process.env.DRAFTER_TOKEN;
+  const token = envToken ?? stored.token;
+  if (!token) {
+    throw new AxiError("Not signed in: no token is configured", "USAGE", [LOGIN_HINT]);
+  }
+  return {
+    url: url.replace(/\/+$/, ""),
+    token,
+    profile,
+    tokenSource: envToken ? "env" : "profile"
+  };
+}
+function resolveLoginUrl(flagUrl) {
+  const url = flagUrl ?? process.env.DRAFTER_URL;
+  if (!url) {
+    throw new AxiError("An instance URL is required", "USAGE", [
+      "Pass --url <instance>, or set DRAFTER_URL in the environment"
+    ]);
+  }
+  return url.replace(/\/+$/, "");
+}
+function isConfigured() {
+  if (process.env.DRAFTER_URL && process.env.DRAFTER_TOKEN) return true;
+  const stored = readProfile("default");
+  return Boolean(stored.url && stored.token);
+}
+
+// src/cli/errors.ts
+var ApiCallError = class extends AxiError {
+  details;
+  constructor(apiCode, message, details = {}) {
+    super(message, apiCode, []);
+    this.details = details;
+  }
+};
+var NetworkError = class extends AxiError {
+  constructor(message) {
+    super(message, "NETWORK_ERROR", ["Check DRAFTER_URL and that the API is reachable"]);
+  }
+};
+var SignInExpiredError = class extends AxiError {
+  constructor() {
+    super("Sign-in expired or revoked; run login again.", "SIGN_IN_EXPIRED", [
+      "Run `drafter-axi login <email> --url <instance>` to sign in again"
+    ]);
+  }
+};
+var DeviceExpiredError = class extends AxiError {
+  constructor(message) {
+    super(message, "DEVICE_EXPIRED", ["Run `drafter-axi login <email> [--url <instance>]` again"]);
+  }
+};
+var EXIT_CODE_BY_CODE = {
+  // CLI-level usage errors (thrown by flags.ts / config.ts).
+  USAGE: 2,
+  UNKNOWN_FLAG: 2,
+  VALIDATION_ERROR: 2,
+  // API validation-shaped errors (400/422).
+  invalid_request: 2,
+  validation_failed: 2,
+  invalid_anchor: 2,
+  judgement_requires_comments: 2,
+  attestation_required: 2,
+  // API phase/conflict errors (409).
+  phase_closed: 3,
+  version_stale: 3,
+  deadline_not_later: 3,
+  stale_edit: 3,
+  unsaved_items: 3,
+  no_change: 3,
+  no_version: 3,
+  already_exists: 3,
+  last_operator: 3,
+  refresh_busy: 3,
+  refresh_diverged: 3,
+  device_pending: 3,
+  DEVICE_EXPIRED: 3,
+  // Not found (404).
+  not_found: 4,
+  // Auth (401/403).
+  unauthenticated: 5,
+  operator_inactive: 5,
+  forbidden: 5,
+  csrf_required: 5,
+  SIGN_IN_EXPIRED: 5,
+  // Everything else (rate limits, internal errors, network failures).
+  rate_limited: 1,
+  internal_error: 1,
+  NETWORK_ERROR: 1
+};
+function exitCodeForCode(code) {
+  return EXIT_CODE_BY_CODE[code] ?? 1;
+}
+
+// src/cli/device-login.ts
+async function postJson(url, body) {
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    throw new NetworkError(
+      `could not reach ${url}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+async function readErrorBody(response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+async function startDeviceLogin(instanceUrl, email) {
+  const response = await postJson(`${instanceUrl}/auth/device`, { email });
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    throw new AxiError(body.message ?? `HTTP ${response.status}`, "USAGE", []);
+  }
+  return await response.json();
+}
+var DEFAULT_MAX_WAIT_MS = 15 * 60 * 1e3;
+function defaultSleep(ms) {
+  return new Promise((resolve2) => setTimeout(resolve2, ms));
+}
+async function pollDeviceToken(instanceUrl, deviceCode, serverIntervalSeconds, options = {}) {
+  const intervalMs = options.intervalMs ?? serverIntervalSeconds * 1e3;
+  const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
+  const sleep = options.sleep ?? defaultSleep;
+  const deadline = Date.now() + maxWaitMs;
+  for (; ; ) {
+    const response = await postJson(`${instanceUrl}/auth/device/token`, {
+      device_code: deviceCode
+    });
+    if (response.ok) return await response.json();
+    const body = await readErrorBody(response);
+    if (response.status === 409 && body.error === "device_pending") {
+      if (Date.now() >= deadline) {
+        throw new DeviceExpiredError(
+          "Timed out waiting for the device to be approved (15 minutes). Run `drafter-axi login` again."
+        );
+      }
+      await sleep(intervalMs);
+      continue;
+    }
+    throw new DeviceExpiredError(
+      body.message ?? "The device code is unknown or has expired. Run `drafter-axi login` again."
+    );
+  }
+}
+
 // src/cli/flags.ts
 var ALWAYS_ALLOWED = /* @__PURE__ */ new Set(["--help", "-h"]);
-var GLOBAL_VALUE_FLAGS = /* @__PURE__ */ new Set(["--actor", "--profile"]);
+var GLOBAL_VALUE_FLAGS = /* @__PURE__ */ new Set(["--profile"]);
 var GLOBAL_BOOLEAN_FLAGS = /* @__PURE__ */ new Set(["--json"]);
 function isValueLike(arg) {
   if (arg === void 0) return false;
@@ -644,7 +864,7 @@ function parseFlags(command, argv, spec) {
     const hint = deprecated[name];
     throw new AxiError(`unknown flag ${name} for \`${command}\``, "UNKNOWN_FLAG", [
       ...hint ? [hint] : [],
-      known.length > 0 ? `valid flags for \`${command}\`: ${known.join(", ")} (--help, --actor, --json, --profile always allowed)` : `\`${command}\` takes no flags of its own (--help, --actor, --json, --profile always allowed)`
+      known.length > 0 ? `valid flags for \`${command}\`: ${known.join(", ")} (--help, --json, --profile always allowed)` : `\`${command}\` takes no flags of its own (--help, --json, --profile always allowed)`
     ]);
   };
   for (let i = 0; i < argv.length; i++) {
@@ -738,39 +958,6 @@ function parseSubcommand(command, args, specs) {
   return { sub: first, parsed };
 }
 
-// src/cli/invocation.ts
-import { accessSync, constants } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { fileURLToPath } from "node:url";
-var cached;
-function cliInvocation() {
-  if (cached) return cached;
-  let bundle;
-  try {
-    bundle = fileURLToPath(import.meta.url);
-  } catch {
-    bundle = process.argv[1] ?? "drafter-axi";
-  }
-  const shim = bundle.replace(/\.mjs$/, "");
-  try {
-    if (shim !== bundle) {
-      accessSync(shim, constants.X_OK);
-      cached = quote(collapseHome(shim));
-      return cached;
-    }
-  } catch {
-  }
-  cached = `node ${quote(collapseHome(bundle))}`;
-  return cached;
-}
-function collapseHome(p) {
-  const home = homedir2();
-  return home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
-}
-function quote(p) {
-  return /\s/.test(p) ? `"${p}"` : p;
-}
-
 // src/cli/output.ts
 function computed(name, fn) {
   return { name, extract: fn };
@@ -802,67 +989,76 @@ function renderJson(value) {
 // src/cli/commands/common.ts
 import { readFileSync as readFileSync2 } from "node:fs";
 
-// src/cli/errors.ts
-var ApiCallError = class extends AxiError {
-  details;
-  constructor(apiCode, message, details = {}) {
-    super(message, apiCode, []);
-    this.details = details;
+// src/cli/jwt.ts
+function decodeJwtIatSeconds(token) {
+  try {
+    const parts = token.split(".");
+    const payloadB64 = parts[1];
+    if (!payloadB64) return void 0;
+    const json = Buffer.from(payloadB64, "base64url").toString("utf8");
+    const payload = JSON.parse(json);
+    return typeof payload.iat === "number" ? payload.iat : void 0;
+  } catch {
+    return void 0;
   }
-};
-var NetworkError = class extends AxiError {
-  constructor(message) {
-    super(message, "NETWORK_ERROR", ["Check DRAFTER_URL and that the API is reachable"]);
-  }
-};
-var EXIT_CODE_BY_CODE = {
-  // CLI-level usage errors (thrown by flags.ts / config.ts).
-  USAGE: 2,
-  UNKNOWN_FLAG: 2,
-  VALIDATION_ERROR: 2,
-  // API validation-shaped errors (400/422).
-  invalid_request: 2,
-  validation_failed: 2,
-  invalid_anchor: 2,
-  judgement_requires_comments: 2,
-  attestation_required: 2,
-  // API phase/conflict errors (409).
-  phase_closed: 3,
-  version_stale: 3,
-  deadline_not_later: 3,
-  stale_edit: 3,
-  unsaved_items: 3,
-  no_change: 3,
-  no_version: 3,
-  // Not found (404).
-  not_found: 4,
-  // Auth (401/403).
-  unauthenticated: 5,
-  forbidden: 5,
-  csrf_required: 5,
-  // Everything else (rate limits, internal errors, network failures).
-  rate_limited: 1,
-  internal_error: 1,
-  NETWORK_ERROR: 1
-};
-function exitCodeForCode(code) {
-  return EXIT_CODE_BY_CODE[code] ?? 1;
 }
 
 // src/cli/client.ts
+var REFRESH_AFTER_DAYS = 30;
+var REAUTH_CODES = /* @__PURE__ */ new Set(["unauthenticated", "operator_inactive"]);
 var DrafterClient = class {
+  config;
+  refreshChecked = false;
   constructor(config) {
     this.config = config;
   }
-  config;
+  /**
+   * `specs/behaviors/operators.md` § CLI sign-in: "The CLI refreshes it
+   * silently when it is older than 30 days by calling `POST /auth/refresh`
+   * with the current token; a refresh is refused for an inactive
+   * operator." Runs at most once per `DrafterClient` instance (i.e. once
+   * per CLI invocation), and only for a token that came from the profile
+   * file — a `DRAFTER_TOKEN` override is never rewritten anywhere.
+   */
+  async ensureFreshToken() {
+    if (this.refreshChecked) return;
+    this.refreshChecked = true;
+    if (this.config.tokenSource !== "profile") return;
+    const iat = decodeJwtIatSeconds(this.config.token);
+    if (iat === void 0) return;
+    const ageDays = (Date.now() / 1e3 - iat) / 86400;
+    if (ageDays < REFRESH_AFTER_DAYS) return;
+    let response;
+    try {
+      response = await fetch(`${this.config.url}/auth/refresh`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${this.config.token}` }
+      });
+    } catch (error) {
+      throw new NetworkError(
+        `could not reach ${this.config.url} to refresh the sign-in token: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    if (!response.ok) {
+      throw new SignInExpiredError();
+    }
+    const refreshed = await response.json();
+    this.config.token = refreshed.token;
+    writeProfile(this.config.profile, {
+      url: this.config.url,
+      token: refreshed.token,
+      email: refreshed.email,
+      expires_at: refreshed.expires_at
+    });
+  }
   async request(method, path, options = {}) {
+    await this.ensureFreshToken();
     const url = new URL(`${this.config.url}/admin/api${path}`);
     for (const [key, value] of Object.entries(options.query ?? {})) {
       if (value !== void 0) url.searchParams.set(key, value);
     }
     const headers = {
-      authorization: `Bearer ${this.config.adminToken}`,
-      "x-actor": this.config.actor
+      authorization: `Bearer ${this.config.token}`
     };
     let body;
     if (options.raw) {
@@ -884,6 +1080,7 @@ var DrafterClient = class {
     if (!response.ok) {
       if (contentType.includes("application/json")) {
         const payload = await response.json();
+        if (REAUTH_CODES.has(payload.error)) throw new SignInExpiredError();
         throw new ApiCallError(payload.error, payload.message, payload.details ?? {});
       }
       const text = await response.text();
@@ -911,73 +1108,14 @@ var DrafterClient = class {
   patch(path, body) {
     return this.request("PATCH", path, { body });
   }
+  delete(path) {
+    return this.request("DELETE", path);
+  }
 };
-
-// src/cli/config.ts
-import { existsSync, readFileSync } from "node:fs";
-import { homedir as homedir3, userInfo } from "node:os";
-import { join } from "node:path";
-function configDir() {
-  return join(homedir3(), ".config", "drafter");
-}
-function parseFlatToml(text) {
-  const result = {};
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#") || line.startsWith("[")) continue;
-    const eq = line.indexOf("=");
-    if (eq === -1) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
-      value = value.slice(1, -1);
-    }
-    if (key === "url" || key === "admin_token") result[key] = value;
-  }
-  return result;
-}
-function readProfile(profile) {
-  const path = join(configDir(), `${profile}.toml`);
-  if (!existsSync(path)) return {};
-  try {
-    return parseFlatToml(readFileSync(path, "utf8"));
-  } catch {
-    return {};
-  }
-}
-function defaultActor() {
-  try {
-    return `cli:${userInfo().username}`;
-  } catch {
-    return "cli";
-  }
-}
-function resolveConfig(options = {}) {
-  const profile = options.profile ?? "default";
-  const fromFile = readProfile(profile);
-  const url = process.env.DRAFTER_URL ?? fromFile.url;
-  const adminToken = process.env.DRAFTER_ADMIN_TOKEN ?? fromFile.admin_token;
-  if (!url) {
-    throw new AxiError("DRAFTER_URL is not set", "USAGE", [
-      `Set DRAFTER_URL in the environment, or add url = "..." to ~/.config/drafter/${profile}.toml`
-    ]);
-  }
-  if (!adminToken) {
-    throw new AxiError("DRAFTER_ADMIN_TOKEN is not set", "USAGE", [
-      `Set DRAFTER_ADMIN_TOKEN in the environment, or add admin_token = "..." to ~/.config/drafter/${profile}.toml`
-    ]);
-  }
-  return { url: url.replace(/\/+$/, ""), adminToken, actor: options.actor ?? defaultActor() };
-}
-function isConfigured() {
-  return Boolean(process.env.DRAFTER_URL) || existsSync(join(configDir(), "default.toml"));
-}
 
 // src/cli/commands/common.ts
 function clientFrom(parsed) {
-  return new DrafterClient(
-    resolveConfig({ actor: str(parsed, "--actor"), profile: str(parsed, "--profile") })
-  );
+  return new DrafterClient(resolveConfig({ profile: str(parsed, "--profile") }));
 }
 function wantsJson(parsed) {
   return bool(parsed, "--json");
@@ -1001,13 +1139,112 @@ function readStdin() {
   });
 }
 
+// src/cli/commands/auth.ts
+var LOGIN_FLAGS = { positionals: 1, value: ["--url"] };
+var LOGOUT_FLAGS = { positionals: 0 };
+var WHOAMI_FLAGS = { positionals: 0 };
+var LOGIN_HELP = `usage: drafter-axi login <email> [--url <instance>]
+
+Device-code sign-in. Resolves the instance from --url, else DRAFTER_URL, else
+fails with exit 2. Sends the operator a magic-link email whose return path
+approves this device, prints the user code to watch for, then polls until
+approved (or the code expires \u2014 15 minutes). On success, writes the instance
+url, the operator's email and a 90-day token to
+~/.config/drafter/<profile>.toml (mode 600); every later command reads from
+there unless DRAFTER_URL/DRAFTER_TOKEN are set.`;
+var LOGOUT_HELP = `usage: drafter-axi logout
+
+Forgets the stored sign-in token for this profile (url/email are kept).`;
+var WHOAMI_HELP = `usage: drafter-axi whoami
+
+Shows the signed-in operator (email, kind) and the token's expiry.`;
+async function loginCommand(args) {
+  const parsed = parseFlags("login", args, LOGIN_FLAGS);
+  const email = requirePositional(
+    parsed,
+    0,
+    "email",
+    "drafter-axi login <email> [--url <instance>]"
+  ).trim().toLowerCase();
+  const profile = str(parsed, "--profile") ?? "default";
+  const url = resolveLoginUrl(str(parsed, "--url"));
+  const start = await startDeviceLogin(url, email);
+  process.stdout.write(
+    `user_code: ${start.user_code}
+Check your email for the sign-in link, then approve this device.
+`
+  );
+  const token = await pollDeviceToken(url, start.device_code, start.interval);
+  writeProfile(profile, {
+    url,
+    email: token.email,
+    token: token.token,
+    expires_at: token.expires_at
+  });
+  return render(
+    parsed,
+    token,
+    () => joinBlocks(
+      renderObject({ signed_in_as: token.email, url, expires_at: token.expires_at }),
+      renderHelp([
+        "Run `drafter-axi whoami` to confirm",
+        "Run `drafter-axi` to see your documents"
+      ])
+    )
+  );
+}
+async function logoutCommand(args) {
+  const parsed = parseFlags("logout", args, LOGOUT_FLAGS);
+  const profile = str(parsed, "--profile") ?? "default";
+  const cleared = clearProfileToken(profile);
+  return render(parsed, { signed_out: cleared }, () => renderObject({ signed_out: cleared }));
+}
+async function whoamiCommand(args) {
+  const parsed = parseFlags("whoami", args, WHOAMI_FLAGS);
+  const client = clientFrom(parsed);
+  const info = await client.get("/whoami");
+  return render(parsed, info, () => renderObject(info));
+}
+
+// src/cli/invocation.ts
+import { accessSync, constants } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { fileURLToPath } from "node:url";
+var cached;
+function cliInvocation() {
+  if (cached) return cached;
+  let bundle;
+  try {
+    bundle = fileURLToPath(import.meta.url);
+  } catch {
+    bundle = process.argv[1] ?? "drafter-axi";
+  }
+  const shim = bundle.replace(/\.mjs$/, "");
+  try {
+    if (shim !== bundle) {
+      accessSync(shim, constants.X_OK);
+      cached = quote(collapseHome(shim));
+      return cached;
+    }
+  } catch {
+  }
+  cached = `node ${quote(collapseHome(bundle))}`;
+  return cached;
+}
+function collapseHome(p) {
+  const home = homedir3();
+  return home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
+}
+function quote(p) {
+  return /\s/.test(p) ? `"${p}"` : p;
+}
+
 // src/cli/commands/docs.ts
 var DOCS_FLAGS = {
   create: {
     positionals: 1,
     value: [
       "--title",
-      "--owner",
       "--sender-name",
       "--reply-to",
       "--capacities",
@@ -1022,19 +1259,24 @@ var DOCS_FLAGS = {
   extend: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   close: { positionals: 1 },
   reopen: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
-  withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] }
+  withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
+  operators: { positionals: 3 }
 };
-var DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw> ...
+var DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
 
-create <slug> --title <text> --owner <email> --sender-name <text> --reply-to <email>
+create <slug> --title <text> --sender-name <text> --reply-to <email>
        [--capacities personal,official] [--public none|read|participate]
        [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
+       (the caller becomes the document's first operator)
 show <slug>
 open <slug> --comments-close <iso> --signing-closes <iso>
 extend <slug> [--comments-close <iso>] [--signing-closes <iso>]
 close <slug>
 reopen <slug> [--comments-close <iso>] --signing-closes <iso>
 withdraw <slug> --reason <text> [--public]
+operators <slug>
+operators add <slug> <email>
+operators remove <slug> <email>
 
 Every mutation prints the document's key fields and the commit subject.`;
 function detailObject(doc) {
@@ -1043,7 +1285,8 @@ function detailObject(doc) {
     title: doc.title,
     state: doc.state,
     phase: doc.phase,
-    owner: doc.owner,
+    created_by: doc.created_by,
+    operators: doc.operators,
     sender_name: doc.sender_name,
     reply_to: doc.reply_to,
     opened_at: doc.opened_at,
@@ -1067,14 +1310,13 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi docs create <slug> --title "..." --owner <email> --sender-name "..." --reply-to <email>'
+        'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>'
       );
       const capacities = csv(str(parsed, "--capacities"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
         title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
-        owner: requireStr(parsed, "--owner", "drafter-axi docs create <slug> --owner <email> ..."),
         sender_name: requireStr(
           parsed,
           "--sender-name",
@@ -1223,13 +1465,53 @@ async function docsCommand(args) {
       );
       return render(parsed, doc, () => renderObject(detailObject(doc)));
     }
+    case "operators": {
+      const first = parsed.positional[0];
+      if (first === "add" || first === "remove") {
+        const slug2 = requirePositional(
+          parsed,
+          1,
+          "slug",
+          `drafter-axi docs operators ${first} <slug> <email>`
+        );
+        const email = requirePositional(
+          parsed,
+          2,
+          "email",
+          `drafter-axi docs operators ${first} <slug> <email>`
+        );
+        if (first === "add") {
+          const result2 = await client.post(
+            `/documents/${encodeURIComponent(slug2)}/operators`,
+            { email }
+          );
+          return render(parsed, result2, () => renderObject(compact(result2)));
+        }
+        const result = await client.delete(`/documents/${encodeURIComponent(slug2)}/operators/${encodeURIComponent(email)}`);
+        return render(parsed, result, () => renderObject(result));
+      }
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs operators <slug>");
+      const operators = await client.get(
+        `/documents/${encodeURIComponent(slug)}/operators`
+      );
+      return render(
+        parsed,
+        operators,
+        () => operators.length === 0 ? renderObject({ operators: "no operators found" }) : renderList("operators", operators, [
+          computed("email", (o) => o.email),
+          computed("name", (o) => o.name),
+          computed("kind", (o) => o.kind),
+          computed("active", (o) => o.active)
+        ])
+      );
+    }
     default:
       return sub;
   }
 }
 
 // src/cli/commands/feedback.ts
-import { writeFileSync } from "node:fs";
+import { writeFileSync as writeFileSync2 } from "node:fs";
 var FEEDBACK_FLAGS = {
   export: { positionals: 1, value: ["--format", "--out"] }
 };
@@ -1259,7 +1541,7 @@ async function feedbackCommand(args) {
           }
         );
         if (out) {
-          writeFileSync(out, markdown, "utf8");
+          writeFileSync2(out, markdown, "utf8");
           return renderObject({ out, format });
         }
         return markdown;
@@ -1269,7 +1551,7 @@ async function feedbackCommand(args) {
       );
       const content = JSON.stringify(bundle, null, 2);
       if (out) {
-        writeFileSync(out, content, "utf8");
+        writeFileSync2(out, content, "utf8");
         return renderObject({
           out,
           format,
@@ -1293,9 +1575,9 @@ async function homeCommand(args) {
   if (!isConfigured()) {
     if (ifConfigured) return "";
     return joinBlocks(
-      renderObject({ documents: "DRAFTER_URL is not set" }),
+      renderObject({ documents: "not signed in" }),
       renderHelp([
-        "Set DRAFTER_URL and DRAFTER_ADMIN_TOKEN in the environment (or ~/.config/drafter/default.toml)",
+        `Run \`${cli} login <email> --url <instance>\` to sign in`,
         `Run \`${cli} --help\` to see the full command list`
       ])
     );
@@ -1313,9 +1595,7 @@ async function homeCommand(args) {
   if (documents.length === 0) {
     return joinBlocks(
       renderObject({ documents: "0 documents found" }),
-      renderHelp([
-        `Run \`${cli} docs create <slug> --title "..." --owner <email> ...\` to start one`
-      ])
+      renderHelp([`Run \`${cli} docs create <slug> --title "..." ...\` to start one`])
     );
   }
   const client = clientFrom(parsed);
@@ -1387,7 +1667,7 @@ function nextDeadline(doc) {
 
 // src/cli/commands/hook.ts
 import { execSync } from "node:child_process";
-import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { homedir as homedir4 } from "node:os";
 import { dirname, join as join2, resolve } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -1464,8 +1744,8 @@ function readSettings(path) {
   }
 }
 function writeSettings(path, settings) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync2(path, `${JSON.stringify(settings, null, 2)}
+  mkdirSync2(dirname(path), { recursive: true });
+  writeFileSync3(path, `${JSON.stringify(settings, null, 2)}
 `, "utf8");
 }
 function managedCommand(settings) {
@@ -1634,8 +1914,109 @@ async function notificationsCommand(args) {
   }
 }
 
+// src/cli/commands/operators.ts
+var OPERATORS_FLAGS = {
+  list: { positionals: 0 },
+  add: { positionals: 1, value: ["--name", "--kind", "--title", "--org", "--notes"] },
+  update: { positionals: 1, value: ["--name", "--active", "--title", "--org", "--notes"] },
+  remove: { positionals: 1 }
+};
+var OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|remove> ...
+
+list
+add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
+update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
+remove <email>
+
+The global operator directory (\`specs/behaviors/operators.md\`) \u2014 every
+active operator may create documents and, once added to one, act on it.
+Every mutation prints the resulting record and the commit subject.`;
+function operatorSchema() {
+  return [
+    computed("email", (o) => o.email),
+    computed("name", (o) => o.name),
+    computed("kind", (o) => o.kind),
+    computed("active", (o) => o.active),
+    computed("title", (o) => o.title ?? ""),
+    computed("org", (o) => o.org ?? "")
+  ];
+}
+function parseActiveFlag(value) {
+  if (value === void 0) return void 0;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new AxiError("--active must be true or false", "USAGE", [
+    "drafter-axi operators update <email> --active true|false"
+  ]);
+}
+async function operatorsCommand(args) {
+  const { sub, parsed } = parseSubcommand("operators", args, OPERATORS_FLAGS);
+  const client = clientFrom(parsed);
+  switch (sub) {
+    case "list": {
+      const operators = await client.get("/operators");
+      return render(
+        parsed,
+        operators,
+        () => operators.length === 0 ? renderObject({ operators: "no operators found" }) : renderList("operators", operators, operatorSchema())
+      );
+    }
+    case "add": {
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        'drafter-axi operators add <email> --name "..."'
+      );
+      const body = {
+        email,
+        name: requireStr(parsed, "--name", 'drafter-axi operators add <email> --name "..."'),
+        kind: str(parsed, "--kind"),
+        title: str(parsed, "--title"),
+        org: str(parsed, "--org"),
+        notes: str(parsed, "--notes")
+      };
+      const result = await client.post("/operators", body);
+      return render(parsed, result, () => renderObject(compact(result)));
+    }
+    case "update": {
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        "drafter-axi operators update <email> ..."
+      );
+      const body = compact({
+        name: str(parsed, "--name"),
+        active: parseActiveFlag(str(parsed, "--active")),
+        title: str(parsed, "--title"),
+        org: str(parsed, "--org"),
+        notes: str(parsed, "--notes")
+      });
+      const result = await client.patch(
+        `/operators/${encodeURIComponent(email)}`,
+        body
+      );
+      return render(parsed, result, () => renderObject(compact(result)));
+    }
+    case "remove": {
+      const email = requirePositional(parsed, 0, "email", "drafter-axi operators remove <email>");
+      const result = await client.delete(
+        `/operators/${encodeURIComponent(email)}`
+      );
+      return render(
+        parsed,
+        result,
+        () => joinBlocks(renderObject(result), renderHelp([`Removed ${email}`]))
+      );
+    }
+    default:
+      return sub;
+  }
+}
+
 // src/cli/commands/people.ts
-import { writeFileSync as writeFileSync3 } from "node:fs";
+import { writeFileSync as writeFileSync4 } from "node:fs";
 var PEOPLE_FLAGS = {
   import: { positionals: 2, value: ["--suggested-capacity"] },
   list: { positionals: 1, value: ["--status", "--source", "-q"], boolean: ["--contacts"] },
@@ -1789,7 +2170,7 @@ async function peopleCommand(args) {
       );
       const out = str(parsed, "--out");
       if (out) {
-        writeFileSync3(out, csvText, "utf8");
+        writeFileSync4(out, csvText, "utf8");
         const rowCount = Math.max(0, parseCsv(csvText).length - 1);
         return render(parsed, { out, rows: rowCount }, () => renderObject({ out, rows: rowCount }));
       }
@@ -2257,11 +2638,37 @@ async function versionsCommand(args) {
 var DESCRIPTION = "Drive a community-drafter document from the shell \u2014 create, open, publish revisions, invite and track signers, and export feedback bundles for an LLM round.";
 var COMMAND_GROUPS = [
   {
+    group: "Session",
+    commands: [
+      {
+        usage: "login <email> [--url <instance>]",
+        summary: "Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile."
+      },
+      { usage: "logout", summary: "Forget the stored token for this profile." },
+      { usage: "whoami", summary: "Show the signed-in operator and token expiry." }
+    ]
+  },
+  {
+    group: "Operators",
+    commands: [
+      { usage: "operators list", summary: "Every operator in the directory." },
+      {
+        usage: 'operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]',
+        summary: "Create an operator."
+      },
+      {
+        usage: 'operators update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
+        summary: "Update or deactivate an operator."
+      },
+      { usage: "operators remove <email>", summary: "Remove an operator." }
+    ]
+  },
+  {
     group: "Documents",
     commands: [
       {
-        usage: 'docs create <slug> --title "<text>" --owner <email> --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft."
+        usage: 'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary: "Create a document in draft; the caller becomes its first operator."
       },
       { usage: "docs show <slug>", summary: "Dashboard numbers, versions, and schedule." },
       {
@@ -2280,6 +2687,15 @@ var COMMAND_GROUPS = [
       {
         usage: 'docs withdraw <slug> --reason "<text>" [--public]',
         summary: "Withdraw the document."
+      },
+      { usage: "docs operators <slug>", summary: "List a document's operators." },
+      {
+        usage: "docs operators add <slug> <email>",
+        summary: "Add an active operator to a document."
+      },
+      {
+        usage: "docs operators remove <slug> <email>",
+        summary: "Remove an operator from a document (refused for the last one)."
       }
     ]
   },
@@ -2400,7 +2816,7 @@ function renderCommandHelp(name) {
     "",
     doc.summary,
     "",
-    "`--actor <label>` sets X-Actor (default cli:<os user>); `--json` prints raw JSON instead of TOON."
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile."
   ];
   return `${lines.join("\n")}
 `;
@@ -2416,8 +2832,8 @@ function renderTopLevelHelp() {
   }
   lines.push(
     "",
-    "Config: DRAFTER_URL / DRAFTER_ADMIN_TOKEN in the environment (or ~/.config/drafter/<profile>.toml).",
-    "`--actor <label>` sets X-Actor on any command; `--json` prints raw JSON instead of TOON.",
+    "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
     "Run `drafter-axi <command> --help` for usage on any command.",
     "Run `drafter-axi` with no arguments to see every open document's status."
   );
@@ -2425,8 +2841,12 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "daeecc1" : "dev";
+var VERSION = true ? "216408b" : "dev";
 var COMMAND_HELP = {
+  login: LOGIN_HELP,
+  logout: LOGOUT_HELP,
+  whoami: WHOAMI_HELP,
+  operators: OPERATORS_HELP,
   docs: DOCS_HELP,
   versions: VERSIONS_HELP,
   people: PEOPLE_HELP,
@@ -2443,6 +2863,10 @@ var COMMANDS = {
   // the SDK rejects a leading flag before a command, so the bare zero-arg
   // form can never itself accept a flag (axi-skills § gotchas).
   home: homeCommand,
+  login: loginCommand,
+  logout: logoutCommand,
+  whoami: whoamiCommand,
+  operators: operatorsCommand,
   docs: docsCommand,
   versions: versionsCommand,
   people: peopleCommand,

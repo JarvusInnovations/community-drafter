@@ -29,7 +29,8 @@ export interface DocumentSummary {
   opened_at?: string;
   comments_close_at?: string;
   signing_closes_at?: string;
-  owner?: string;
+  created_by?: string;
+  operators?: string[];
   sender_name?: string;
   reply_to?: string;
   capacities?: Capacity[];
@@ -151,7 +152,20 @@ export interface NotificationsHealth {
 export interface SessionInfo {
   email: string;
   name?: string;
+  kind?: "person" | "bot";
   expires_at: string;
+}
+
+/** `specs/api/admin.md` § Operators — the global operator directory. */
+export interface OperatorRecord {
+  email: string;
+  name: string;
+  kind: "person" | "bot";
+  active: boolean;
+  title?: string;
+  org?: string;
+  notes?: string;
+  commit?: string | null;
 }
 
 /** The JSON error envelope, `specs/api/conventions.md` § Responses. */

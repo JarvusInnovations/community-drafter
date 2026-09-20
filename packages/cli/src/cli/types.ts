@@ -23,7 +23,8 @@ export interface DocumentSummary {
   opened_at?: string;
   comments_close_at?: string;
   signing_closes_at?: string;
-  owner: string;
+  created_by: string;
+  operators: string[];
   sender_name: string;
   reply_to: string;
   capacities?: string[];
@@ -219,7 +220,31 @@ export interface NotificationsRetryResult {
   retried: number;
 }
 
+/** `GET /admin/api/whoami` (`specs/api/admin.md` § Instance). */
 export interface WhoAmI {
-  actor: string;
-  capability: string;
+  email: string;
+  name: string;
+  kind: "person" | "bot";
+  expires_at: string;
+  transport: "bearer" | "cookie";
+}
+
+/** `specs/api/admin.md` § Operators — the global operator directory. */
+export interface OperatorRecord {
+  email: string;
+  name: string;
+  kind: "person" | "bot";
+  active: boolean;
+  title?: string;
+  org?: string;
+}
+
+export interface OperatorMutationResult extends OperatorRecord {
+  commit?: string | null;
+}
+
+/** `POST /documents/:slug/operators` response — the added operator plus whether it was new. */
+export interface DocOperatorAddResult extends OperatorRecord {
+  added: boolean;
+  commit?: string | null;
 }

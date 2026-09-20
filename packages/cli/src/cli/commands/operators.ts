@@ -1,0 +1,113 @@
+import { AxiError } from "axi-sdk-js";
+
+import { parseSubcommand, requirePositional, requireStr, str, type FlagSpec } from "../flags.js";
+import { compact, computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
+import type { OperatorMutationResult, OperatorRecord } from "../types.js";
+import { clientFrom, render } from "./common.js";
+
+const OPERATORS_FLAGS: Record<string, FlagSpec> = {
+  list: { positionals: 0 },
+  add: { positionals: 1, value: ["--name", "--kind", "--title", "--org", "--notes"] },
+  update: { positionals: 1, value: ["--name", "--active", "--title", "--org", "--notes"] },
+  remove: { positionals: 1 },
+};
+
+export const OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|remove> ...
+
+list
+add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
+update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
+remove <email>
+
+The global operator directory (\`specs/behaviors/operators.md\`) — every
+active operator may create documents and, once added to one, act on it.
+Every mutation prints the resulting record and the commit subject.`;
+
+function operatorSchema() {
+  return [
+    computed<OperatorRecord>("email", (o) => o.email),
+    computed<OperatorRecord>("name", (o) => o.name),
+    computed<OperatorRecord>("kind", (o) => o.kind),
+    computed<OperatorRecord>("active", (o) => o.active),
+    computed<OperatorRecord>("title", (o) => o.title ?? ""),
+    computed<OperatorRecord>("org", (o) => o.org ?? ""),
+  ];
+}
+
+function parseActiveFlag(value: string | undefined): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new AxiError("--active must be true or false", "USAGE", [
+    "drafter-axi operators update <email> --active true|false",
+  ]);
+}
+
+export async function operatorsCommand(args: string[]): Promise<string> {
+  const { sub, parsed } = parseSubcommand("operators", args, OPERATORS_FLAGS);
+  const client = clientFrom(parsed);
+
+  switch (sub) {
+    case "list": {
+      const operators = await client.get<OperatorRecord[]>("/operators");
+      return render(parsed, operators, () =>
+        operators.length === 0
+          ? renderObject({ operators: "no operators found" })
+          : renderList("operators", operators, operatorSchema()),
+      );
+    }
+
+    case "add": {
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        'drafter-axi operators add <email> --name "..."',
+      );
+      const body = {
+        email,
+        name: requireStr(parsed, "--name", 'drafter-axi operators add <email> --name "..."'),
+        kind: str(parsed, "--kind"),
+        title: str(parsed, "--title"),
+        org: str(parsed, "--org"),
+        notes: str(parsed, "--notes"),
+      };
+      const result = await client.post<OperatorMutationResult>("/operators", body);
+      return render(parsed, result, () => renderObject(compact(result)));
+    }
+
+    case "update": {
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        "drafter-axi operators update <email> ...",
+      );
+      const body = compact({
+        name: str(parsed, "--name"),
+        active: parseActiveFlag(str(parsed, "--active")),
+        title: str(parsed, "--title"),
+        org: str(parsed, "--org"),
+        notes: str(parsed, "--notes"),
+      });
+      const result = await client.patch<OperatorMutationResult>(
+        `/operators/${encodeURIComponent(email)}`,
+        body,
+      );
+      return render(parsed, result, () => renderObject(compact(result)));
+    }
+
+    case "remove": {
+      const email = requirePositional(parsed, 0, "email", "drafter-axi operators remove <email>");
+      const result = await client.delete<{ ok: boolean; commit?: string | null }>(
+        `/operators/${encodeURIComponent(email)}`,
+      );
+      return render(parsed, result, () =>
+        joinBlocks(renderObject(result), renderHelp([`Removed ${email}`])),
+      );
+    }
+
+    default:
+      return sub; // unreachable — parseSubcommand already validated `sub`
+  }
+}

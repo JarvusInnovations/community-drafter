@@ -20,7 +20,7 @@ The full desired behavior lives in [`specs/`](specs/README.md); [`specs/principl
 
 ## Architecture
 
-- **API**: Fastify 5 on Bun with a deny-by-default auth gateway. Participant credential is the opaque token in the personal link; admins use a bearer token (agents, CLI) or Google OAuth (dashboard).
+- **API**: Fastify 5 on Bun with a deny-by-default auth gateway. Participant credential is the opaque token in the personal link; admins are operators: a bearer token (agents, CLI, via device-code `login`) or a magic-link session cookie (dashboard).
 - **Web**: React 19, Vite, Tailwind v4, React Router v7. Participant routes work in email webviews and iframes with cookies and local storage disabled.
 - **Storage**: no database. A private git data repository of four flat [gitsheets](https://github.com/JarvusInnovations/gitsheets) sheets (`documents`, `people`, `participations`, `submissions`). Commits are the data model: records hold current state, and every change is a commit whose trailers carry the structured facts. Versions are the document record's body-changing commits; dates, positions and activity feeds are read from `git log`.
 - **Admin CLI**: `drafter-axi`, an agent-facing CLI shipped as an installable skill with the bundle embedded. It is the primary admin interface.
@@ -39,7 +39,7 @@ packages/shared/   record types, markdown render with block ids, redline diff, c
 packages/cli/      drafter-axi source
 skills/drafter-axi the installable skill (SKILL.md, shim, committed bundle)
 tf/                OpenTofu for the instance
-docs/operations.md runbook: data repo, secrets, deploy, OAuth, DNS
+docs/operations.md runbook: data repo, secrets, deploy, operator sign-in, DNS
 ```
 
 ## Developing
@@ -81,7 +81,7 @@ The skill's `SKILL.md` documents every command.
 
 ## Deploying
 
-`docs/operations.md` covers the one-time setup (private data repo and deploy key, Secret Manager entries, optional Postmark and Google OAuth, DNS) and both deploy paths: a manual image build plus `tofu apply -concise`, and the release workflow that runs on a GitHub release.
+`docs/operations.md` covers the one-time setup (private data repo and deploy key, Secret Manager entries, optional Postmark, operator sign-in and the CLI login flow, DNS) and both deploy paths: a manual image build plus `tofu apply -concise`, and the release workflow that runs on a GitHub release.
 
 ## Status
 
