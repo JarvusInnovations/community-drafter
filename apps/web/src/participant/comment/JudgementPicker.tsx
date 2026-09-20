@@ -40,11 +40,11 @@ export function JudgementPicker({
         return (
           <label
             key={judgement}
-            className={`flex flex-col gap-0.5 rounded border p-2 text-sm ${
-              value === judgement ? "border-foreground" : "border-border"
-            } ${optionDisabled ? "opacity-50" : ""}`}
+            className={`flex cursor-pointer flex-col gap-0.5 rounded-xl border border-border p-3 text-sm has-checked:border-primary has-checked:bg-primary-soft ${
+              optionDisabled ? "cursor-not-allowed opacity-50" : ""
+            }`}
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 font-bold text-foreground">
               <input
                 type="radio"
                 name={`${formId}-judgement`}
