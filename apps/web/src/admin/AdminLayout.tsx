@@ -58,28 +58,32 @@ export function AdminLayout(): JSX.Element {
   return (
     <SessionContext.Provider value={contextValue}>
       <div className="min-h-screen bg-background text-foreground">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <nav className="flex items-center gap-4">
-            <NavLink to="/admin" className="font-semibold" end>
-              {copy.nav.documents}
-            </NavLink>
-            <NavLink to="/admin/operators" className="text-sm text-muted-foreground">
-              {copy.nav.operators}
-            </NavLink>
-          </nav>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>{contextValue.session.email}</span>
-            <button
-              type="button"
-              className="underline"
-              onClick={() => {
-                void logout().then(() => {
-                  window.location.href = "/admin";
-                });
-              }}
+        <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+          <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-3 px-5 py-2.5">
+            <NavLink
+              to="/admin"
+              end
+              className="text-sm font-extrabold tracking-tight text-foreground"
             >
-              {copy.nav.signOut}
-            </button>
+              {copy.instanceName}
+            </NavLink>
+            <div className="flex items-center gap-4 text-sm">
+              <NavLink to="/admin/operators" className="font-medium text-primary">
+                {copy.nav.operators}
+              </NavLink>
+              <span className="text-muted-foreground">{contextValue.session.email}</span>
+              <button
+                type="button"
+                className="font-medium text-primary"
+                onClick={() => {
+                  void logout().then(() => {
+                    window.location.href = "/admin";
+                  });
+                }}
+              >
+                {copy.nav.signOut}
+              </button>
+            </div>
           </div>
         </header>
         <Outlet />

@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ApiError, createOperator, updateOperator } from "../api.ts";
 import { copy } from "../copy.ts";
+import {
+  inputClass,
+  labelClass,
+  primaryButtonClass,
+  quietButtonClass,
+  selectClass,
+} from "../styles.ts";
 import { type OperatorRecord } from "../types.ts";
+import { DialogShell } from "./DialogShell.tsx";
 
 /**
  * Add/edit form for `/admin/operators` (`specs/screens/admin-dashboard.md`
@@ -23,7 +31,6 @@ export function OperatorFormDialog({
   /** Called with the mutation's commit hash once it succeeds — the parent shows it, e.g. as a banner. */
   onSaved: (commit: string | null) => void;
 }): JSX.Element | null {
-  const ref = useRef<HTMLDialogElement>(null);
   const isEdit = Boolean(operator);
   const [email, setEmail] = useState(operator?.email ?? "");
   const [name, setName] = useState(operator?.name ?? "");
@@ -34,16 +41,6 @@ export function OperatorFormDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-    }
     if (open) {
       setEmail(operator?.email ?? "");
       setName(operator?.name ?? "");
@@ -53,10 +50,6 @@ export function OperatorFormDialog({
       setError(null);
     }
   }, [open, operator]);
-
-  if (!open) {
-    return null;
-  }
 
   async function handleSubmit(): Promise<void> {
     setBusy(true);
@@ -85,44 +78,59 @@ export function OperatorFormDialog({
   }
 
   return (
-    <dialog
-      ref={ref}
+    <DialogShell
+      open={open}
       onClose={onClose}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground backdrop:bg-black/40"
+      title={isEdit ? copy.operators.edit : copy.operators.add}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={quietButtonClass}>
+            {copy.operators.cancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={
+              busy || (!isEdit && (!email.trim() || !name.trim())) || (isEdit && !name.trim())
+            }
+            className={primaryButtonClass}
+          >
+            {copy.operators.save}
+          </button>
+        </>
+      }
     >
-      <h2 className="text-lg font-semibold">{isEdit ? copy.operators.edit : copy.operators.add}</h2>
-
       {!isEdit ? (
-        <label className="mt-3 block text-sm">
+        <label className={labelClass}>
           {copy.operators.emailLabel}
           <input
             type="email"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-1 w-full rounded border border-border p-2 text-sm"
+            className={inputClass}
           />
         </label>
       ) : null}
 
-      <label className="mt-3 block text-sm">
+      <label className={labelClass}>
         {copy.operators.nameLabel}
         <input
           type="text"
           required
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
 
       {!isEdit ? (
-        <label className="mt-3 block text-sm">
+        <label className={labelClass}>
           {copy.operators.kindLabel}
           <select
             value={kind}
             onChange={(event) => setKind(event.target.value as "person" | "bot")}
-            className="mt-1 w-full rounded border border-border p-2 text-sm"
+            className={selectClass}
           >
             <option value="person">person</option>
             <option value="bot">bot</option>
@@ -130,52 +138,31 @@ export function OperatorFormDialog({
         </label>
       ) : null}
 
-      <label className="mt-3 block text-sm">
+      <label className={labelClass}>
         {copy.operators.titleLabel}
         <input
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
 
-      <label className="mt-3 block text-sm">
+      <label className={labelClass}>
         {copy.operators.orgLabel}
         <input
           type="text"
           value={org}
           onChange={(event) => setOrg(event.target.value)}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
 
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
-
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={busy}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
-          {copy.operators.cancel}
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={
-            busy || (!isEdit && (!email.trim() || !name.trim())) || (isEdit && !name.trim())
-          }
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-60"
-        >
-          {copy.operators.save}
-        </button>
-      </div>
-    </dialog>
+    </DialogShell>
   );
 }

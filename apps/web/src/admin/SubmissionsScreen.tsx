@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { ApiError, getSubmissions } from "./api.ts";
+import { Card } from "./components/Card.tsx";
+import { Pill, type PillTone } from "./components/Pill.tsx";
 import { copy } from "./copy.ts";
 import { useAdminDocument } from "./DocumentContext.tsx";
+import { chipClass, inputClass, quietLinkClass, selectClass } from "./styles.ts";
 import { type SubmissionView } from "./types.ts";
 
 interface AnchorLike {
@@ -15,76 +18,114 @@ function submissionAnchor(id: string): string {
   return `submission-${id}`;
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/u).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase() || "?";
+}
+
+/**
+ * `specs/screens/admin-dashboard.md` § Design "Submissions page": disposition
+ * pills — "pending muted, accepted green, partial blue, declined amber,
+ * noted muted."
+ */
+function dispositionPill(outcome: string | undefined): { tone: PillTone; label: string } {
+  switch (outcome) {
+    case "accepted":
+      return { tone: "ok", label: "accepted" };
+    case "partial":
+      return { tone: "primary", label: "partial" };
+    case "declined":
+      return { tone: "amber", label: "declined" };
+    case "noted":
+      return { tone: "muted", label: "noted" };
+    default:
+      return { tone: "muted", label: copy.submissions.pending };
+  }
+}
+
+function SubmissionCard({ submission }: { submission: SubmissionView }): JSX.Element {
+  return (
+    <li
+      id={submissionAnchor(submission.id)}
+      className="rounded-2xl border border-border bg-card p-4 text-sm"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="grid h-8 w-8 flex-none place-items-center rounded-full bg-primary-soft text-xs font-bold text-primary-deep"
+        >
+          {initials(submission.author)}
+        </span>
+        <p className="font-semibold text-foreground">{submission.author}</p>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
+          v{submission.version}
+        </span>
+        {submission.state === "draft" ? (
+          <Pill tone="amber">{copy.submissions.unsubmittedBadge}</Pill>
+        ) : (
+          <Pill tone="ok">{submission.judgement ?? "comment"}</Pill>
+        )}
+      </div>
+      <ul className="mt-3 flex flex-col gap-2 border-t border-border pt-3 pl-1">
+        {submission.comments.map((comment) => {
+          const anchor = comment.anchor as AnchorLike | null;
+          const pill = dispositionPill(comment.disposition?.outcome);
+          return (
+            <li key={comment.id} className="rounded-xl border border-border px-3 py-2.5">
+              {anchor?.heading_path && anchor.heading_path.length > 0 ? (
+                <p className="text-xs text-muted-foreground">{anchor.heading_path.join(" > ")}</p>
+              ) : null}
+              {anchor?.quote ? (
+                <p className="text-xs italic text-muted-foreground">“{anchor.quote}”</p>
+              ) : null}
+              <p className="mt-1 text-foreground">{comment.body}</p>
+              <div className="mt-1.5">
+                <Pill tone={pill.tone}>{pill.label}</Pill>
+              </div>
+            </li>
+          );
+        })}
+        {submission.comments.length === 0 ? (
+          <li className="text-muted-foreground">No comments.</li>
+        ) : null}
+      </ul>
+    </li>
+  );
+}
+
+function SubmissionGroup({ items }: { items: SubmissionView[] }): JSX.Element {
+  return (
+    <ul className="mt-2 flex flex-col gap-4">
+      {items.map((submission) => (
+        <SubmissionCard key={submission.id} submission={submission} />
+      ))}
+    </ul>
+  );
+}
+
 function BySubmissionView({ submissions }: { submissions: SubmissionView[] }): JSX.Element {
   const submitted = submissions.filter((s) => s.state === "submitted");
   const drafts = submissions.filter((s) => s.state === "draft");
 
-  function renderGroup(items: SubmissionView[]): JSX.Element {
-    return (
-      <ul className="mt-2 flex flex-col gap-4">
-        {items.map((submission) => (
-          <li
-            key={submission.id}
-            id={submissionAnchor(submission.id)}
-            className="rounded border border-border p-3 text-sm"
-          >
-            <p className="font-medium">
-              {submission.author} · v{submission.version} ·{" "}
-              {submission.state === "draft" ? (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                  {copy.submissions.unsubmittedBadge}
-                </span>
-              ) : (
-                (submission.judgement ?? "comment")
-              )}
-            </p>
-            <ul className="mt-2 flex flex-col gap-2 pl-3">
-              {submission.comments.map((comment) => {
-                const anchor = comment.anchor as AnchorLike | null;
-                return (
-                  <li key={comment.id} className="border-l-2 border-border pl-2">
-                    {anchor?.heading_path && anchor.heading_path.length > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {anchor.heading_path.join(" > ")}
-                      </p>
-                    ) : null}
-                    {anchor?.quote ? (
-                      <p className="text-xs italic text-muted-foreground">“{anchor.quote}”</p>
-                    ) : null}
-                    <p>{comment.body}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {comment.disposition ? comment.disposition.outcome : copy.submissions.pending}
-                    </p>
-                  </li>
-                );
-              })}
-              {submission.comments.length === 0 ? (
-                <li className="text-muted-foreground">No comments.</li>
-              ) : null}
-            </ul>
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
   return (
     <div>
-      <h3 className="mt-4 text-sm font-semibold uppercase text-muted-foreground">
+      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {copy.submissions.submittedGroup}
       </h3>
       {submitted.length > 0 ? (
-        renderGroup(submitted)
+        <SubmissionGroup items={submitted} />
       ) : (
-        <p className="text-muted-foreground">{copy.submissions.empty}</p>
+        <p className="mt-2 text-muted-foreground">{copy.submissions.empty}</p>
       )}
 
       {drafts.length > 0 ? (
         <>
-          <h3 className="mt-6 text-sm font-semibold uppercase text-muted-foreground">
+          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {copy.submissions.unsubmittedGroup}
           </h3>
-          {renderGroup(drafts)}
+          <SubmissionGroup items={drafts} />
         </>
       ) : null}
     </div>
@@ -116,20 +157,23 @@ function ByPassageView({ submissions }: { submissions: SubmissionView[] }): JSX.
   return (
     <div className="mt-2 flex flex-col gap-4">
       {[...groups.entries()].map(([heading, entries]) => (
-        <div key={heading}>
-          <h3 className="text-sm font-semibold">{heading}</h3>
-          <ul className="mt-1 flex flex-col gap-2 pl-3 text-sm">
+        <Card key={heading}>
+          <h3 className="text-sm font-bold text-foreground">{heading}</h3>
+          <ul className="mt-2 flex flex-col gap-2 text-sm">
             {entries.map(({ submission, comment }) => (
-              <li key={comment.id} className="border-l-2 border-border pl-2">
-                <p>{comment.body}</p>
-                <a href={`#${submissionAnchor(submission.id)}`} className="text-xs underline">
+              <li key={comment.id} className="rounded-xl border border-border px-3 py-2.5">
+                <p className="text-foreground">{comment.body}</p>
+                <a
+                  href={`#${submissionAnchor(submission.id)}`}
+                  className={`mt-1 inline-block ${quietLinkClass}`}
+                >
                   {copy.submissions.previewLink} ({submission.author}
                   {submission.state === "draft" ? `, ${copy.submissions.unsubmittedBadge}` : ""})
                 </a>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       ))}
     </div>
   );
@@ -173,16 +217,27 @@ export function SubmissionsScreen(): JSX.Element {
       .catch((err) => setError(err instanceof ApiError ? err.message : copy.genericError));
   }, [document.slug, disposition, version, judgement, person]);
 
-  return (
-    <main className="p-4">
-      <h2 className="font-semibold">{copy.submissions.heading}</h2>
+  const activeFilters = [
+    disposition ? { key: "disposition", label: `Disposition: ${disposition}` } : null,
+    version ? { key: "version", label: `Version: ${version}` } : null,
+    judgement ? { key: "judgement", label: `Judgement: ${judgement}` } : null,
+    person ? { key: "person", label: `Person: ${person}` } : null,
+  ].filter((f): f is { key: string; label: string } => f !== null);
 
-      <div className="mt-2 flex flex-wrap gap-2 text-sm">
+  return (
+    <main className="mx-auto max-w-[1120px] px-5 py-6">
+      <h2 className="text-lg font-bold tracking-tight text-foreground">
+        {copy.submissions.heading}
+      </h2>
+
+      <div className="mt-3 inline-flex rounded-xl bg-muted p-1 text-sm">
         <button
           type="button"
           onClick={() => updateParam("view", "")}
           aria-pressed={view === "whole"}
-          className={`rounded border border-border px-2 py-1 ${view === "whole" ? "font-semibold" : ""}`}
+          className={`rounded-lg px-3 py-1.5 font-semibold ${
+            view === "whole" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+          }`}
         >
           {copy.submissions.whole}
         </button>
@@ -190,17 +245,19 @@ export function SubmissionsScreen(): JSX.Element {
           type="button"
           onClick={() => updateParam("view", "passage")}
           aria-pressed={view === "passage"}
-          className={`rounded border border-border px-2 py-1 ${view === "passage" ? "font-semibold" : ""}`}
+          className={`rounded-lg px-3 py-1.5 font-semibold ${
+            view === "passage" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+          }`}
         >
           {copy.submissions.byPassage}
         </button>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-2 text-sm">
+      <div className="mt-3 flex flex-wrap gap-2">
         <select
           value={disposition}
           onChange={(e) => updateParam("disposition", e.target.value)}
-          className="rounded border border-border px-2 py-1"
+          className={selectClass}
           aria-label={copy.submissions.filters.disposition}
         >
           <option value="">{copy.submissions.filters.disposition}</option>
@@ -212,24 +269,40 @@ export function SubmissionsScreen(): JSX.Element {
           value={version}
           onChange={(e) => updateParam("version", e.target.value)}
           placeholder={copy.submissions.filters.version}
-          className="w-24 rounded border border-border px-2 py-1"
+          className={`${inputClass} w-24`}
         />
         <input
           value={judgement}
           onChange={(e) => updateParam("judgement", e.target.value)}
           placeholder={copy.submissions.filters.judgement}
-          className="w-32 rounded border border-border px-2 py-1"
+          className={`${inputClass} w-32`}
         />
         <input
           value={person}
           onChange={(e) => updateParam("person", e.target.value)}
           placeholder={copy.submissions.filters.person}
-          className="w-32 rounded border border-border px-2 py-1"
+          className={`${inputClass} w-32`}
         />
       </div>
 
+      {activeFilters.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {activeFilters.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => updateParam(filter.key, "")}
+              className={chipClass}
+            >
+              {filter.label}
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? (
-        <p role="alert" className="mt-2 text-destructive">
+        <p role="alert" className="mt-3 text-destructive">
           {error}
         </p>
       ) : null}

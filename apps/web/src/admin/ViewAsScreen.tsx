@@ -32,20 +32,22 @@ export function ViewAsScreen(): JSX.Element {
 
   if (error) {
     return (
-      <main className="p-4 text-destructive" role="alert">
+      <main className="mx-auto max-w-[1120px] px-5 py-6 text-destructive" role="alert">
         {error}
       </main>
     );
   }
   if (!bundle) {
-    return <main className="p-4 text-muted-foreground">{copy.loading}</main>;
+    return (
+      <main className="mx-auto max-w-[1120px] px-5 py-6 text-muted-foreground">{copy.loading}</main>
+    );
   }
 
   return (
     <div>
       <div
         role="status"
-        className="sticky top-0 z-10 bg-foreground px-4 py-2 text-center text-sm font-medium text-background"
+        className="sticky top-0 z-10 border-b-2 border-amber bg-amber-soft px-4 py-2 text-center text-sm font-bold text-amber"
       >
         {copy.viewAs.banner(bundle.person.name)}
       </div>

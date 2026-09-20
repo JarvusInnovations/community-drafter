@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ApiError, extendDeadline } from "../api.ts";
 import { copy } from "../copy.ts";
+import { inputClass, labelClass, primaryButtonClass, quietButtonClass } from "../styles.ts";
 import { type DocumentDetail } from "../types.ts";
+import { DialogShell } from "./DialogShell.tsx";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -33,7 +35,6 @@ export function ExtendDeadlineDialog({
   onClose: () => void;
   onExtended: () => void;
 }): JSX.Element | null {
-  const ref = useRef<HTMLDialogElement>(null);
   const [comments, setComments] = useState(toLocalInputValue(document.comments_close_at));
   const [signing, setSigning] = useState(toLocalInputValue(document.signing_closes_at));
   const [busy, setBusy] = useState(false);
@@ -41,16 +42,6 @@ export function ExtendDeadlineDialog({
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-    }
     if (open) {
       setComments(toLocalInputValue(document.comments_close_at));
       setSigning(toLocalInputValue(document.signing_closes_at));
@@ -58,10 +49,6 @@ export function ExtendDeadlineDialog({
       setSuccess(null);
     }
   }, [open, document.comments_close_at, document.signing_closes_at]);
-
-  if (!open) {
-    return null;
-  }
 
   async function handleSubmit() {
     setBusy(true);
@@ -105,60 +92,55 @@ export function ExtendDeadlineDialog({
   }
 
   return (
-    <dialog
-      ref={ref}
+    <DialogShell
+      open={open}
       onClose={onClose}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground backdrop:bg-black/40"
+      title={copy.extendDeadline.heading}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={quietButtonClass}>
+            {copy.extendDeadline.cancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={busy}
+            className={primaryButtonClass}
+          >
+            {busy ? copy.extendDeadline.submitting : copy.extendDeadline.submit}
+          </button>
+        </>
+      }
     >
-      <h2 className="text-lg font-semibold">{copy.extendDeadline.heading}</h2>
-      <label className="mt-3 block text-sm">
+      <label className={labelClass}>
         {copy.extendDeadline.commentsLabel}
         <input
           type="datetime-local"
           value={comments}
           onChange={(event) => setComments(event.target.value)}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
-      <label className="mt-3 block text-sm">
+      <label className={labelClass}>
         {copy.extendDeadline.signingLabel}
         <input
           type="datetime-local"
           value={signing}
           onChange={(event) => setSigning(event.target.value)}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
 
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
       {success ? (
-        <p role="status" className="mt-3 text-sm text-foreground">
+        <p role="status" className="rounded-xl bg-ok-soft px-3 py-2 text-sm font-medium text-ok">
           {success}
         </p>
       ) : null}
-
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={busy}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
-          {copy.extendDeadline.cancel}
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={busy}
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background"
-        >
-          {busy ? copy.extendDeadline.submitting : copy.extendDeadline.submit}
-        </button>
-      </div>
-    </dialog>
+    </DialogShell>
   );
 }

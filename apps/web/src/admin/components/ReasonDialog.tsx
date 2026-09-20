@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+
+import { inputClass, primaryButtonClass, quietButtonClass } from "../styles.ts";
+import { DialogShell } from "./DialogShell.tsx";
 
 /**
  * A reason-required confirmation dialog — used where
  * `specs/screens/admin-dashboard.md` § Actions says "reason required"
- * (revoke signature). Unlike the participant `ConfirmDialog`, the confirm
- * button stays disabled until a non-empty reason is entered.
+ * (revoke signature). Unlike `ConfirmDialog`, the confirm button stays
+ * disabled until a non-empty reason is entered.
  */
 export function ReasonDialog({
   open,
@@ -31,72 +34,53 @@ export function ReasonDialog({
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }): JSX.Element | null {
-  const ref = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState("");
 
   useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-    }
     if (open) {
       setReason("");
     }
   }, [open]);
 
-  if (!open) {
-    return null;
-  }
-
   const trimmed = reason.trim();
 
   return (
-    <dialog
-      ref={ref}
+    <DialogShell
+      open={open}
       onClose={onCancel}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground backdrop:bg-black/40"
+      title={heading}
+      footer={
+        <>
+          <button type="button" onClick={onCancel} disabled={busy} className={quietButtonClass}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(trimmed)}
+            disabled={busy || trimmed.length === 0}
+            className={primaryButtonClass}
+          >
+            {busy ? busyLabel : confirmLabel}
+          </button>
+        </>
+      }
     >
-      <h2 className="text-lg font-semibold">{heading}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{body}</p>
-      <label className="mt-3 block text-sm">
+      <p className="text-sm text-muted-foreground">{body}</p>
+      <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
         {reasonLabel}
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
           required
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className={inputClass}
         />
       </label>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
-          {cancelLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => onConfirm(trimmed)}
-          disabled={busy || trimmed.length === 0}
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-60"
-        >
-          {busy ? busyLabel : confirmLabel}
-        </button>
-      </div>
-    </dialog>
+    </DialogShell>
   );
 }

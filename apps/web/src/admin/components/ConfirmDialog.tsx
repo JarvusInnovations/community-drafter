@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { primaryButtonClass, quietButtonClass } from "../styles.ts";
+import { DialogShell } from "./DialogShell.tsx";
 
 /**
  * A plain yes/no confirmation dialog — used wherever
@@ -30,56 +31,28 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }): JSX.Element | null {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
-  if (!open) {
-    return null;
-  }
-
   return (
-    <dialog
-      ref={ref}
+    <DialogShell
+      open={open}
       onClose={onCancel}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground backdrop:bg-black/40"
+      title={heading}
+      footer={
+        <>
+          <button type="button" onClick={onCancel} disabled={busy} className={quietButtonClass}>
+            {cancelLabel}
+          </button>
+          <button type="button" onClick={onConfirm} disabled={busy} className={primaryButtonClass}>
+            {busy ? busyLabel : confirmLabel}
+          </button>
+        </>
+      }
     >
-      <h2 className="text-lg font-semibold">{heading}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+      <p className="text-sm text-muted-foreground">{body}</p>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded border border-border px-3 py-1.5 text-sm"
-        >
-          {cancelLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={busy}
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-60"
-        >
-          {busy ? busyLabel : confirmLabel}
-        </button>
-      </div>
-    </dialog>
+    </DialogShell>
   );
 }
