@@ -200,9 +200,9 @@ export const copy = {
         case "accepted":
           return "Accepted";
         case "partial":
-          return "Partially addressed";
+          return "Partly addressed";
         case "declined":
-          return "Not addressed";
+          return "Declined";
         case "noted":
           return "Noted";
         default:
