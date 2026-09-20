@@ -9,6 +9,7 @@ import {
   requireStr,
   str,
   type FlagSpec,
+  type Parsed,
 } from "../flags.js";
 import {
   computed,
@@ -34,7 +35,7 @@ const PEOPLE_FLAGS: Record<string, FlagSpec> = {
   links: { positionals: 1, value: ["--person", "--out"] },
   send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
   remove: { positionals: 2 },
-  remind: { positionals: 1, value: ["--target"], boolean: ["--dry-run"] },
+  remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 },
 };
@@ -70,8 +71,13 @@ links <slug> [--person a,b] [--out <file.csv>]
        The only command that returns tokens — recorded as an admin event.
 send <slug> [--only-unsent] [--person a,b] [--dry-run]
        Sends invitations to everyone not yet sent (or to --person, even if sent).
+       Prints how many the mailer accepted and names the ones it rejected; a
+       rejected invitee stays not_sent, so running send again picks them up.
        --dry-run lists who would receive one and who is skipped and why.
-remind <slug> --target unopened|opened-not-acted [--dry-run]
+remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
+       Skips anyone this document has messaged within --min-age hours (default
+       48; pass 0 to send regardless) and reports what it actually sent,
+       counting recently-messaged and reminders-off invitees separately.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
        Prints the new link once.`;
@@ -108,6 +114,23 @@ function parseImportRows(text: string): ImportRow[] {
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line) as ImportRow);
+}
+
+/**
+ * `--min-age <hours>` for `people remind`. Left to the API's own default
+ * (48) when the flag is absent, so the interval is stated in one place;
+ * a value the API would reject is caught here with the usage hint instead.
+ */
+function minAgeHours(parsed: Parsed): number | undefined {
+  const raw = str(parsed, "--min-age");
+  if (raw === undefined) return undefined;
+  const hours = Number(raw);
+  if (!Number.isFinite(hours) || hours < 0) {
+    throw new AxiError(`"${raw}" is not a valid --min-age`, "USAGE", [
+      "--min-age takes a number of hours, 0 or greater (default 48; 0 sends regardless)",
+    ]);
+  }
+  return hours;
 }
 
 /** Minimal RFC 4180 CSV row parser — matches `apps/api/src/lib/csv.ts`'s writer. */
@@ -304,13 +327,27 @@ export async function peopleCommand(args: string[]): Promise<string> {
           ),
         );
       }
+      type Failure = NonNullable<SendResult["failures"]>[number];
+      const failures = result.failures ?? [];
       return render(parsed, result, () =>
         joinBlocks(
           renderObject({
-            queued: result.queued,
+            sent: result.sent,
+            failed: result.failed,
             mailer_export: result.csv ? "included (rerun with --json to capture)" : undefined,
           }),
           skippedBlock,
+          failures.length > 0
+            ? renderList("failures", failures, [
+                computed<Failure>("person", (f) => f.person),
+                computed<Failure>("error", (f) => f.error),
+              ])
+            : "",
+          failures.length > 0
+            ? renderHelp([
+                `${failures.length} invitation(s) were not delivered and are still not_sent — fix the address, then run \`drafter-axi people send ${slug}\` again`,
+              ])
+            : "",
         ),
       );
     }
@@ -361,10 +398,56 @@ export async function peopleCommand(args: string[]): Promise<string> {
         `/documents/${encodeURIComponent(slug)}/invitations/remind`,
         {
           target,
+          min_age_hours: minAgeHours(parsed),
           dry_run: bool(parsed, "--dry-run") || undefined,
         },
       );
-      return render(parsed, result, () => renderObject(result));
+      type RemindFailure = NonNullable<RemindResult["failures"]>[number];
+      const remindFailures = result.failures ?? [];
+      // `specs/api/admin-cli.md`: a remind prints what it actually sent and,
+      // when it sent nothing, why — the recency guard and the `reminders`
+      // preference are separate answers.
+      const help: string[] = [];
+      if (result.skipped_recent > 0) {
+        help.push(
+          `${result.skipped_recent} were already messaged within ${result.min_age_hours}h — pass \`--min-age <hours>\` (0 to send regardless) if you need to nudge sooner`,
+        );
+      }
+      if (result.skipped_pref > 0) {
+        help.push(`${result.skipped_pref} have turned reminders off and were left alone`);
+      }
+      if (result.dry_run) {
+        help.push("Nothing was sent. Run again without --dry-run to send");
+      }
+      return render(parsed, result, () =>
+        joinBlocks(
+          renderObject(
+            result.dry_run
+              ? {
+                  dry_run: true,
+                  targeted: result.targeted,
+                  skipped_recent: result.skipped_recent,
+                  skipped_pref: result.skipped_pref,
+                  min_age_hours: result.min_age_hours,
+                }
+              : {
+                  sent: result.sent,
+                  failed: result.failed,
+                  skipped_recent: result.skipped_recent,
+                  skipped_pref: result.skipped_pref,
+                  min_age_hours: result.min_age_hours,
+                  commit: result.commit ?? undefined,
+                },
+          ),
+          remindFailures.length > 0
+            ? renderList("failures", remindFailures, [
+                computed<RemindFailure>("person", (f) => f.person),
+                computed<RemindFailure>("error", (f) => f.error),
+              ])
+            : "",
+          help.length > 0 ? renderHelp(help) : "",
+        ),
+      );
     }
 
     case "revoke-link": {
