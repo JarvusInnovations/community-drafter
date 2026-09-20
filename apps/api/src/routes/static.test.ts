@@ -46,6 +46,7 @@ describe("static SPA serving", () => {
       "/i/some-token/history",
       "/d/some-slug",
       "/admin/dashboard",
+      "/auth/device?code=ABCD1234",
     ]) {
       const response = await server.inject({ method: "GET", url: path });
       expect(response.statusCode).toBe(200);
