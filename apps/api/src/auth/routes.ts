@@ -3,6 +3,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../errors.ts";
 import { OPERATOR_ROUTE, PUBLIC_ROUTE } from "../gateway/gateway.ts";
+import { firstName, renderEmail } from "../lib/mailer/shell.ts";
 import { uniqueSlug } from "../lib/slug.ts";
 import { isSafeReturnPath } from "./cookie.ts";
 import { DEVICE_POLL_INTERVAL_SECONDS } from "./device.ts";
@@ -96,29 +97,28 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const host = base.replace(/^https?:\/\//u, "");
     const fromEmail = fastify.config.INSTANCE_FROM_EMAIL ?? "no-reply@community-drafter.local";
 
-    // `specs/behaviors/notifications.md` § `operator-magic-link`.
-    const greeting = `Hi ${operator.name},`;
-    const context =
-      trigger.kind === "web"
-        ? `You asked to sign in to ${name} (${host}) on the web.`
-        : `A command line asked to sign in to ${name} (${host}) with the code ${trigger.userCode}.`;
-    const expiry = "This link works once and expires in 15 minutes.";
-    const ignore = "If you didn't request this, you can ignore this email.";
-    const button = `Sign in to ${name}`;
+    // `specs/behaviors/notifications.md` § `operator-magic-link`, rendered
+    // through the same shell as every participant message (§ "Shape").
+    const rendered = renderEmail({
+      greeting: `Hi ${firstName(operator.name)},`,
+      body: [
+        trigger.kind === "web"
+          ? `You asked to sign in to ${name} (${host}) on the web.`
+          : `A command line asked to sign in to ${name} (${host}) with the code ${trigger.userCode}.`,
+      ],
+      button: { label: `Sign in to ${name}`, url: link },
+      smallPrint: [
+        "This link works once and expires in 15 minutes.",
+        "If you didn't request this, you can ignore this email.",
+      ],
+    });
 
     await fastify.mailer.send({
       to: { name: operator.name, email: operator.email },
       from: { name, email: fromEmail },
       subject: `Sign in to ${name}`,
-      text: `${greeting}\n\n${context}\n\n${button}: ${link}\n\n${expiry}\n${ignore}\n`,
-      html:
-        `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.5;color:#1b1b1b;max-width:520px">` +
-        `<p>${escapeHtml(greeting)}</p>` +
-        `<p>${escapeHtml(context)}</p>` +
-        `<p style="margin:24px 0"><a href="${link}" style="display:inline-block;background:#1f4d3a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:8px">${escapeHtml(button)}</a></p>` +
-        `<p style="font-size:14px;color:#5d5d57">Or paste this link into your browser:<br><a href="${link}" style="color:#1f4d3a">${link}</a></p>` +
-        `<p style="font-size:14px;color:#5d5d57">${escapeHtml(expiry)}<br>${escapeHtml(ignore)}</p>` +
-        `</div>`,
+      text: rendered.text,
+      html: rendered.html,
       personalLink: link,
     });
   }

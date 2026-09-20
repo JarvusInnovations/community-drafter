@@ -24,9 +24,10 @@ function buildContext(): RecipientContext {
     instanceName: "Save the Academy Coalition",
     documentTitle: "Coalition Charter",
     personName: "Jane Doe",
+    firstName: "Jane",
     personEmail: "jane@example.org",
-    phaseLabel: "signing",
-    nextDeadline: "Sep 20, 2026, 9:14 AM EDT",
+    senderName: "Coalition Team",
+    clockLine: "Signatures are due Sun, Sep 20 · 9:14 AM EDT.",
     personalLink: "https://drafter.example.org/i/JANE-TOKEN-1234",
     prefsLink: "https://drafter.example.org/i/JANE-TOKEN-1234/prefs",
     stopOptionalLink: "https://drafter.example.org/i/JANE-TOKEN-1234/prefs?stop-optional=1",
@@ -44,13 +45,32 @@ function assertNoLeakage(result: { subject: string; text: string; html: string }
   }
 }
 
+/**
+ * `specs/behaviors/notifications.md` § Content rules "Shape": greeting by
+ * first name, the clock sentence, exactly one button whose URL also appears
+ * in plain text, the private-link small print, and the same words in both
+ * parts.
+ */
+function assertShape(result: { subject: string; text: string; html: string }): void {
+  expect(result.text.startsWith("Hi Jane,\n\n")).toBe(true);
+  expect(result.text).toContain("Signatures are due Sun, Sep 20 · 9:14 AM EDT.");
+  expect(result.text).toContain("This link is yours alone; please don't forward it.");
+  const buttons = result.html.match(/display:inline-block;background:#2457f5/g) ?? [];
+  expect(buttons).toHaveLength(1);
+  expect(result.html).toContain("Or paste this link into your browser:");
+  expect(result.html).not.toContain("<img");
+  expect(result.text).not.toContain("Coalition Team <");
+}
+
 describe("notification templates", () => {
   const ctx = buildContext();
 
-  it("invitation names the document and links the personal link", () => {
+  it("invitation speaks as the sender, names the document and offers one action", () => {
     const result = invitationTemplate(ctx);
     expect(result.subject).toContain("Coalition Charter");
-    expect(result.text).toContain(ctx.personalLink);
+    expect(result.text).toContain("Coalition Team would like you to read");
+    expect(result.text).toContain(`Read and sign: ${ctx.personalLink}`);
+    assertShape(result);
     assertNoLeakage(result);
   });
 
@@ -58,28 +78,36 @@ describe("notification templates", () => {
     const result = signatureConfirmationTemplate(ctx, { capacity: "official", conditional: false });
     expect(result.subject).toBe("Coalition Charter — you signed");
     expect(result.text).toContain("official");
+    expect(result.text).not.toContain(ctx.prefsLink);
+    assertShape(result);
     assertNoLeakage(result);
   });
 
   it("conditional signature confirmation mentions confirm/remove", () => {
     const result = signatureConfirmationTemplate(ctx, { capacity: "personal", conditional: true });
     expect(result.text).toContain("conditional");
+    expect(result.text).toContain("confirm or remove");
+    assertShape(result);
     assertNoLeakage(result);
   });
 
   it("revocation confirmation includes the reason when given", () => {
     const result = revocationConfirmationTemplate(ctx, { reason: "changed my mind" });
     expect(result.text).toContain("changed my mind");
+    expect(result.text).toContain(`Sign again: ${ctx.personalLink}`);
+    assertShape(result);
     assertNoLeakage(result);
   });
 
   it("review receipt states judgement and comment count, never another author's comments", () => {
     const result = reviewReceiptTemplate(ctx, { judgement: "decline", commentCount: 0 });
     expect(result.text).toContain("declined");
+    expect(result.text).toContain("0 comments");
+    assertShape(result);
     assertNoLeakage(result);
   });
 
-  it("version template includes version number, summary and a compare link", () => {
+  it("version template includes version number, summary, a compare button and the document link", () => {
     const result = versionTemplate(ctx, {
       version: 3,
       summary: "Clarified section 2",
@@ -87,7 +115,11 @@ describe("notification templates", () => {
     });
     expect(result.subject).toBe("Coalition Charter — version 3 published");
     expect(result.text).toContain("Clarified section 2");
-    expect(result.text).toContain("compare?from=2&to=3");
+    expect(result.text).toContain(
+      "See what changed: https://drafter.example.org/i/JANE-TOKEN-1234/history/compare?from=2&to=3",
+    );
+    expect(result.text).toContain(`Read the whole document: ${ctx.personalLink}`);
+    assertShape(result);
     assertNoLeakage(result);
   });
 
@@ -100,6 +132,8 @@ describe("notification templates", () => {
     expect(result.text).toContain("Version 3");
     expect(result.text).toContain("accepted");
     expect(result.text).toContain("2 organizations and 5 individuals");
+    expect(result.html).toContain("<ul");
+    assertShape(result);
     assertNoLeakage(result);
   });
 
@@ -113,6 +147,7 @@ describe("notification templates", () => {
       const result = template(ctx);
       expect(result.text).toContain("Coalition Charter");
       expect(result.text).toContain(ctx.personalLink);
+      assertShape(result);
       assertNoLeakage(result);
     }
   });
@@ -120,10 +155,13 @@ describe("notification templates", () => {
   it("final-published uses the confirm/remove variant only for conditional signers", () => {
     const plain = finalPublishedTemplate(ctx, { version: 4, conditional: false });
     expect(plain.subject).toBe("Coalition Charter — final version published");
+    expect(plain.text).toContain(`Read the final text: ${ctx.personalLink}`);
 
     const conditional = finalPublishedTemplate(ctx, { version: 4, conditional: true });
     expect(conditional.subject).toBe("Coalition Charter — final version, please confirm");
-    expect(conditional.text).toContain("Confirm or remove");
+    expect(conditional.text).toContain(`Confirm or remove your signature: ${ctx.personalLink}`);
+    assertShape(plain);
+    assertShape(conditional);
     assertNoLeakage(plain);
     assertNoLeakage(conditional);
   });
@@ -135,6 +173,7 @@ describe("notification templates", () => {
     });
     expect(result.text).toContain("partial");
     expect(result.text).toContain("we addressed part of this");
+    assertShape(result);
     assertNoLeakage(result);
   });
 
@@ -143,17 +182,27 @@ describe("notification templates", () => {
     expect(first.text).toContain("a reminder");
     const second = reminderTemplate(ctx, { n: 2 });
     expect(second.text).toContain("reminder #2");
+    assertShape(first);
+    assertShape(second);
     assertNoLeakage(first);
     assertNoLeakage(second);
   });
 
-  it("every subscription message includes the prefs link and the stop-optional link", () => {
+  it("every subscription message includes the prefs link and the stop-optional link, in both parts", () => {
     const result = versionTemplate(ctx, {
       version: 1,
       summary: "First draft",
       compareLink: ctx.personalLink,
     });
-    expect(result.text).toContain(ctx.prefsLink);
-    expect(result.text).toContain(ctx.stopOptionalLink);
+    expect(result.text).toContain(`Manage how we contact you: ${ctx.prefsLink}`);
+    expect(result.text).toContain(`Stop optional messages: ${ctx.stopOptionalLink}`);
+    expect(result.html).toContain(`href="${ctx.prefsLink}"`);
+    expect(result.html).toContain(`href="${ctx.stopOptionalLink}"`);
+  });
+
+  it("omits the clock sentence when the document is not open", () => {
+    const result = closedTemplate({ ...ctx, clockLine: undefined });
+    expect(result.text).not.toContain("Signatures are due");
+    expect(result.text.startsWith("Hi Jane,\n\n")).toBe(true);
   });
 });
