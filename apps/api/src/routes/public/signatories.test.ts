@@ -91,10 +91,11 @@ describe("GET /d/:slug/signatories.json", () => {
     expect(publicSignatories.individuals).toBe(participantSignatories.individuals);
     expect(publicSignatories.unlisted).toBe(participantSignatories.unlisted);
     expect(publicSignatories.organizations).toBe(1);
-    // jane-doe and unlisted-person are both current personal signatories —
-    // `unlisted` counts but doesn't name unlisted-person, per
-    // `specs/behaviors/signatures.md` § Display.
-    expect(publicSignatories.individuals).toBe(2);
+    // jane-doe and unlisted-person are both current personal signatories, but
+    // `specs/behaviors/signatures.md` § Display counts an unlisted signer
+    // *once*, in `unlisted` alone — so `individuals` is jane-doe only and the
+    // three figures never overlap (issue #68).
+    expect(publicSignatories.individuals).toBe(1);
     expect(publicSignatories.unlisted).toBe(1);
 
     await server.close();

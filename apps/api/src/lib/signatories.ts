@@ -69,8 +69,13 @@ function latestEffectiveSignedAt(entries: ParticipationEntry[]): string {
  * `specs/behaviors/signatures.md` § Display + `specs/api/participant.md`
  * bundle `signatories` field. `show_signatories = none` → `null`;
  * `= count` → counts only; `= list` → counts plus the ordered, unlisted-
- * filtered list. Counts always include `listed = false` signers (they are
- * "counted but not named"); only the `list` array excludes them.
+ * filtered list.
+ *
+ * An unlisted signer is counted **once**: they are "counted but not named"
+ * by `unlisted`, and excluded from `organizations` and `individuals`, so the
+ * three figures in a counts line never overlap (issue #68 — the sentence
+ * read "3 individuals, and 1 other who asked not to be listed" above two
+ * names).
  */
 export function computeSignatories(
   participations: ParticipationEntry[],
@@ -80,32 +85,35 @@ export function computeSignatories(
 
   const current = participations.filter(isCurrentSignatory);
 
+  const isListed = (entry: ParticipationEntry): boolean => entry.record.signature?.listed !== false;
+
   const officials = current.filter((entry) => entry.record.signature?.capacity === "official");
   const personals = current.filter((entry) => entry.record.signature?.capacity === "personal");
 
-  const orgs = new Set(officials.map((entry) => entry.record.signature?.org ?? ""));
-  const unlisted = current.filter((entry) => entry.record.signature?.listed === false).length;
+  const listedOfficials = officials.filter(isListed);
+  const listedPersonals = personals.filter(isListed);
+
+  const orgs = new Set(listedOfficials.map((entry) => entry.record.signature?.org ?? ""));
+  const unlisted = current.length - listedOfficials.length - listedPersonals.length;
 
   const summary: SignatorySummary = {
     organizations: orgs.size,
-    individuals: personals.length,
+    individuals: listedPersonals.length,
     unlisted,
     updated_at: latestEffectiveSignedAt(current) || undefined,
   };
 
   if (showSignatories !== "list") return summary;
 
-  const listedOfficials = officials
-    .filter((entry) => entry.record.signature?.listed !== false)
-    .sort((a, b) => (a.record.signature?.org ?? "").localeCompare(b.record.signature?.org ?? ""));
+  const orderedOfficials = [...listedOfficials].sort((a, b) =>
+    (a.record.signature?.org ?? "").localeCompare(b.record.signature?.org ?? ""),
+  );
 
-  const listedPersonals = personals
-    .filter((entry) => entry.record.signature?.listed !== false)
-    .sort((a, b) =>
-      effectiveSignedAt(a.signatureEvents).localeCompare(effectiveSignedAt(b.signatureEvents)),
-    );
+  const orderedPersonals = [...listedPersonals].sort((a, b) =>
+    effectiveSignedAt(a.signatureEvents).localeCompare(effectiveSignedAt(b.signatureEvents)),
+  );
 
-  summary.list = [...listedOfficials, ...listedPersonals].map((entry) => {
+  summary.list = [...orderedOfficials, ...orderedPersonals].map((entry) => {
     const signature = entry.record.signature;
     return {
       display_name: signature?.display_name ?? "",
