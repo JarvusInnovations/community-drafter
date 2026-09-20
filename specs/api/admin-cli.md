@@ -26,9 +26,9 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
 | `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
 | `docs show <slug>` | dashboard numbers, versions, schedule |
-| `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
+| `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations, printing how many were delivered and naming any the mailer rejected; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
 | `docs extend <slug> [--comments-close <when>] [--signing-closes <when>]` | extension |
-| `docs close|reopen|withdraw <slug> …` | lifecycle |
+| `docs close | reopen | withdraw <slug> …` | lifecycle |
 | `versions list <slug>` / `versions show <slug> <n> [--body]` | read |
 | `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts |
 | `versions compare <slug> <from> <to> [--unchanged]` | text redline for a terminal |
@@ -36,9 +36,9 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `people remove <slug> <person>` | remove a staged invitation that was never sent |
 | `people list <slug> [--status not_sent\|signed\|…] [--source crm] [-q name]` | statuses (staged invitations read `not_sent`), no tokens |
 | `people links <slug> [--person a,b] [--out links.csv]` | export personal links (recorded) |
-| `people send <slug> [--only-unsent] [--person a,b] [--dry-run]` | send invitations; `--dry-run` lists who would receive one and who is skipped and why |
-| `people remind <slug> --target unopened\|opened-not-acted [--dry-run]` | reminders |
-| `people revoke-link|reissue-link <slug> <person>` | link management |
+| `people send <slug> [--only-unsent] [--person a,b] [--dry-run]` | send invitations; prints how many were delivered, how many failed and who with what error; `--dry-run` lists who would receive one and who is skipped and why |
+| `people remind <slug> --target unopened\|opened-not-acted [--min-age <hours>] [--dry-run]` | reminders; skips anyone this document messaged within `--min-age` hours (default 48, `0` to send regardless) and prints what it actually sent, how many were skipped as recently messaged and how many by preference |
+| `people revoke-link | reissue-link <slug> <person>` | link management |
 | `signatures list <slug> [--include-revoked] [--conditional]` | signatures |
 | `signatures revoke <slug> <person> --reason "…"` | admin revocation |
 | `submissions list <slug> [--pending] [--version n] [--person p] [--include-drafts]` | whole submissions, each with its comments; drafts only on request and always labeled |
@@ -69,7 +69,9 @@ Per `axi-skills`, the skill ships a SessionStart hook that prints the home view 
 ## Principles
 
 **Inherited**
+
 - [The record is a git repo the team can read without the app](../principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app): the CLI is how the team's agent participates in the record; commit subjects in output let it cite what it did.
 
 **Local**
+
 - **Publishing from the CLI is the LLM loop's output path.** `feedback export` → agent → `versions publish --dispositions` must be a two-command round trip with no manual step in between, or the bulk-rounds promise fails.

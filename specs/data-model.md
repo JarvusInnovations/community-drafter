@@ -123,10 +123,10 @@ One record per person per document, created by an invitation. Current state only
 | `suggested_capacity` | enum? | preselects the sign card |
 | `link_revoked` | boolean | link no longer resolves (a reissue mints a new `token`) |
 | `expires_at` | timestamp? | |
-| `sent_at` | timestamp? | invitation message sent or exported |
+| `sent_at` | timestamp? | invitation message accepted by the mailer or exported; written in the same commit as `notified.invitation`, never before delivery |
 | `first_opened_at`, `last_seen_at`, `opens` | | batched writes (`Action: track`) |
 | `notify` | table | `channel`, `every_revision`, `daily_digest`, `phase_changes`, `my_comments_addressed`, `reminders` |
-| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified.reminder = 2` |
+| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified."reminder-2"`; `notified.reminder = 2` is the reminder count beside those per-reminder timestamps. A timestamp here means the message was delivered, so the newest of them is when this document last reached the person (`notified."links-exported"` is an operator's CSV export, not a message) |
 | `signature` | table? | absent = never signed; see below |
 
 `signature` table:

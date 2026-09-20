@@ -11,7 +11,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 - `DELETE /documents/:slug/operators/:email` → removes (`Action: doc-operator-remove`); 409 `last_operator` when it would leave none.
 - `GET /documents/:slug` → document + versions (from content history) + counts.
 - `PATCH /documents/:slug` → settings fields only (not `state`, not deadlines).
-- `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; queues invitations. Deadlines are ISO 8601 with a zone (offset or `Z`), stored as UTC. Errors: `validation_failed` (format, order, `comments_close_at` already past), `no_version`.
+- `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; sends the invitations that have never been sent. Deadlines are ISO 8601 with a zone (offset or `Z`), stored as UTC. Response: the document summary plus `invitations: { sent, failed, failures: [{ person, error }] }`; only the accepted messages are marked `sent_at` (`behaviors/notifications.md` § Sending), so a rejected recipient stays unsent and a later `.../invitations/send` reaches them. Errors: `validation_failed` (format, order, `comments_close_at` already past), `no_version`.
 - `POST /documents/:slug/schedule` `{ comments_close_at?, signing_closes_at? }` → extension only; `deadline_not_later` otherwise; records and announces.
 - `POST /documents/:slug/close` → closes now (sets `signing_closes_at = now`); rare, recorded.
 - `POST /documents/:slug/reopen` `{ comments_close_at?, signing_closes_at }`.
@@ -21,10 +21,12 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 - `GET /documents/:slug/versions` and `GET /documents/:slug/versions/:n` (derived from git; includes `body` markdown, `notes`, `commit`, dispositions).
 - `POST /documents/:slug/versions`
+
   ```
   { body, summary, notes?, final?: boolean,
     dispositions?: [{ submission, comment, outcome, note? }] }
   ```
+
   One transaction, one commit: the document body, disposition fields on the affected submissions (`Disposed` trailer), and the `signing_closes_at` extension if in signing phase; notifications queued from it. Errors: `validation_failed` (summary length, unknown comment id, `declined` without note), `no_change` (text identical to current), `phase_closed` when `state` is `closed` or `withdrawn`. Response: the version (number, summary, commit) and `{ notified: { every_revision: n, dispositions: n, signers: n } }`.
 - `GET /documents/:slug/compare?from=&to=` → same shape as the participant compare.
 
@@ -33,10 +35,10 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 - `POST /documents/:slug/invitations/import[?dry_run=1]` — body: NDJSON or JSON array of `{ name, email, phone?, org?, role?, descriptor?, external_id?, suggested_capacity?, tags? }`. Merges people by email (case-insensitive), creates invitations for those without one, mints tokens. One transaction. Response: `{ people_created, people_updated, invitations_created, skipped_existing, rows: [{ email, name, person, action, changes }] }` where `action` is `invite_new_person`, `invite_existing_person` or `skip_existing` and `changes` lists the person fields the row would overwrite. With `dry_run=1` nothing is written and the same shape comes back with `dry_run: true`, so a list can be built and reviewed before anything exists.
 - `DELETE /documents/:slug/invitations/:person` → removes a staged invitation that has never been sent (`Action: uninvite`); 409 `already_sent` once `sent_at` is set, 409 `has_activity` if the person opened the link, has a submission or a signature. The person record stays.
 - `GET /documents/:slug/invitations` → participations as rows with derived status (`not_sent` first, so a staged list reads as staged), tracking, signature summary, preferences; **never tokens**. Filters: `status`, `source`, `q`.
-- `POST /documents/:slug/invitations/send` `{ only_unsent?: true, person?: [..], dry_run?: true }` → queues `invitation` messages; response `{ queued, skipped: [{ person, reason }] }` with reasons `already_sent`, `link_revoked`, `no_email`. With `dry_run` nothing is sent or recorded and the response is `{ dry_run: true, would_send: [{ person, name }], skipped }`. With `MAILER=export`, the real send includes the CSV path/content.
+- `POST /documents/:slug/invitations/send` `{ only_unsent?: true, person?: [..], dry_run?: true }` → sends `invitation` messages; response `{ sent, failed, skipped: [{ person, reason }], failures: [{ person, error }] }` with skip reasons `already_sent`, `link_revoked`, `no_email`. `sent` counts the messages the mailer accepted, and only those are marked `sent_at`; the rest are named in `failures` and remain unsent. With `dry_run` nothing is sent or recorded and the response is `{ dry_run: true, would_send: [{ person, name }], skipped }`. With `MAILER=export`, the real send includes the CSV path/content for the rows it wrote.
 - `POST /documents/:slug/invitations/links` `{ person?: [..] }` → CSV `person,name,email,link`. Recorded as an admin event with count. This is the only read path for tokens.
 - `POST /documents/:slug/invitations/:person/revoke-link`, `.../reissue-link` (returns the new link once), `.../expire { expires_at }`.
-- `POST /documents/:slug/invitations/remind` `{ target: "unopened" | "opened_not_acted", dry_run?: boolean }` → counts (respecting `reminders` preference).
+- `POST /documents/:slug/invitations/remind` `{ target: "unopened" | "opened_not_acted", min_age_hours?: number, dry_run?: boolean }` → sends reminders to the targets that have the `reminders` preference on and have not been messaged within `min_age_hours` (default 48; `0` sends regardless — `behaviors/notifications.md` § Sending). Response `{ sent, failed, skipped_recent, skipped_pref, min_age_hours, failures: [{ person, error }] }`; with `dry_run`, `{ dry_run: true, targeted, skipped_recent, skipped_pref, min_age_hours }` and nothing is sent or recorded. 422 `validation_failed` when `min_age_hours` is negative or not a number.
 
 ## Signatures
 
@@ -74,8 +76,10 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 ## Principles
 
 **Inherited**
+
 - [The record is a git repo the team can read without the app](../principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app): every mutation here is exactly one transaction with a descriptive subject; the CLI prints the resulting commit subject so the agent can cite it.
 - [Nothing pending is lost; pending is labeled](../principles.md#nothing-pending-is-lost-pending-is-labeled): draft reads are labeled, and drafts are never mixed into `comments` results without the `unsubmitted` marker.
 
 **Local**
+
 - **Tokens leave through one door.** Only `invitations/links` and `reissue-link` return tokens, and both are recorded. Any new endpoint that would return a token must reuse one of them.
