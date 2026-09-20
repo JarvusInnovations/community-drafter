@@ -153,6 +153,7 @@ export interface SessionInfo {
   email: string;
   name?: string;
   kind?: "person" | "bot";
+  superadmin?: boolean;
   expires_at: string;
 }
 
@@ -162,6 +163,7 @@ export interface OperatorRecord {
   name: string;
   kind: "person" | "bot";
   active: boolean;
+  superadmin?: boolean;
   title?: string;
   org?: string;
   notes?: string;
