@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { ApiError, listOperators, removeOperator, updateOperator } from "./api.ts";
+import { Card } from "./components/Card.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { OperatorFormDialog } from "./components/OperatorFormDialog.tsx";
+import { Pill } from "./components/Pill.tsx";
 import { copy } from "./copy.ts";
 import { useAdminSession } from "./SessionContext.tsx";
+import { primaryButtonClass, quietLinkClass } from "./styles.ts";
 import { type OperatorRecord } from "./types.ts";
 
 type PendingAction =
@@ -69,20 +72,21 @@ export function OperatorsScreen(): JSX.Element {
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <main className="mx-auto max-w-[1120px] px-5 py-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{copy.operators.heading}</h1>
-        <button
-          type="button"
-          onClick={() => setFormTarget("add")}
-          className="rounded bg-foreground px-3 py-1.5 text-sm font-medium text-background"
-        >
+        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+          {copy.operators.heading}
+        </h1>
+        <button type="button" onClick={() => setFormTarget("add")} className={primaryButtonClass}>
           {copy.operators.add}
         </button>
       </div>
 
       {banner ? (
-        <p role="status" className="mt-3 rounded border border-border bg-muted p-2 text-sm">
+        <p
+          role="status"
+          className="mt-3 rounded-xl bg-ok-soft px-3 py-2 text-sm font-medium text-ok"
+        >
           {banner}
         </p>
       ) : null}
@@ -100,70 +104,76 @@ export function OperatorsScreen(): JSX.Element {
       ) : null}
 
       {operators && operators.length > 0 ? (
-        <table className="mt-4 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted-foreground">
-              <th className="py-2">Name</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Kind</th>
-              <th className="py-2">Active</th>
-              <th className="py-2">Title</th>
-              <th className="py-2">Org</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {operators.map((operator) => (
-              <tr key={operator.email} className="border-b border-border">
-                <td className="py-2">{operator.name}</td>
-                <td className="py-2">{operator.email}</td>
-                <td className="py-2">{operator.kind}</td>
-                <td className="py-2">{operator.active ? "active" : "inactive"}</td>
-                <td className="py-2">{operator.title ?? ""}</td>
-                <td className="py-2">{operator.org ?? ""}</td>
-                <td className="py-2 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormTarget(operator)}
-                      className="rounded border border-border px-2 py-1 text-xs"
-                    >
-                      {copy.operators.edit}
-                    </button>
-                    {operator.active ? (
+        <Card className="mt-4 overflow-x-auto p-0">
+          <table className="w-full min-w-[700px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-2.5">Name</th>
+                <th className="px-4 py-2.5">Email</th>
+                <th className="px-4 py-2.5">Kind</th>
+                <th className="px-4 py-2.5">Active</th>
+                <th className="px-4 py-2.5">Title</th>
+                <th className="px-4 py-2.5">Org</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {operators.map((operator) => (
+                <tr key={operator.email} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2.5 font-semibold text-foreground">{operator.name}</td>
+                  <td className="px-4 py-2.5 text-foreground">{operator.email}</td>
+                  <td className="px-4 py-2.5 text-foreground">{operator.kind}</td>
+                  <td className="px-4 py-2.5">
+                    <Pill tone={operator.active ? "ok" : "muted"}>
+                      {operator.active ? "active" : "inactive"}
+                    </Pill>
+                  </td>
+                  <td className="px-4 py-2.5 text-foreground">{operator.title ?? ""}</td>
+                  <td className="px-4 py-2.5 text-foreground">{operator.org ?? ""}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
                       <button
                         type="button"
-                        onClick={() => setPending({ kind: "deactivate", operator })}
+                        onClick={() => setFormTarget(operator)}
+                        className={quietLinkClass}
+                      >
+                        {copy.operators.edit}
+                      </button>
+                      {operator.active ? (
+                        <button
+                          type="button"
+                          onClick={() => setPending({ kind: "deactivate", operator })}
+                          disabled={isSelf(operator)}
+                          title={isSelf(operator) ? copy.operators.cannotSelf : undefined}
+                          className={quietLinkClass}
+                        >
+                          {copy.operators.deactivate}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void reactivate(operator)}
+                          className={quietLinkClass}
+                        >
+                          {copy.operators.reactivate}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPending({ kind: "remove", operator })}
                         disabled={isSelf(operator)}
                         title={isSelf(operator) ? copy.operators.cannotSelf : undefined}
-                        className="rounded border border-border px-2 py-1 text-xs disabled:opacity-40"
+                        className={quietLinkClass}
                       >
-                        {copy.operators.deactivate}
+                        {copy.operators.remove}
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void reactivate(operator)}
-                        className="rounded border border-border px-2 py-1 text-xs"
-                      >
-                        {copy.operators.reactivate}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setPending({ kind: "remove", operator })}
-                      disabled={isSelf(operator)}
-                      title={isSelf(operator) ? copy.operators.cannotSelf : undefined}
-                      className="rounded border border-border px-2 py-1 text-xs disabled:opacity-40"
-                    >
-                      {copy.operators.remove}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       ) : null}
 
       <OperatorFormDialog
