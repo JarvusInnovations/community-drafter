@@ -1,6 +1,8 @@
 @import "tailwindcss";
+/* Inter, self-hosted (`specs/screens/document.md` § Design "Tokens": no third-party font request). */
+@import "@fontsource-variable/inter";
 
-/* `specs/screens/document.md` § Design: the "Docket" tokens. */
+/* `specs/screens/document.md` § Design: the "Docket" tokens. Light scheme only. */
 @theme {
   --color-background: #f4f6f8;
   --color-card: #ffffff;
@@ -20,38 +22,21 @@
   --color-accent: #e8eeff;
   --color-accent-foreground: #0f2fa8;
   --font-sans:
-    Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
 }
 
 /*
- * `@theme` above both registers these as Tailwind utilities *and* emits
- * them as real `:root` custom properties, so overriding the properties
- * directly (not re-declaring `@theme`, which is a build-time registration
- * step, not a runtime one) is what makes dark mode apply at paint time.
+ * The design is light only (`specs/screens/document.md` § Design "Tokens":
+ * "does not follow an OS dark preference; a dark scheme is a future design
+ * pass, never an automatic inversion"). Declaring the scheme also tells
+ * browser extensions that re-theme pages that this one is intentionally
+ * light, which is what keeps the tokens above from being inverted.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0f1216;
-    --color-card: #171b21;
-    --color-foreground: #e9edf2;
-    --color-muted: #1f252d;
-    --color-muted-foreground: #9aa4b1;
-    --color-border: #2a313b;
-    --color-primary: #6b8cff;
-    --color-primary-soft: #182241;
-    --color-primary-deep: #b9c8ff;
-    --color-ok: #5ec78a;
-    --color-ok-soft: #14291c;
-    --color-amber: #e8a54a;
-    --color-amber-soft: #2c2312;
-    --color-destructive: oklch(0.704 0.191 22.216);
-    --color-destructive-foreground: oklch(0.985 0 0);
-    --color-accent: #182241;
-    --color-accent-foreground: #b9c8ff;
-  }
-}
-
 @layer base {
+  html {
+    color-scheme: light;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -59,12 +44,16 @@
 
 /*
  * `specs/screens/document.md` § Display Rules 5: "readable typography, max
- * line length for prose, headings with anchor links." Hand-rolled rather
- * than `@tailwindcss/typography` — no new build dependency for one class.
+ * line length for prose, headings with anchor links"; § Design "Document
+ * card": body text slightly larger than the interface text with a generous
+ * line height, section headings semibold a step above body size with clear
+ * space above them. Hand-rolled rather than `@tailwindcss/typography` — no
+ * new build dependency for one class.
  */
 @layer components {
   .doc-body {
     max-width: 65ch;
+    font-size: 1.05rem;
     line-height: 1.7;
   }
 
@@ -77,19 +66,21 @@
   .doc-body h3,
   .doc-body h4 {
     @apply font-semibold text-foreground;
-    margin-top: 1.75em;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-top: 1.6em;
     margin-bottom: 0.5em;
     position: relative;
   }
 
   .doc-body h1 {
-    font-size: 1.5em;
+    font-size: 1.35em;
   }
   .doc-body h2 {
-    font-size: 1.25em;
+    font-size: 1.15em;
   }
   .doc-body h3 {
-    font-size: 1.125em;
+    font-size: 1.05em;
   }
 
   .doc-body p,
@@ -97,7 +88,7 @@
   .doc-body ol,
   .doc-body blockquote {
     margin-top: 0;
-    margin-bottom: 1em;
+    margin-bottom: 0.85em;
   }
 
   .doc-body ul,
@@ -110,6 +101,9 @@
   .doc-body ol {
     list-style: decimal;
   }
+  .doc-body li {
+    margin-bottom: 0.6em;
+  }
 
   .doc-body blockquote {
     @apply border-l-2 border-border text-muted-foreground;
@@ -117,7 +111,7 @@
   }
 
   .doc-body a {
-    @apply text-foreground underline underline-offset-2;
+    @apply text-primary underline underline-offset-2;
   }
 
   .doc-heading-anchor {
@@ -146,13 +140,12 @@
     text-decoration: line-through;
   }
   .doc-body ins {
-    color: oklch(0.5 0.14 155);
+    @apply text-ok;
     text-decoration: underline;
   }
 
   .diff-block[data-status="added"] {
-    @apply border-l-2 pl-3;
-    border-color: oklch(0.5 0.14 155);
+    @apply border-ok border-l-2 pl-3;
   }
   .diff-block[data-status="removed"] {
     @apply border-destructive border-l-2 pl-3 opacity-70;

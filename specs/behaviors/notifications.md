@@ -57,6 +57,15 @@ Set when the participation is created, editable by the participant at any time:
 - No message ever includes another participant's contact details or unsubmitted content.
 - Subject lines are short and stable: "[Title] — version 3 published", "[Title] — final version, please confirm", "[Title] — you signed".
 
+**Shape.** Every message to a participant has the same shape as `operator-magic-link`, so mail from an instance always looks like it comes from one place and never like a form letter or a phishing attempt:
+
+- A greeting by name ("Hi Jane,") using the person's first name when the record has a full name.
+- One or two plain sentences in the sender's voice (`documents.sender_name`) saying what happened and what, if anything, the reader is being asked to do. No boilerplate "you are receiving this because".
+- While the document is open, the clock in one sentence: "Comments close Thu, Sep 24 · 5:00 PM EDT, and signatures are due Thu, Oct 1 · 5:00 PM EDT." (signing phase: only the second half; closed: "The signatory list closed …"). Dates use the instance time zone with its name and drop the year when it is the current year.
+- Exactly one button whose label is the action ("Read and sign", "See what changed", "Confirm or remove your signature", "Sign in to …"), followed by "Or paste this link into your browser:" and the same URL in plain text. At most one further link in the body (for example the full document beneath a "see what changed" button).
+- Small print at the end: "This link is yours alone; please don't forward it." and, for subscription messages, the two preference links ("Manage how we contact you" · "Stop optional messages"). Questions go to the document's reply-to, which is the message's Reply-To header, not a line in the body.
+- The HTML part and the text part say the same words; the HTML adds only a button in the accent blue and the app's type. No logo, header image, tracking pixel or extra links. No participant token appears anywhere except inside the personal link itself.
+
 ## Sending
 
 - Sends are derived, not stored: the commit that causes them (a publish, a phase change, an admin `send`/`remind`) is the trigger; the dispatcher computes recipients from preferences and `notified`, and dispatches with retries (3 attempts, exponential backoff). Failures after the last attempt are logged and shown in the dashboard from memory.

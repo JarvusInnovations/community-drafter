@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 
 import type { DocumentEntry, ParticipationEntry } from "../storage/read-model.ts";
+import { firstName } from "../lib/mailer/shell.ts";
 import { derivePhase } from "../phase/phase.ts";
-import { formatDeadline } from "./format.ts";
+import { clockLine } from "./format.ts";
 import { personalLink, prefsLink, stopOptionalLink } from "./links.ts";
 import type { RecipientContext } from "./types.ts";
 
@@ -17,27 +18,31 @@ export function buildRecipientContext(
   participation: ParticipationEntry,
 ): RecipientContext {
   const person = fastify.storage.readModel.getPerson(participation.record.person);
-  const phase = derivePhase(document.record, new Date());
+  const now = new Date();
+  const phase = derivePhase(document.record, now);
   const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
-
-  const deadlineIso =
-    phase === "commenting"
-      ? document.record.comments_close_at
-      : phase === "signing"
-        ? document.record.signing_closes_at
-        : undefined;
+  const instanceName = fastify.config.INSTANCE_NAME || "Community Drafter";
+  const personName = person?.name ?? participation.record.person;
+  const senderName = document.record.sender_name ?? instanceName;
 
   return {
-    instanceName: fastify.config.INSTANCE_NAME ?? "",
+    instanceName,
     documentTitle: document.record.title,
-    personName: person?.name ?? participation.record.person,
+    personName,
+    firstName: firstName(personName),
     personEmail: person?.email ?? "",
-    phaseLabel: phase,
-    nextDeadline: formatDeadline(deadlineIso, timezone),
+    senderName,
+    clockLine: clockLine(
+      phase,
+      document.record.comments_close_at,
+      document.record.signing_closes_at,
+      timezone,
+      now,
+    ),
     personalLink: personalLink(fastify.config.PUBLIC_URL, participation.record.token),
     prefsLink: prefsLink(fastify.config.PUBLIC_URL, participation.record.token),
     stopOptionalLink: stopOptionalLink(fastify.config.PUBLIC_URL, participation.record.token),
-    fromName: document.record.sender_name ?? fastify.config.INSTANCE_NAME ?? "",
+    fromName: senderName,
     fromEmail: fastify.config.INSTANCE_FROM_EMAIL ?? "",
     replyTo: document.record.reply_to,
   };

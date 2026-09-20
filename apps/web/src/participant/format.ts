@@ -2,15 +2,26 @@
  * Date/time and countdown formatting for the participant routes.
  * `specs/behaviors/document-lifecycle.md` § "The visible clock": "absolute
  * time (participant's local time zone, with zone name) and a relative
- * countdown". No date library — `Intl` covers both natively, which matters
- * for the 120 KB gzipped bundle budget (`specs/architecture.md`).
+ * countdown". `specs/screens/document.md` § Design "Dates": "Thu, Sep 24 ·
+ * 5:00 PM EDT", the year only when it is not the current year, date-only
+ * points as "Sep 24". No date library — `Intl` covers both natively, which
+ * matters for the 120 KB gzipped bundle budget (`specs/architecture.md`).
  */
 
-const ABSOLUTE_FORMAT = new Intl.DateTimeFormat(undefined, {
+const DAY_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+
+const DAY_WITH_YEAR_FORMAT = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
   month: "short",
   day: "numeric",
   year: "numeric",
+});
+
+const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",
   timeZoneName: "short",
@@ -19,23 +30,35 @@ const ABSOLUTE_FORMAT = new Intl.DateTimeFormat(undefined, {
 const DATE_ONLY_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
+});
+
+const DATE_ONLY_WITH_YEAR_FORMAT = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
   year: "numeric",
 });
 
-/** "Tue, Sep 23, 2026, 5:00 PM EDT" — the participant's local zone, zone name included. */
+function isCurrentYear(date: Date): boolean {
+  return date.getFullYear() === new Date().getFullYear();
+}
+
+/** "Thu, Sep 24 · 5:00 PM EDT" — the participant's local zone, zone name included; the year only when it differs from this year. */
 export function formatAbsolute(iso: string | undefined): string {
   if (!iso) {
     return "";
   }
-  return ABSOLUTE_FORMAT.format(new Date(iso));
+  const date = new Date(iso);
+  const day = (isCurrentYear(date) ? DAY_FORMAT : DAY_WITH_YEAR_FORMAT).format(date);
+  return `${day} · ${TIME_FORMAT.format(date)}`;
 }
 
-/** "Sep 23, 2026" — used where only the date (no time) reads better. */
+/** "Sep 24" (or "Sep 24, 2027" outside the current year) — used where only the date reads better. */
 export function formatDateOnly(iso: string | undefined): string {
   if (!iso) {
     return "";
   }
-  return DATE_ONLY_FORMAT.format(new Date(iso));
+  const date = new Date(iso);
+  return (isCurrentYear(date) ? DATE_ONLY_FORMAT : DATE_ONLY_WITH_YEAR_FORMAT).format(date);
 }
 
 export interface Countdown {

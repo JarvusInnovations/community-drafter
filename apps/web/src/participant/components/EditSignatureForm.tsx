@@ -45,46 +45,46 @@ export function EditSignatureForm({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded border border-border p-3">
-      <label className="flex flex-col gap-1 text-sm">
+    <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border p-3">
+      <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
         {copy.signForm.nameLabel}
         <input
           type="text"
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
-          className="rounded border border-border p-2"
+          className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
         />
       </label>
       {isOfficial ? (
         <>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
             {copy.signForm.orgLabel}
             <input
               type="text"
               value={org}
               onChange={(event) => setOrg(event.target.value)}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
             {copy.signForm.titleLabel}
             <input
               type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
             />
           </label>
         </>
       ) : (
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
           {copy.signForm.descriptorLabel}
           <input
             type="text"
             value={descriptor}
             onChange={(event) => setDescriptor(event.target.value)}
             placeholder={copy.signForm.descriptorHint}
-            className="rounded border border-border p-2"
+            className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
           />
         </label>
       )}
@@ -106,7 +106,7 @@ export function EditSignatureForm({
           type="button"
           onClick={() => void handleSave()}
           disabled={saving}
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           {saving ? copy.signed.saving : copy.signed.save}
         </button>
@@ -114,7 +114,7 @@ export function EditSignatureForm({
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="rounded border border-border px-3 py-1.5 text-sm"
+          className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-60"
         >
           {copy.signed.cancel}
         </button>

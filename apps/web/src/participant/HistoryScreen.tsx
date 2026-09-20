@@ -11,28 +11,30 @@ export function HistoryScreen(): JSX.Element {
   const versions = bundle.versions.toSorted((a, b) => b.number - a.number);
 
   return (
-    <main className="px-4 py-4 pb-8">
+    <main className="mx-auto max-w-[760px] px-5 py-6 pb-10">
       <p className="mb-2">
-        <Link to={`/i/${token}`} className="text-sm underline">
+        <Link to={`/i/${token}`} className="text-sm font-medium text-primary hover:underline">
           {copy.history.backToDocument}
         </Link>
       </p>
-      <h1 className="text-xl font-semibold text-foreground">{copy.history.title}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+        {copy.history.title}
+      </h1>
       <p className="mt-1 text-sm text-muted-foreground">{copy.history.explainer}</p>
 
       <ul className="mt-4 flex flex-col gap-3">
         {versions.map((version) => (
-          <li key={version.number} className="rounded border border-border p-3">
+          <li key={version.number} className="rounded-2xl border border-border bg-card p-4">
             <p className="text-sm font-semibold text-foreground">
               {copy.submissions.versionLabel(version.number)} ·{" "}
               {formatAbsolute(version.published_at)}
               {version.number === currentNumber ? (
-                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal">
+                <span className="ml-2 rounded-full bg-ok-soft px-2 py-0.5 text-xs font-bold text-ok">
                   {copy.history.current}
                 </span>
               ) : null}
               {version.final ? (
-                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal">
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
                   {copy.history.finalBadge}
                 </span>
               ) : null}
@@ -50,14 +52,14 @@ export function HistoryScreen(): JSX.Element {
                     ? `/i/${token}`
                     : `/i/${token}/v/${version.number}`
                 }
-                className="underline"
+                className="font-medium text-primary hover:underline"
               >
                 {copy.history.read}
               </Link>
               {version.number > 1 ? (
                 <Link
                   to={`/i/${token}/history/compare?from=${version.number - 1}&to=${version.number}`}
-                  className="underline"
+                  className="font-medium text-primary hover:underline"
                 >
                   {copy.history.compareWithPrevious}
                 </Link>

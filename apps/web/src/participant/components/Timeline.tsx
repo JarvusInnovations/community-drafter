@@ -184,7 +184,7 @@ function Chip({
       data-state={state}
       className={
         "rounded-xl border px-3 py-2.5 " +
-        (active ? "border-primary bg-primary-soft" : "border-border bg-muted")
+        (active ? "border-primary bg-primary-soft" : "border-border bg-background")
       }
     >
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -192,7 +192,7 @@ function Chip({
       </p>
       <p
         className={
-          "text-lg font-bold leading-tight tracking-tight " +
+          "text-[1.2rem] font-bold leading-tight tracking-tight " +
           (active ? "text-primary-deep" : "text-foreground")
         }
       >

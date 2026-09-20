@@ -34,6 +34,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@community-drafter/shared": "workspace:*",
+        "@fontsource-variable/inter": "^5.3.0",
         "@tailwindcss/vite": "^4.3.3",
         "clsx": "^2.1.1",
         "react": "^19.2.8",
@@ -170,6 +171,8 @@
     "@fastify/send": ["@fastify/send@4.1.1", "", { "dependencies": { "@lukeed/ms": "^2.0.2", "escape-html": "~1.0.3", "fast-decode-uri-component": "^1.0.1", "http-errors": "^2.0.0", "mime": "^3" } }, "sha512-BYo+EiaKwlxH+WetGk6hAs1d39iP0y1gqB8lGF/qwkJ9ZZ/cBY1vx5NvExb9Sc3yRMFjD5X4Eyh4e4+TzRkzdw=="],
 
     "@fastify/static": ["@fastify/static@10.1.4", "", { "dependencies": { "@fastify/accept-negotiator": "^2.0.0", "@fastify/error": "^4.0.0", "@fastify/send": "^4.0.0", "content-disposition": "^3.0.0", "fastify-plugin": "^6.0.0", "fastq": "^1.17.1", "glob": "^13.0.0" } }, "sha512-YWYmXV0c3t/3DDyV32kRXJTgTY16FOkqtQ4mmBjbkWeukGR5n+Sr+7ppknNpS7hiRPrLU9zcySZZ1nLJVHTZkg=="],
+
+    "@fontsource-variable/inter": ["@fontsource-variable/inter@5.3.0", "", {}, "sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA=="],
 
     "@gitsheets/core-napi": ["@gitsheets/core-napi@0.4.0", "", { "optionalDependencies": { "@gitsheets/core-napi-darwin-arm64": "0.4.0", "@gitsheets/core-napi-darwin-x64": "0.4.0", "@gitsheets/core-napi-linux-arm64-gnu": "0.4.0", "@gitsheets/core-napi-linux-x64-gnu": "0.4.0", "@gitsheets/core-napi-linux-x64-musl": "0.4.0", "@gitsheets/core-napi-win32-x64-msvc": "0.4.0" } }, "sha512-2HS8rI5/5OyYy/Pw7gZphner37GUnxfcPFqkqiwNYvhFfU+1CqjFsOI7eNMFcGtmhm3Rq/5hTL6xJKd09sD7jQ=="],
 

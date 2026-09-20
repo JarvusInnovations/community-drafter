@@ -1,83 +1,126 @@
 import type { Judgement } from "@community-drafter/shared";
 
+import { type EmailLink, renderEmail } from "../lib/mailer/shell.ts";
 import type { RecipientContext, TemplateResult } from "./types.ts";
 
 /**
  * `specs/behaviors/notifications.md` § Messages — one function per event
- * key. Every function takes only `ctx` (this recipient's own data, built by
- * `context.ts`) plus event-specific `extra` (also always scoped to this one
- * recipient) — there is no parameter through which another participant's
- * name, email or comment text could reach a template, which is what the
- * plan's "no message leaks another participant's data" validation
- * criterion is testing structurally, not just by inspection.
+ * key, every one rendered through the shared email shell (§ Content rules
+ * "Shape"). Every function takes only `ctx` (this recipient's own data,
+ * built by `context.ts`) plus event-specific `extra` (also always scoped to
+ * this one recipient) — there is no parameter through which another
+ * participant's name, email or comment text could reach a template, which
+ * is what the plan's "no message leaks another participant's data"
+ * validation criterion is testing structurally, not just by inspection.
  */
 
-function paragraphs(lines: string[]): { text: string; html: string } {
-  const nonEmpty = lines.filter((line) => line.length > 0);
-  return {
-    text: nonEmpty.join("\n\n"),
-    html: nonEmpty.map((line) => `<p>${escapeHtml(line)}</p>`).join("\n"),
-  };
+const PRIVATE_LINK = "This link is yours alone; please don't forward it.";
+
+function greeting(ctx: RecipientContext): string {
+  return `Hi ${ctx.firstName},`;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function quoted(ctx: RecipientContext): string {
+  return `"${ctx.documentTitle}"`;
 }
 
-function phaseAndDeadline(ctx: RecipientContext): string {
-  const deadline = ctx.nextDeadline ? ` Next deadline: ${ctx.nextDeadline}.` : "";
-  return `${ctx.documentTitle} is currently in the ${ctx.phaseLabel} phase.${deadline}`;
-}
-
-/** Every subscription (non-transactional) message ends with this footer. */
-function subscriptionFooter(ctx: RecipientContext): string[] {
+/** Every subscription (non-transactional) message ends with these two links. */
+function subscriptionLinks(ctx: RecipientContext): EmailLink[] {
   return [
-    `Manage how we contact you: ${ctx.prefsLink}`,
-    `Stop all optional messages: ${ctx.stopOptionalLink}`,
+    { label: "Manage how we contact you", url: ctx.prefsLink },
+    { label: "Stop optional messages", url: ctx.stopOptionalLink },
   ];
 }
 
-function build(subject: string, intro: string[], footer: string[] = []): TemplateResult {
-  const { text, html } = paragraphs([...intro, ...footer]);
-  return { subject, text, html };
+function transactional(
+  ctx: RecipientContext,
+  subject: string,
+  body: string[],
+  button: EmailLink,
+  alsoLink?: EmailLink,
+): TemplateResult {
+  const rendered = renderEmail({
+    greeting: greeting(ctx),
+    body,
+    button,
+    alsoLink,
+    smallPrint: [PRIVATE_LINK],
+  });
+  return { subject, ...rendered };
+}
+
+function subscription(
+  ctx: RecipientContext,
+  subject: string,
+  body: string[],
+  button: EmailLink,
+  alsoLink?: EmailLink,
+): TemplateResult {
+  const rendered = renderEmail({
+    greeting: greeting(ctx),
+    body,
+    button,
+    alsoLink,
+    smallPrint: [PRIVATE_LINK],
+    footerLinks: subscriptionLinks(ctx),
+  });
+  return { subject, ...rendered };
+}
+
+/** The clock sentence, or nothing when the document isn't open. */
+function clock(ctx: RecipientContext): string {
+  return ctx.clockLine ?? "";
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 export function invitationTemplate(ctx: RecipientContext): TemplateResult {
-  return build(`${ctx.documentTitle} — you're invited to review`, [
-    `Hi ${ctx.personName},`,
-    `You've been invited to review "${ctx.documentTitle}".`,
-    phaseAndDeadline(ctx),
-    `Open it here: ${ctx.personalLink}`,
-  ]);
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — you're invited to review`,
+    [
+      `${ctx.senderName} would like you to read ${quoted(ctx)} and, if you agree with it, add your name. You can also leave comments first, or tell us you'd rather not sign.`,
+      clock(ctx),
+    ],
+    { label: "Read and sign", url: ctx.personalLink },
+  );
 }
 
 export function signatureConfirmationTemplate(
   ctx: RecipientContext,
   extra: { capacity: string; conditional: boolean },
 ): TemplateResult {
-  const conditionalNote = extra.conditional
-    ? " Your signature is conditional; you can confirm or remove it any time before signing closes."
-    : "";
-  return build(`${ctx.documentTitle} — you signed`, [
-    `Hi ${ctx.personName},`,
-    `You signed "${ctx.documentTitle}" in a ${extra.capacity} capacity.${conditionalNote}`,
-    `View it here: ${ctx.personalLink}`,
-  ]);
+  const capacity =
+    extra.capacity === "official"
+      ? "in an official capacity, on behalf of your organization"
+      : `in a ${extra.capacity} capacity`;
+  const conditional = extra.conditional
+    ? " You signed conditionally, so we'll show you what changed when the final version is published, and you can confirm or remove your name then."
+    : " You can remove it any time before signatures are due.";
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — you signed`,
+    [`Your name is on ${quoted(ctx)}, ${capacity}.${conditional}`, clock(ctx)],
+    { label: "Open the document", url: ctx.personalLink },
+  );
 }
 
 export function revocationConfirmationTemplate(
   ctx: RecipientContext,
   extra: { reason?: string },
 ): TemplateResult {
-  return build(`${ctx.documentTitle} — your signature was removed`, [
-    `Hi ${ctx.personName},`,
-    `Your signature on "${ctx.documentTitle}" was removed.${extra.reason ? ` Reason: ${extra.reason}` : ""}`,
-    `You can sign again any time before signing closes: ${ctx.personalLink}`,
-  ]);
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — your signature was removed`,
+    [
+      `Your name has been removed from ${quoted(ctx)}.${extra.reason ? ` Reason given: ${extra.reason}` : ""}`,
+      `You can sign again any time before signatures are due.`,
+      clock(ctx),
+    ],
+    { label: "Sign again", url: ctx.personalLink },
+  );
 }
 
 export function reviewReceiptTemplate(
@@ -87,30 +130,33 @@ export function reviewReceiptTemplate(
   const judgementLabel: Record<Judgement, string> = {
     sign: "you signed",
     sign_conditional: "you signed conditionally",
-    comment: "you left comments",
+    comment: "you left comments without signing",
     decline: "you declined to sign",
   };
-  return build(`${ctx.documentTitle} — we received your review`, [
-    `Hi ${ctx.personName},`,
-    `Thanks — we received your review of "${ctx.documentTitle}" (${judgementLabel[extra.judgement]}, ${extra.commentCount} comment${extra.commentCount === 1 ? "" : "s"}).`,
-    `View it here: ${ctx.personalLink}`,
-  ]);
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — we received your review`,
+    [
+      `We received your review of ${quoted(ctx)}: ${judgementLabel[extra.judgement]}, with ${plural(extra.commentCount, "comment")}. ${ctx.senderName} reads every submission whole and answers in the next version.`,
+      clock(ctx),
+    ],
+    { label: "Open the document", url: ctx.personalLink },
+  );
 }
 
 export function versionTemplate(
   ctx: RecipientContext,
   extra: { version: number; summary: string; compareLink: string },
 ): TemplateResult {
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — version ${extra.version} published`,
     [
-      `Hi ${ctx.personName},`,
-      `"${ctx.documentTitle}" was updated to version ${extra.version}: ${extra.summary}`,
-      phaseAndDeadline(ctx),
-      `See what changed: ${extra.compareLink}`,
-      `Read it here: ${ctx.personalLink}`,
+      `${ctx.senderName} published version ${extra.version} of ${quoted(ctx)}: ${extra.summary}`,
+      clock(ctx),
     ],
-    subscriptionFooter(ctx),
+    { label: "See what changed", url: extra.compareLink },
+    { label: "Read the whole document", url: ctx.personalLink },
   );
 }
 
@@ -121,32 +167,36 @@ export interface DigestData {
 }
 
 export function digestTemplate(ctx: RecipientContext, extra: DigestData): TemplateResult {
-  const lines = [`Hi ${ctx.personName},`, `Here's what changed on "${ctx.documentTitle}" today:`];
+  const body = [`Here's what changed on ${quoted(ctx)} today:`];
   for (const version of extra.versions) {
-    lines.push(`- Version ${version.number}: ${version.summary}`);
+    body.push(`- Version ${version.number}: ${version.summary}`);
   }
   for (const disposition of extra.dispositions) {
-    lines.push(
+    body.push(
       `- One of your comments was marked "${disposition.outcome}"${disposition.note ? `: ${disposition.note}` : ""}.`,
     );
   }
-  lines.push(
-    `${extra.signatoryCounts.organizations} organizations and ${extra.signatoryCounts.individuals} individuals have signed so far (${extra.signatoryCounts.unlisted} unlisted).`,
+  const unlisted =
+    extra.signatoryCounts.unlisted > 0 ? ` (${extra.signatoryCounts.unlisted} unlisted)` : "";
+  body.push(
+    `${extra.signatoryCounts.organizations} organizations and ${extra.signatoryCounts.individuals} individuals have signed so far${unlisted}.`,
+    clock(ctx),
   );
-  lines.push(`View it here: ${ctx.personalLink}`);
-  return build(`${ctx.documentTitle} — daily summary`, lines, subscriptionFooter(ctx));
+  return subscription(ctx, `${ctx.documentTitle} — daily summary`, body, {
+    label: "Open the document",
+    url: ctx.personalLink,
+  });
 }
 
 export function signingOpenedTemplate(ctx: RecipientContext): TemplateResult {
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — signing is open`,
     [
-      `Hi ${ctx.personName},`,
-      `Signing is now open for "${ctx.documentTitle}".`,
-      phaseAndDeadline(ctx),
-      `Sign here: ${ctx.personalLink}`,
+      `The comment period on ${quoted(ctx)} has ended and signing is open. If your name isn't on it yet, now is the time; if it is, nothing changes unless you remove it.`,
+      clock(ctx),
     ],
-    subscriptionFooter(ctx),
+    { label: "Open the document", url: ctx.personalLink },
   );
 }
 
@@ -155,64 +205,54 @@ export function finalPublishedTemplate(
   extra: { version: number; conditional: boolean },
 ): TemplateResult {
   if (extra.conditional) {
-    return build(
+    return subscription(
+      ctx,
       `${ctx.documentTitle} — final version, please confirm`,
       [
-        `Hi ${ctx.personName},`,
-        `The final text of "${ctx.documentTitle}" (version ${extra.version}) has been published. Your signature was conditional — please confirm it or remove it.`,
-        phaseAndDeadline(ctx),
-        `Confirm or remove your signature: ${ctx.personalLink}`,
+        `${ctx.senderName} published the final text of ${quoted(ctx)} (version ${extra.version}). Your signature was conditional, so please read it and either confirm or remove your name.`,
+        clock(ctx),
       ],
-      subscriptionFooter(ctx),
+      { label: "Confirm or remove your signature", url: ctx.personalLink },
     );
   }
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — final version published`,
     [
-      `Hi ${ctx.personName},`,
-      `The final text of "${ctx.documentTitle}" (version ${extra.version}) has been published.`,
-      phaseAndDeadline(ctx),
-      `Read it here: ${ctx.personalLink}`,
+      `${ctx.senderName} published the final text of ${quoted(ctx)} (version ${extra.version}). Your name stays on it unless you remove it before signatures are due.`,
+      clock(ctx),
     ],
-    subscriptionFooter(ctx),
+    { label: "Read the final text", url: ctx.personalLink },
   );
 }
 
 export function closingSoonTemplate(ctx: RecipientContext): TemplateResult {
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — signing window closes soon`,
     [
-      `Hi ${ctx.personName},`,
-      `The signing window for "${ctx.documentTitle}" closes soon.`,
-      phaseAndDeadline(ctx),
-      `Review your signature: ${ctx.personalLink}`,
+      `Signatures on ${quoted(ctx)} close in about a day. Your name is on it; if you'd rather it weren't, remove it before then.`,
+      clock(ctx),
     ],
-    subscriptionFooter(ctx),
+    { label: "Review your signature", url: ctx.personalLink },
   );
 }
 
 export function closedTemplate(ctx: RecipientContext): TemplateResult {
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — signing has closed`,
-    [
-      `Hi ${ctx.personName},`,
-      `Signing has closed for "${ctx.documentTitle}".`,
-      `View the final record here: ${ctx.personalLink}`,
-    ],
-    subscriptionFooter(ctx),
+    [`The signatory list for ${quoted(ctx)} is now final. Thank you for taking part.`, clock(ctx)],
+    { label: "See the final record", url: ctx.personalLink },
   );
 }
 
 export function scheduleChangedTemplate(ctx: RecipientContext): TemplateResult {
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — schedule updated`,
-    [
-      `Hi ${ctx.personName},`,
-      `The schedule for "${ctx.documentTitle}" changed.`,
-      phaseAndDeadline(ctx),
-      `View it here: ${ctx.personalLink}`,
-    ],
-    subscriptionFooter(ctx),
+    [`${ctx.senderName} changed the schedule for ${quoted(ctx)}.`, clock(ctx)],
+    { label: "Open the document", url: ctx.personalLink },
   );
 }
 
@@ -220,31 +260,28 @@ export function dispositionTemplate(
   ctx: RecipientContext,
   extra: { version: number; outcomes: Array<{ outcome: string; note?: string }> },
 ): TemplateResult {
-  const lines = [
-    `Hi ${ctx.personName},`,
-    `Version ${extra.version} of "${ctx.documentTitle}" responds to your comments:`,
-  ];
+  const body = [`Version ${extra.version} of ${quoted(ctx)} answers your comments:`];
   for (const outcome of extra.outcomes) {
-    lines.push(`- Marked "${outcome.outcome}"${outcome.note ? `: ${outcome.note}` : ""}.`);
+    body.push(`- Marked "${outcome.outcome}"${outcome.note ? `: ${outcome.note}` : ""}.`);
   }
-  lines.push(`Read it here: ${ctx.personalLink}`);
-  return build(
+  body.push(clock(ctx));
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — your comments were addressed in version ${extra.version}`,
-    lines,
-    subscriptionFooter(ctx),
+    body,
+    { label: `Read version ${extra.version}`, url: ctx.personalLink },
   );
 }
 
 export function reminderTemplate(ctx: RecipientContext, extra: { n: number }): TemplateResult {
   const ordinal = extra.n === 1 ? "a reminder" : `reminder #${extra.n}`;
-  return build(
+  return subscription(
+    ctx,
     `${ctx.documentTitle} — reminder: your review is needed`,
     [
-      `Hi ${ctx.personName},`,
-      `Just ${ordinal} — "${ctx.documentTitle}" is waiting on your review.`,
-      phaseAndDeadline(ctx),
-      `Review it here: ${ctx.personalLink}`,
+      `Just ${ordinal}: ${quoted(ctx)} is waiting on you. Read it and add your name, leave comments, or tell us you'd rather not sign.`,
+      clock(ctx),
     ],
-    subscriptionFooter(ctx),
+    { label: "Open the document", url: ctx.personalLink },
   );
 }

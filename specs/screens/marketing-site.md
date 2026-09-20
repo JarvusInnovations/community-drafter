@@ -21,7 +21,11 @@ Top to bottom, one page:
 5. **For teams**: how to run one: install the admin skill, create, publish, open, invite, export feedback, publish again; a code block with the commands.
 6. **Footer**: repository link, license, "built by Jarvus Innovations", and a note that the pilot deployment serves a civic coalition while the tool is generic.
 
-Rules: works at phone width with no horizontal scroll; readable in light and dark color schemes; no external scripts; images have alt text describing the state shown; no analytics.
+Rules: works at phone width with no horizontal scroll; light scheme only, like the app; no external scripts and no third-party requests (the font is served from the site itself); images have alt text describing the state shown; no analytics.
+
+## Design
+
+The same design as the app (`document.md` § Design): the cool neutral page, white cards with a 1 px border and rounded corners, near-black ink and a muted ink, one accent blue for links, buttons and the step numbers, Inter served from `site/fonts/` with a system fallback. The hero is a plain band on the page background with a rule beneath it, not a tinted gradient. Buttons are the app's primary (blue, soft shadow) and quiet (bordered) styles. Screenshots sit in a phone frame in the ink color or a bordered card, with a soft shadow. Code blocks use the muted surface. Nothing on the page uses a warm or paper-toned color.
 
 ## Actions
 

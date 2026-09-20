@@ -53,17 +53,17 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       onClose={onCancel}
-      className="w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground backdrop:bg-black/40"
+      className="w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl backdrop:bg-black/40"
     >
-      <h2 className="text-lg font-semibold">{heading}</h2>
+      <h2 className="text-lg font-bold tracking-tight">{heading}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{body}</p>
-      <label className="mt-3 block text-sm">
+      <label className="mt-3 block text-sm font-semibold text-muted-foreground">
         {reasonLabel}
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
-          className="mt-1 w-full rounded border border-border p-2 text-sm"
+          className="mt-1 w-full rounded-xl border border-border bg-card p-2.5 text-sm font-normal text-foreground"
         />
       </label>
       <div className="mt-4 flex justify-end gap-2">
@@ -71,7 +71,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="rounded border border-border px-3 py-1.5 text-sm"
+          className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-60"
         >
           {cancelLabel}
         </button>
@@ -79,7 +79,7 @@ export function ConfirmDialog({
           type="button"
           onClick={() => onConfirm(reason.trim().length > 0 ? reason.trim() : undefined)}
           disabled={busy}
-          className="rounded bg-foreground px-3 py-1.5 text-sm text-background"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           {busy ? busyLabel : confirmLabel}
         </button>
