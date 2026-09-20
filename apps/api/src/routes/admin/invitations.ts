@@ -41,6 +41,7 @@ interface ListInvitationsQuery {
 interface SendBody {
   only_unsent?: boolean;
   person?: string[];
+  dry_run?: boolean;
 }
 
 interface LinksBody {
@@ -86,7 +87,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  fastify.post<{ Params: DocumentParams }>(
+  fastify.post<{ Params: DocumentParams; Querystring: { dry_run?: string } }>(
     "/documents/:slug/invitations/import",
     { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
@@ -94,11 +95,68 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       if (!document) throw notFoundDocument(request.params.slug);
       const slug = document.record.slug;
       const rows = parseImportRows(request);
+      const dryRun = request.query?.dry_run === "1" || request.query?.dry_run === "true";
 
-      let peopleCreated = 0;
-      let peopleUpdated = 0;
-      let invitationsCreated = 0;
-      let skippedExisting = 0;
+      // `specs/api/admin.md` § People and invitations: the plan is computed
+      // read-only first, so a dry run reports exactly what the commit below
+      // would do — including which existing person fields a row overwrites.
+      const plan: Array<{
+        email: string;
+        name: string;
+        person: string;
+        action: "invite_new_person" | "invite_existing_person" | "skip_existing";
+        changes: string[];
+      }> = [];
+      const plannedIds = new Set<string>();
+      for (const row of rows) {
+        const email = row.email.trim();
+        const existing = await fastify.storage.store.people.queryFirst({
+          email: (value) => value.toLowerCase() === email.toLowerCase(),
+        });
+        const personId =
+          existing?.id ??
+          uniqueSlug(
+            row.name,
+            (candidate) =>
+              plannedIds.has(candidate) || Boolean(fastify.storage.readModel.getPerson(candidate)),
+          );
+        if (!existing) plannedIds.add(personId);
+        const changes: string[] = [];
+        if (existing) {
+          for (const field of [
+            "name",
+            "phone",
+            "org",
+            "role",
+            "descriptor",
+            "external_id",
+          ] as const) {
+            const next = row[field];
+            if (next !== undefined && next !== existing[field]) changes.push(field);
+          }
+        }
+        const alreadyOn = fastify.storage.readModel.getParticipation(slug, personId);
+        plan.push({
+          email,
+          name: row.name,
+          person: personId,
+          action: alreadyOn
+            ? "skip_existing"
+            : existing
+              ? "invite_existing_person"
+              : "invite_new_person",
+          changes,
+        });
+      }
+      const counts = {
+        people_created: plan.filter((p) => p.action === "invite_new_person").length,
+        people_updated: plan.filter((p) => p.action !== "invite_new_person").length,
+        invitations_created: plan.filter((p) => p.action !== "skip_existing").length,
+        skipped_existing: plan.filter((p) => p.action === "skip_existing").length,
+      };
+      if (dryRun) {
+        return { dry_run: true, ...counts, rows: plan, commit: null };
+      }
 
       const result = await fastify.storage.commit(
         "invite",
@@ -131,7 +189,6 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
                   external_id: row.external_id ?? existing.external_id,
                 },
               );
-              peopleUpdated += 1;
             } else {
               personId = uniqueSlug(row.name, (candidate) => {
                 if (takenIds.has(candidate)) return true;
@@ -150,17 +207,13 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
                 external_id: row.external_id,
                 source: "crm",
               });
-              peopleCreated += 1;
             }
 
             const existingParticipation = await tx.participations.queryFirst({
               document: slug,
               person: personId,
             });
-            if (existingParticipation) {
-              skippedExisting += 1;
-              continue;
-            }
+            if (existingParticipation) continue;
 
             const token = mintUniqueToken(
               (candidate) =>
@@ -175,18 +228,66 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
               source: "crm",
               suggested_capacity: row.suggested_capacity,
             });
-            invitationsCreated += 1;
           }
         },
       );
 
-      return {
-        people_created: peopleCreated,
-        people_updated: peopleUpdated,
-        invitations_created: invitationsCreated,
-        skipped_existing: skippedExisting,
-        commit: result.commitHash,
-      };
+      return { ...counts, rows: plan, commit: result.commitHash };
+    },
+  );
+
+  /**
+   * `specs/api/admin.md` § People and invitations: a staged invitation that
+   * was never sent can be taken back (`Action: uninvite`). Once it has been
+   * sent, opened, commented on or signed, the record is part of the story
+   * and stays; the only options then are revoke-link or the normal flows.
+   */
+  fastify.delete<{ Params: PersonParams }>(
+    "/documents/:slug/invitations/:person",
+    { config: DOCUMENT_SCOPED_ROUTE },
+    async (request) => {
+      const document = fastify.storage.readModel.getDocument(request.params.slug);
+      if (!document) throw notFoundDocument(request.params.slug);
+      const slug = document.record.slug;
+      const entry = fastify.storage.readModel.getParticipation(slug, request.params.person);
+      if (!entry) {
+        throw new ApiError(
+          "not_found",
+          `No invitation for '${request.params.person}' on '${slug}'.`,
+        );
+      }
+      if (entry.record.sent_at) {
+        throw new ApiError(
+          "already_sent",
+          `${request.params.person} has already been sent their invitation; revoke the link instead.`,
+          { person: request.params.person, sent_at: entry.record.sent_at },
+        );
+      }
+      const hasSubmission = fastify.storage.readModel
+        .listSubmissionsForDocument(slug)
+        .some((s) => s.record.person === request.params.person);
+      if (entry.record.first_opened_at || entry.record.signature || hasSubmission) {
+        throw new ApiError(
+          "has_activity",
+          `${request.params.person} has already acted on this document; the record stays.`,
+          { person: request.params.person },
+        );
+      }
+
+      const result = await fastify.storage.commit(
+        "uninvite",
+        {
+          actor: adminActor(request),
+          subject: `uninvite: ${request.params.person} on ${slug}`,
+          document: slug,
+          person: request.params.person,
+          requestId: request.requestId,
+        },
+        async (tx) => {
+          await tx.participations.delete(entry.record);
+        },
+      );
+      return { ok: true, commit: result.commitHash };
     },
   );
 
@@ -241,19 +342,46 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
       const slug = document.record.slug;
-      const { only_unsent, person } = request.body ?? {};
+      const { only_unsent, person, dry_run } = request.body ?? {};
 
-      let candidates = fastify.storage.readModel.listParticipationsForDocument(slug);
-      if (person && person.length > 0) {
-        const wanted = new Set(person);
-        candidates = candidates.filter((entry) => wanted.has(entry.record.person));
-      } else {
-        candidates = candidates.filter((entry) => !entry.record.sent_at);
+      // `specs/api/admin.md`: who would receive one and who is skipped and
+      // why, computed the same way for a dry run and a real send.
+      const wanted = person && person.length > 0 ? new Set(person) : null;
+      const all = fastify.storage.readModel.listParticipationsForDocument(slug);
+      const candidates: typeof all = [];
+      const skipped: Array<{
+        person: string;
+        reason: "already_sent" | "link_revoked" | "no_email";
+      }> = [];
+      for (const entry of all) {
+        if (wanted && !wanted.has(entry.record.person)) continue;
+        if (entry.record.link_revoked) {
+          skipped.push({ person: entry.record.person, reason: "link_revoked" });
+          continue;
+        }
+        if ((!wanted || only_unsent) && entry.record.sent_at) {
+          skipped.push({ person: entry.record.person, reason: "already_sent" });
+          continue;
+        }
+        const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
+        if (!personRecord?.email) {
+          skipped.push({ person: entry.record.person, reason: "no_email" });
+          continue;
+        }
+        candidates.push(entry);
       }
-      if (only_unsent) {
-        candidates = candidates.filter((entry) => !entry.record.sent_at);
+
+      if (dry_run) {
+        return {
+          dry_run: true,
+          would_send: candidates.map((entry) => ({
+            person: entry.record.person,
+            name:
+              fastify.storage.readModel.getPerson(entry.record.person)?.name ?? entry.record.person,
+          })),
+          skipped,
+        };
       }
-      candidates = candidates.filter((entry) => !entry.record.link_revoked);
 
       const now = new Date().toISOString();
       const rows: string[][] = [];
@@ -301,7 +429,11 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         commit: commitHash ?? "",
       });
 
-      const response: Record<string, unknown> = { queued: candidates.length, commit: commitHash };
+      const response: Record<string, unknown> = {
+        queued: candidates.length,
+        skipped,
+        commit: commitHash,
+      };
       if (fastify.config.MAILER === "export") {
         response.csv = toCsv(["name", "email", "subject", "link"], rows);
       }

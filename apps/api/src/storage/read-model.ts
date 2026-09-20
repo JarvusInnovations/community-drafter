@@ -34,6 +34,7 @@ const SIGNATURE_ACTIONS = new Set<Action>(["sign", "resign", "revoke", "admin-re
 
 /** Actions whose commit patches one participation record directly (not a bulk sheet reload). */
 const PARTICIPATION_ACTIONS = new Set<Action>([
+  "uninvite",
   "sign",
   "resign",
   "revoke",

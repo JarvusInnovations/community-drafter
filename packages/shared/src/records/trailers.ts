@@ -35,6 +35,8 @@ export const ACTIONS = [
   // Follow-up: fold these two into that table.
   "link-export",
   "link-expire",
+  // `specs/api/admin.md` § People and invitations: removing a not-yet-sent invitation.
+  "uninvite",
   // `specs/behaviors/operators.md`: operator lifecycle and per-document
   // membership changes are ordinary admin actions, each one commit.
   "operator-add",
