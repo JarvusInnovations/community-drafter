@@ -43,10 +43,23 @@ export const PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
-       a gitsheets people sheet's NDJSON export works directly. Each row may carry
-       email, name, phone, org, role, descriptor, external_id, suggested_capacity.
-       --dry-run shows what every row would do (new person, existing person and
-       which fields would change, or already invited) without writing anything.
+       a gitsheets people sheet's NDJSON export works directly.
+
+       Row fields, by these exact names:
+         email              required  merge key; matches an existing person
+                                      case-insensitively and updates them
+         name               required  full name, as it should be prefilled
+         org                optional  organization — NOT "organization"
+         role               optional  job title — NOT "title"
+         phone              optional
+         descriptor         optional  how a personal-capacity signer is described
+         external_id        optional  your own system's id for this person
+         suggested_capacity optional  personal | official; prefills the sign card
+         tags               optional  array of strings
+       Any other key is ignored silently, so a misnamed field simply does
+       nothing. Run --dry-run first: it shows what every row would do (new
+       person, existing person and which fields would change, or already
+       invited) without writing anything.
 list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]
        Never prints tokens; emails only with --contacts. Staged invitations that
        have not been sent yet show status not_sent.

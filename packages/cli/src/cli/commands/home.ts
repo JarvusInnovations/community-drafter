@@ -23,12 +23,18 @@ const DRILL_DOWN_LIMIT = 10;
 export async function homeCommand(args: string[]): Promise<string> {
   const parsed = parseFlags("home", args, HOME_FLAGS);
   const ifConfigured = bool(parsed, "--if-configured");
-  const cli = cliInvocation();
+  // `specs/api/admin-cli.md` § Output rules, "One invocation form per
+  // surface": every emitted command reads `drafter-axi …`, and the
+  // resolved path of the shim (which is not on PATH) is printed exactly
+  // once — here, as `invoke_as` — so a reader learns how to run any of
+  // them without the two forms interleaving.
+  const cli = "drafter-axi";
+  const invokeAs = cliInvocation();
 
   if (!isConfigured({ profile: str(parsed, "--profile") })) {
     if (ifConfigured) return ""; // hook: stay silent when unconfigured (spec: "when DRAFTER_URL is set")
     return joinBlocks(
-      renderObject({ documents: "not signed in" }),
+      renderObject({ documents: "not signed in", invoke_as: invokeAs }),
       renderHelp([
         `Run \`${cli} login <email> --url <instance>\` to sign in`,
         `Run \`${cli} --help\` to see the full command list`,
@@ -57,6 +63,7 @@ export async function homeCommand(args: string[]): Promise<string> {
       instance: config.url,
       profile:
         config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+      invoke_as: invokeAs,
     });
     if (expired) {
       return joinBlocks(
@@ -80,6 +87,7 @@ export async function homeCommand(args: string[]): Promise<string> {
     instance: config.url,
     profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
     token_expires: who.expires_at,
+    invoke_as: invokeAs,
   });
 
   if (documents.length === 0) {

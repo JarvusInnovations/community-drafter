@@ -1210,39 +1210,6 @@ async function whoamiCommand(args) {
   return render(parsed, info, () => renderObject(info));
 }
 
-// src/cli/invocation.ts
-import { accessSync, constants } from "node:fs";
-import { homedir as homedir3 } from "node:os";
-import { fileURLToPath } from "node:url";
-var cached;
-function cliInvocation() {
-  if (cached) return cached;
-  let bundle;
-  try {
-    bundle = fileURLToPath(import.meta.url);
-  } catch {
-    bundle = process.argv[1] ?? "drafter-axi";
-  }
-  const shim = bundle.replace(/\.mjs$/, "");
-  try {
-    if (shim !== bundle) {
-      accessSync(shim, constants.X_OK);
-      cached = quote(collapseHome(shim));
-      return cached;
-    }
-  } catch {
-  }
-  cached = `node ${quote(collapseHome(bundle))}`;
-  return cached;
-}
-function collapseHome(p) {
-  const home = homedir3();
-  return home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
-}
-function quote(p) {
-  return /\s/.test(p) ? `"${p}"` : p;
-}
-
 // src/cli/deadline.ts
 var ZONED = /(Z|[+-]\d\d:?\d\d)$/u;
 var LOCAL = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/u;
@@ -1333,8 +1300,14 @@ operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
 
-Every mutation prints the document's key fields and the commit subject.`;
-function detailObject(doc) {
+Every mutation prints the document's key fields and the commit subject. When the
+document's --public is not none, create/show/open also print public_url \u2014 the
+<instance>/d/<slug> address anyone with the link can read.`;
+function publicUrl(doc, instanceUrl) {
+  if (!doc.public_access || doc.public_access === "none") return void 0;
+  return `${instanceUrl}/d/${doc.slug}`;
+}
+function detailObject(doc, instanceUrl) {
   return compact({
     slug: doc.slug,
     title: doc.title,
@@ -1349,6 +1322,7 @@ function detailObject(doc) {
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
     public_access: doc.public_access,
+    public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
     commit: doc.commit,
@@ -1358,7 +1332,8 @@ function detailObject(doc) {
 async function docsCommand(args) {
   const { sub, parsed } = parseSubcommand("docs", args, DOCS_FLAGS);
   const client = clientFrom(parsed);
-  const cli = cliInvocation();
+  const cli = "drafter-axi";
+  const instanceUrl = resolveConfig({ profile: str(parsed, "--profile") }).url;
   switch (sub) {
     case "create": {
       const slug = requirePositional(
@@ -1393,7 +1368,7 @@ async function docsCommand(args) {
         parsed,
         doc,
         () => joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([
             `Run \`${cli} versions publish ${slug} --file <path> --summary "..."\` to publish a first version`
           ])
@@ -1407,7 +1382,7 @@ async function docsCommand(args) {
         parsed,
         doc,
         () => joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           doc.versions.length === 0 ? renderObject({ versions: "no published versions yet" }) : renderList("versions", doc.versions, [
             computed("number", (v) => v.number),
             computed("summary", (v) => v.summary),
@@ -1447,7 +1422,7 @@ async function docsCommand(args) {
         parsed,
         doc,
         () => joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([
             comments.note,
             signing.note,
@@ -1480,7 +1455,7 @@ async function docsCommand(args) {
         parsed,
         doc,
         () => joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([comments?.note, signing?.note].filter((n) => Boolean(n)))
         )
       );
@@ -1490,7 +1465,7 @@ async function docsCommand(args) {
       const doc = await client.post(
         `/documents/${encodeURIComponent(slug)}/close`
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
     case "reopen": {
       const slug = requirePositional(
@@ -1516,7 +1491,7 @@ async function docsCommand(args) {
         parsed,
         doc,
         () => joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([comments?.note, signing.note].filter((n) => Boolean(n)))
         )
       );
@@ -1540,7 +1515,7 @@ async function docsCommand(args) {
         `/documents/${encodeURIComponent(slug)}/withdraw`,
         body
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
     case "operators": {
       const first = parsed.positional[0];
@@ -1642,17 +1617,51 @@ async function feedbackCommand(args) {
   }
 }
 
+// src/cli/invocation.ts
+import { accessSync, constants } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { fileURLToPath } from "node:url";
+var cached;
+function cliInvocation() {
+  if (cached) return cached;
+  let bundle;
+  try {
+    bundle = fileURLToPath(import.meta.url);
+  } catch {
+    bundle = process.argv[1] ?? "drafter-axi";
+  }
+  const shim = bundle.replace(/\.mjs$/, "");
+  try {
+    if (shim !== bundle) {
+      accessSync(shim, constants.X_OK);
+      cached = quote(collapseHome(shim));
+      return cached;
+    }
+  } catch {
+  }
+  cached = `node ${quote(collapseHome(bundle))}`;
+  return cached;
+}
+function collapseHome(p) {
+  const home = homedir3();
+  return home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p;
+}
+function quote(p) {
+  return /\s/.test(p) ? `"${p}"` : p;
+}
+
 // src/cli/commands/home.ts
 var HOME_FLAGS = { positionals: 0, boolean: ["--if-configured"] };
 var DRILL_DOWN_LIMIT = 10;
 async function homeCommand(args) {
   const parsed = parseFlags("home", args, HOME_FLAGS);
   const ifConfigured = bool(parsed, "--if-configured");
-  const cli = cliInvocation();
+  const cli = "drafter-axi";
+  const invokeAs = cliInvocation();
   if (!isConfigured({ profile: str(parsed, "--profile") })) {
     if (ifConfigured) return "";
     return joinBlocks(
-      renderObject({ documents: "not signed in" }),
+      renderObject({ documents: "not signed in", invoke_as: invokeAs }),
       renderHelp([
         `Run \`${cli} login <email> --url <instance>\` to sign in`,
         `Run \`${cli} --help\` to see the full command list`
@@ -1674,7 +1683,8 @@ async function homeCommand(args) {
     const identity2 = renderObject({
       signed_in: expired ? "no \u2014 the stored sign-in is expired or revoked" : "unknown",
       instance: config.url,
-      profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile
+      profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+      invoke_as: invokeAs
     });
     if (expired) {
       return joinBlocks(
@@ -1695,7 +1705,8 @@ async function homeCommand(args) {
     kind: who.kind,
     instance: config.url,
     profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
-    token_expires: who.expires_at
+    token_expires: who.expires_at,
+    invoke_as: invokeAs
   });
   if (documents.length === 0) {
     return joinBlocks(
@@ -2159,10 +2170,23 @@ var PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remi
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
-       a gitsheets people sheet's NDJSON export works directly. Each row may carry
-       email, name, phone, org, role, descriptor, external_id, suggested_capacity.
-       --dry-run shows what every row would do (new person, existing person and
-       which fields would change, or already invited) without writing anything.
+       a gitsheets people sheet's NDJSON export works directly.
+
+       Row fields, by these exact names:
+         email              required  merge key; matches an existing person
+                                      case-insensitively and updates them
+         name               required  full name, as it should be prefilled
+         org                optional  organization \u2014 NOT "organization"
+         role               optional  job title \u2014 NOT "title"
+         phone              optional
+         descriptor         optional  how a personal-capacity signer is described
+         external_id        optional  your own system's id for this person
+         suggested_capacity optional  personal | official; prefills the sign card
+         tags               optional  array of strings
+       Any other key is ignored silently, so a misnamed field simply does
+       nothing. Run --dry-run first: it shows what every row would do (new
+       person, existing person and which fields would change, or already
+       invited) without writing anything.
 list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]
        Never prints tokens; emails only with --contacts. Staged invitations that
        have not been sent yet show status not_sent.
@@ -2653,8 +2677,18 @@ compare <slug> <from> <to> [--unchanged]
 publish is one commit: the document body, disposition fields on any submissions
 named in --dispositions (a JSON array of {submission, comment, outcome, note?}),
 and a signing_closes_at extension if the document is mid-signing. Prints the
-version number, the commit subject, and notification counts.`;
+version number, the commit subject, and notification counts.
+
+--dispositions outcomes \u2014 exactly one of these four; anything else is rejected:
+  accepted  Incorporated in this version. Note optional.
+  partial   Partly addressed in this version. Note expected, saying which part.
+  declined  Not incorporated. Note required \u2014 it is what the commenter is told.
+  noted     Read and noted; no text change. Note optional.
+
+Each entry is {submission: <id>, comment: <id>, outcome: <one of the four>,
+note?: "<text>"}. Run feedback export <slug> to get the ids to fill in.`;
 var BODY_PREVIEW_CHARS = 800;
+var DISPOSITIONS_SHAPE = "The file must be a JSON array of {submission, comment, outcome, note?}, where outcome is accepted (incorporated), partial (partly addressed), declined (not incorporated, note required) or noted (read, no text change)";
 function toTerminalText(html) {
   return html.replace(/<ins>/g, "{+").replace(/<\/ins>/g, "+}").replace(/<del>/g, "{-").replace(/<\/del>/g, "-}").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
 }
@@ -2666,12 +2700,12 @@ function parseDispositions(text) {
     throw new AxiError(
       `--dispositions file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       "USAGE",
-      ["The file must be a JSON array of {submission, comment, outcome, note?}"]
+      [DISPOSITIONS_SHAPE]
     );
   }
   if (!Array.isArray(parsed)) {
     throw new AxiError("--dispositions file must contain a JSON array", "USAGE", [
-      "The file must be a JSON array of {submission, comment, outcome, note?}"
+      DISPOSITIONS_SHAPE
     ]);
   }
   return parsed;
@@ -2855,8 +2889,8 @@ var COMMAND_GROUPS = [
         summary: "Create an operator."
       },
       {
-        usage: 'operators update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
-        summary: "Update or deactivate an operator."
+        usage: 'operators update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
+        summary: "Update or deactivate an operator; --superadmin is grantable only by another superadmin."
       },
       { usage: "operators remove <email>", summary: "Remove an operator." }
     ]
@@ -2868,7 +2902,10 @@ var COMMAND_GROUPS = [
         usage: 'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
         summary: "Create a document in draft; the caller becomes its first operator."
       },
-      { usage: "docs show <slug>", summary: "Dashboard numbers, versions, and schedule." },
+      {
+        usage: "docs show <slug>",
+        summary: "Dashboard numbers, versions, and schedule; prints public_url when the document is publicly readable."
+      },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",
         summary: "Open commenting and signing, and send invitations."
@@ -2904,7 +2941,7 @@ var COMMAND_GROUPS = [
       { usage: "versions show <slug> <n> [--body]", summary: "One version, with dispositions." },
       {
         usage: 'versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--final] [--dispositions <file.json>]',
-        summary: "Publish a new version in one commit; prints the version number, commit subject, and notification counts."
+        summary: "Publish a new version in one commit; prints the version number, commit subject, and notification counts. A --dispositions entry's outcome is one of accepted, partial, declined or noted."
       },
       {
         usage: "versions compare <slug> <from> <to> [--unchanged]",
@@ -2916,8 +2953,8 @@ var COMMAND_GROUPS = [
     group: "People",
     commands: [
       {
-        usage: "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official]",
-        summary: "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly)."
+        usage: "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]",
+        summary: "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags, and --dry-run shows what each row would do first. Run `people import --help` for the full field list."
       },
       {
         usage: "people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]",
@@ -2928,8 +2965,12 @@ var COMMAND_GROUPS = [
         summary: "Export personal sign-in links (recorded)."
       },
       {
-        usage: "people send <slug> [--only-unsent] [--person a,b]",
-        summary: "Send invitations."
+        usage: "people remove <slug> <person>",
+        summary: "Take back a staged invitation that was never sent."
+      },
+      {
+        usage: "people send <slug> [--only-unsent] [--person a,b] [--dry-run]",
+        summary: "Send invitations; --dry-run lists who would receive one and who is skipped and why."
       },
       {
         usage: "people remind <slug> --target unopened|opened-not-acted [--dry-run]",
@@ -3039,7 +3080,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "bb12fb9" : "dev";
+var VERSION = true ? "943b6c8" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
