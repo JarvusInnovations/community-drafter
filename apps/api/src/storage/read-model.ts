@@ -106,6 +106,12 @@ export interface SignatureEvent {
   actor: string;
   commit: string;
   reason?: string;
+  /**
+   * The commit's `Version` trailer. `specs/behaviors/signatures.md` § A
+   * signature belongs to a version: on a record written before
+   * `signed_on_version` existed, the version is read back from here.
+   */
+  version?: number;
 }
 
 export interface ParticipationEntry {
@@ -438,12 +444,14 @@ export class ReadModel {
           ? (signatureTrailer as SignatureEvent["action"])
           : null;
       if (!eventAction) continue;
+      const version = Number.parseInt(logEntry.trailers.Version ?? "", 10);
       events.push({
         action: eventAction,
         at: logEntry.committerDate,
         actor: logEntry.trailers.Actor ?? logEntry.authorName,
         commit: logEntry.hash,
         reason: logEntry.trailers.Reason,
+        version: Number.isNaN(version) ? undefined : version,
       });
     }
     entry.signatureEvents = events;

@@ -140,7 +140,7 @@ One record per person per document, created by an invitation. Current state only
 | `conditional` | boolean | |
 | `listed` | boolean, default true | |
 | `display_approved` | boolean | true for invited; **[phase 2]** false until reviewed for `public` |
-| `signed_on_version` | integer | |
+| `signed_on_version` | integer | the version in force when the signature was given or last re-affirmed, per `behaviors/signatures.md` § A signature belongs to a version. Absent on records written before the field existed, where the number is read back from the `Version` trailer of the commit behind the signature in force |
 | `revoked` | boolean | current signatory = present, `revoked = false`, `display_approved = true` |
 
 Signed-at, revoked-at, re-signed-at and the revoke reason are not fields: they are the dates and `Reason` trailers of the `sign`, `revoke`, `resign` and `admin-revoke` commits touching this record — and of a `submit` commit carrying a `Signature` trailer, which is the same event written by comment mode.

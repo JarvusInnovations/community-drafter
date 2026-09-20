@@ -1,11 +1,15 @@
 ---
-status: planned
+status: done
 depends: []
 specs:
   - specs/behaviors/signatures.md
   - specs/screens/document.md
   - specs/screens/admin-dashboard.md
   - specs/data-model.md
+  - specs/api/admin.md
+  - specs/api/admin-cli.md
+issues: [67]
+pr: 86
 ---
 
 # Plan: signature-version
@@ -30,9 +34,9 @@ Decision of 2026-09-20: store which version a signature was made on and show it 
 
 ## Validation
 
-- [ ] The nurses' document scenario (four signatures on v2, v3 published) shows the drift line to each signer and the count to the operator.
-- [ ] Existing tests pass; new tests as above.
-- [ ] #67 closed by the PR.
+- [x] The nurses' document scenario (four signatures on v2, v3 published) shows the drift line to each signer and the count to the operator. Verified in the browser at 390 and 1280 against a throwaway temp data repo: each signer's card carried "The text has changed since you signed (now version 3)" with the comparison defaulted to v2 → v3; the dashboard read "Behind current 3" after one signer kept her name, the people table showed "personal · v2 / behind v3" on the other three, and `signatures list` / `docs show` reported the same numbers.
+- [x] Existing tests pass; new tests as above. 352 pass, 0 fail across all four packages (16 new: 8 API, 3 StatusCard, 3 dashboard, 3 people table). `lint`, `format:check`, `typecheck` green everywhere; `apps/web` builds at 105.18 KB gzip against the 120 KB budget.
+- [x] #67 closed by the PR (PR #86). Its second point — emailing signers when a non-final version changes the body — was explicitly out of scope here and is carried forward below.
 
 ## Risks / unknowns
 
@@ -40,8 +44,14 @@ Decision of 2026-09-20: store which version a signature was made on and show it 
 
 ## Notes
 
-(closeout)
+- **The field already existed; nothing read it.** `signature.signed_on_version` was written on every sign. The work was almost entirely in reading it back, moving it, and saying it — which is what made the issue possible: the product knew and did not tell.
+- **Re-affirmation is one action with two labels.** The plan sketched "Keep" as a `submit` with the newer `Version`. Implemented instead as the existing `PATCH /signature {confirm: true}`, which already re-affirms for a final version: one commit (`sign: … (reaffirmed v3)`), no phantom comment-less submission record on the signer's "Your submissions" list, and one re-affirmation button ever — "Confirm my signature" on a final version, "Keep my name" otherwise. Comment mode's "keep" still goes through `submit` exactly as `signatures.md` § Signing describes, and that path now advances the version too.
+- **Version moves forward only.** A `sign`/"keep" submission against an older version (someone still commenting on v2 after v3 published) must not drag a v3 signature backwards; `submit.ts` takes the max. Worth remembering when the comment-mode rebase work lands.
+- **The backfill never writes.** A record predating the field derives its version from the `Version` trailer of the commit behind the signature in force. A listing edit deliberately does *not* persist the derived number — the derivation stays the single story for those records, and the edit's own `sign` commit carries the same trailer so it stays stable.
+- **Only the signer moves their name.** Publishing a version, an operator action, and a listing edit all leave `signed_on_version` alone. That rule is in the spec, not just the code.
 
 ## Follow-ups
 
-- One-line email to signers when a new version touches a section they commented on (needs anchor-to-section mapping on publish).
+- **Issue** — #67's second point: publishing a non-final version that alters the body should tell signers, or the operator should have to acknowledge that it will not (`signers: 0` currently prints as a success line). Out of scope here by the plan's own Scope; needs the notification design, not this plan's data work.
+- **Deferred to plan** — one-line email to signers when a new version touches a section they commented on (needs anchor-to-section mapping on publish).
+- **Deferred to plan** — `audience-and-consent` rewrites the sign form and the signed-state card next; it already `depends: [signature-version]` and needs no amendment from this work.

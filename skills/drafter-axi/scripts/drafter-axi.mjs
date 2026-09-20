@@ -2621,6 +2621,11 @@ async function signaturesCommand(args) {
             computed("capacity", (r) => r.signature?.capacity ?? ""),
             computed("conditional", (r) => r.signature?.conditional ?? false),
             computed("revoked", (r) => r.signature?.revoked ?? false),
+            // `specs/api/admin-cli.md`: each signature carries the
+            // version it is attached to and whether that version is
+            // behind the document's current one.
+            computed("version", (r) => r.signature?.signed_on_version ?? ""),
+            computed("behind", (r) => r.behind ?? false),
             computed("signed_at", (r) => r.signature?.signed_at ?? "")
           ])
         )
@@ -3063,7 +3068,7 @@ var COMMAND_GROUPS = [
     commands: [
       {
         usage: "signatures list <slug> [--include-revoked] [--conditional]",
-        summary: "Every signature, with sign/revoke dates."
+        summary: "Every signature, with its version, sign/revoke dates and whether it is behind."
       },
       {
         usage: 'signatures revoke <slug> <person> --reason "<text>"',
@@ -3155,7 +3160,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "cb60472" : "dev";
+var VERSION = true ? "85b3a29" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

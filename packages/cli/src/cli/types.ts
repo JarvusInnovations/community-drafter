@@ -13,6 +13,12 @@ export interface SignatoryCounts {
   organizations: number;
   individuals: number;
   unlisted: number;
+  /**
+   * Live signatures attached to a version older than the current one
+   * (`specs/api/admin.md`; `specs/behaviors/signatures.md` § A signature
+   * belongs to a version). Absent on the public counts.
+   */
+  behind?: number;
 }
 
 export interface DocumentSummary {
@@ -202,6 +208,8 @@ export interface RemindResult {
 export interface SignatureListRow {
   person: string;
   name: string;
+  /** True when this signature is attached to an older version than the current one. */
+  behind?: boolean;
   signature: SignatureView | null;
 }
 

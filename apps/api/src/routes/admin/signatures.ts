@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
-import { buildSignatureView } from "../../lib/signature-view.ts";
+import { buildSignatureView, isSignatureBehind } from "../../lib/signature-view.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -29,6 +29,10 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
       const includeRevoked = request.query.include_revoked === "true";
+      // `specs/api/admin.md`: each row says whether the signature is behind
+      // the document's current version (`specs/behaviors/signatures.md` § A
+      // signature belongs to a version).
+      const currentVersion = document.versions.length;
 
       return fastify.storage.readModel
         .listParticipationsForDocument(document.record.slug)
@@ -39,6 +43,7 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
           return {
             person: entry.record.person,
             name: person?.name ?? "",
+            behind: isSignatureBehind(entry, currentVersion),
             signature: buildSignatureView(entry),
           };
         });

@@ -159,7 +159,7 @@ every-session use instead.
 
 ### Signatures
 
-- `scripts/drafter-axi signatures list <slug> [--include-revoked] [--conditional]` — Every signature, with sign/revoke dates.
+- `scripts/drafter-axi signatures list <slug> [--include-revoked] [--conditional]` — Every signature, with its version, sign/revoke dates and whether it is behind.
 - `scripts/drafter-axi signatures revoke <slug> <person> --reason "<text>"` — Admin revocation of a signature.
 
 ### Submissions and feedback

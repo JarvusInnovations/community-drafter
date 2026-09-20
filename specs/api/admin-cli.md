@@ -25,7 +25,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `operators remove <email>` | remove |
 | `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
 | `docs create <slug> --title … --sender-name … --reply-to … [--capacities personal,official] [--public read] [--show-signatories list]` | create; the caller becomes the first operator |
-| `docs show <slug>` | dashboard numbers, versions, schedule |
+| `docs show <slug>` | dashboard numbers (including how many signatures are behind the current version), versions, schedule |
 | `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations, printing how many were delivered and naming any the mailer rejected; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
 | `docs extend <slug> [--comments-close <when>] [--signing-closes <when>]` | extension |
 | `docs close | reopen | withdraw <slug> …` | lifecycle |
@@ -39,7 +39,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `people send <slug> [--only-unsent] [--person a,b] [--dry-run]` | send invitations; prints how many were delivered, how many failed and who with what error; `--dry-run` lists who would receive one and who is skipped and why |
 | `people remind <slug> --target unopened\|opened-not-acted [--min-age <hours>] [--dry-run]` | reminders; skips anyone this document messaged within `--min-age` hours (default 48, `0` to send regardless) and prints what it actually sent, how many were skipped as recently messaged and how many by preference |
 | `people revoke-link | reissue-link <slug> <person>` | link management |
-| `signatures list <slug> [--include-revoked] [--conditional]` | signatures |
+| `signatures list <slug> [--include-revoked] [--conditional]` | signatures, each with the version it is attached to and whether it is behind the current version |
 | `signatures revoke <slug> <person> --reason "…"` | admin revocation |
 | `submissions list <slug> [--pending] [--version n] [--person p] [--include-drafts]` | whole submissions, each with its comments; drafts only on request and always labeled |
 | `feedback export <slug> [--format json\|md] [--out …]` | the LLM-round bundle |

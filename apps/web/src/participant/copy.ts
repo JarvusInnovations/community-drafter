@@ -15,7 +15,7 @@ import { type DiffSummaryItem, type Phase, type SignatureView } from "./types.ts
 /** Just the fields the signed-state line reads off a signature. */
 export type SignedWho = Pick<
   SignatureView,
-  "capacity" | "display_name" | "descriptor" | "org" | "title"
+  "capacity" | "display_name" | "descriptor" | "org" | "title" | "signed_on_version"
 >;
 
 export const copy = {
@@ -140,15 +140,31 @@ export const copy = {
     heading(date: string, who: SignedWho): string {
       const detail = who.capacity === "official" ? who.title : who.descriptor;
       const named = detail ? `${who.display_name}, ${detail}` : who.display_name;
+      // `specs/behaviors/signatures.md` § A signature belongs to a version:
+      // the line names the version signed, and drops that clause only when
+      // no version can be established for the signature.
+      const signed =
+        who.signed_on_version === undefined
+          ? `You signed on ${date}`
+          : `You signed version ${who.signed_on_version} on ${date}`;
       return who.capacity === "official" && who.org
-        ? `You signed on ${date} for ${who.org} as ${named}.`
-        : `You signed on ${date} as ${named}.`;
+        ? `${signed} for ${who.org} as ${named}.`
+        : `${signed} as ${named}.`;
     },
     changeListing: "Change how you're listed",
     remove: "Remove my name",
     addComments: "Add comments",
     conditionalNote:
       "You signed conditionally; we'll show you what changed when the final version is published.",
+    /**
+     * `specs/screens/document.md` § Display Rules 3, *Behind the current
+     * version*: a fact, not a scolding. The signature stands; the two
+     * things the signer might want to do about it sit beside the line.
+     */
+    textChanged: (current: number) =>
+      `The text has changed since you signed (now version ${current}).`,
+    seeWhatChanged: "See what changed",
+    keep: "Keep my name",
     finalPublished: (date: string) => `The final text was published ${date}.`,
     confirmButton: "Confirm my signature",
     save: "Save",
@@ -164,7 +180,10 @@ export const copy = {
 
   closedCard: {
     heading: (absolute: string) => `The signatory list closed ${absolute}.`,
-    ownSigned: (date: string, name: string) => `You signed on ${date} as ${name}.`,
+    ownSigned: (date: string, name: string, version?: number) =>
+      version === undefined
+        ? `You signed on ${date} as ${name}.`
+        : `You signed version ${version} on ${date} as ${name}.`,
     ownDeclined: "You told us you wouldn't be signing.",
     ownNotSigned: "You didn't sign this document.",
   },

@@ -37,9 +37,15 @@ interface Funnel {
   individuals: number;
   conditional: number;
   revoked: number;
+  /**
+   * `specs/screens/admin-dashboard.md` § Funnel: live signatures still
+   * attached to a version older than the current one
+   * (`specs/behaviors/signatures.md` § A signature belongs to a version).
+   */
+  behind: number;
 }
 
-function computeFunnel(rows: InvitationRow[]): Funnel {
+function computeFunnel(rows: InvitationRow[], currentVersion: number): Funnel {
   const funnel: Funnel = {
     invited: rows.length,
     sent: 0,
@@ -49,6 +55,7 @@ function computeFunnel(rows: InvitationRow[]): Funnel {
     individuals: 0,
     conditional: 0,
     revoked: 0,
+    behind: 0,
   };
   for (const row of rows) {
     if (row.sent_at) {
@@ -72,6 +79,15 @@ function computeFunnel(rows: InvitationRow[]): Funnel {
     }
     if (row.status === "revoked" || row.link_revoked) {
       funnel.revoked += 1;
+    }
+    const signedOn = row.signature?.signed_on_version;
+    if (
+      row.signature &&
+      !row.signature.revoked &&
+      signedOn !== undefined &&
+      signedOn < currentVersion
+    ) {
+      funnel.behind += 1;
     }
   }
   return funnel;
@@ -135,7 +151,11 @@ export function DashboardScreen(): JSX.Element {
     setBanner(`Public link copied: ${link}`);
   }
 
-  const funnel = invitations ? computeFunnel(invitations) : null;
+  const currentVersion = document.versions.reduce(
+    (max, version) => Math.max(max, version.number),
+    0,
+  );
+  const funnel = invitations ? computeFunnel(invitations, currentVersion) : null;
 
   return (
     <main className="mx-auto max-w-[1120px] px-5 py-6">
@@ -213,7 +233,11 @@ export function DashboardScreen(): JSX.Element {
                 acted: copy.dashboard.acted,
               }}
             />
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div
+              className={`mt-4 grid grid-cols-2 gap-3 ${
+                currentVersion > 1 ? "sm:grid-cols-5" : "sm:grid-cols-4"
+              }`}
+            >
               <StatTile label={copy.dashboard.organizations} value={funnel.organizations} />
               <StatTile label={copy.dashboard.individuals} value={funnel.individuals} />
               <StatTile
@@ -222,6 +246,14 @@ export function DashboardScreen(): JSX.Element {
                 tone="muted"
               />
               <StatTile label={copy.dashboard.revoked} value={funnel.revoked} tone="muted" />
+              {/*
+               * Shown from the moment a second version exists, zero
+               * included: the operator needs to read the number, not infer
+               * it from the tile's absence.
+               */}
+              {currentVersion > 1 ? (
+                <StatTile label={copy.dashboard.behind} value={funnel.behind} tone="amber" />
+              ) : null}
             </div>
           </Card>
         ) : (

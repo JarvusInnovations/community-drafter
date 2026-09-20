@@ -153,7 +153,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       {
         usage: "signatures list <slug> [--include-revoked] [--conditional]",
-        summary: "Every signature, with sign/revoke dates.",
+        summary: "Every signature, with its version, sign/revoke dates and whether it is behind.",
       },
       {
         usage: 'signatures revoke <slug> <person> --reason "<text>"',
