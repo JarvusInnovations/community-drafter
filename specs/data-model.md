@@ -53,9 +53,10 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `opened_at`, `comments_close_at`, `signing_closes_at` | timestamp? | |
 | `revocation_window_hours` | integer, default 72 | |
 | `capacities` | array of `personal` \| `official`, default both | |
-| `public_access` | enum `none` \| `read` \| `participate`, default `none` | the document's **audience** in stored form (below); `participate` is **[phase 2]** |
+| `audience` | enum `public` \| `closed` | who the **finished** statement is for (below); absent only on a record written before the field existed, which reads as `closed` |
+| `addressed_to` | array of string | who the finished statement is published or delivered to — a council, a board, an organization; required when `audience = closed` (below) |
+| `public_access` | enum `none` \| `read` \| `participate`, default `none` | **drafting-time** read access: whether anyone holding the link may read the working document; independent of `audience` (below); `participate` is **[phase 2]** |
 | `show_signatories` | enum `list` \| `count` \| `none`, default `list` | |
-| `list_visible_to` | array of string | organizations the team will show the signatory list to besides the invitees; meaningful only on a `closed` document (below) |
 | `created_by` | email | the operator who created the document; always also in `operators` |
 | `operators` | array of email | current operators of this document; never empty |
 | `sender_name`, `reply_to` | string | |
@@ -67,20 +68,31 @@ The sheet's format sets `body = 'body'` and does not set `title`, so the body ma
 
 ### Audience
 
-Every document declares, before anyone is invited, **who it is for**: `public` — anyone holding the link may read it — or `closed` — only the people invited, each through their own personal link. It is the first thing an operator decides and the thing a signer is told before they sign (`screens/document.md` § Display Rules 3), so it has exactly one home in the record.
+Every document declares, before anyone is invited, **who the finished statement is for**: `public` — it will be published for anyone to read — or `closed` — it is delivered to the people and bodies it is addressed to, and to no one else. It is the thing a signer is told before they sign (`screens/document.md` § Display Rules 3), because it is who they will be standing in front of once their name is on it.
 
-That home is `public_access`. The audience **is not a separate field**: it is `public_access` read as the two-way partition it already is, so the record cannot say two different things about who a document is for.
+`audience` is **stored on the document**. It is not derived from `public_access`, and the two answer different questions:
 
-| `public_access` | Audience | Means |
+- **`audience` is a property of the statement** — who the finished text and its signatory list will be published or delivered to.
+- **`public_access` is a property of the drafting process** — whether anyone holding the link may read the *working* document while it is being drafted (`screens/public-and-embed.md`).
+
+The two are orthogonal, and all four combinations are meaningful:
+
+| `audience` | `public_access` | Means |
 | --- | --- | --- |
-| `none` | `closed` | invitees only; nothing but a personal link opens the document |
-| `read`, `participate` | `public` | anyone with the link may read it (`screens/public-and-embed.md`) |
+| `public` | `none` | a public statement drafted in private: only invitees see the draft, and the finished statement is published |
+| `public` | `read`, `participate` | a public statement drafted in the open |
+| `closed` | `none` | a letter to a named body, drafted among its invitees |
+| `closed` | `read`, `participate` | a letter to a named body whose draft anyone with the link may read |
 
-`audience` is the word every surface uses: `docs create --audience public\|closed` is how an operator sets it (`api/admin-cli.md`) and it writes `public_access` (`public` → `read`, `closed` → `none`) and nothing else; the admin API returns it alongside `public_access`; the dashboard and the sign card derive it. Because it is derived rather than stored, a document created before the word existed already has one, and no migration is needed.
+A signer is told the audience, never the drafting access: "anyone with this link can read the draft" is not what they are being asked to stand behind.
 
-`show_signatories` is the separate question of whether the *signatory list* is shown at all, and it is orthogonal: a `public` document may show only counts, and a `closed` one may show a full list to its invitees.
+`addressed_to` names who the finished statement goes to — a council, a board, an organization. It is **required when `audience = closed`**: a closed statement that names no recipient tells a signer nothing about who will read their name. It is also allowed on a `public` document, where it says who the published statement is addressed to even though anyone may read it.
 
-`list_visible_to` names the organizations the team will show a `closed` document's signatory list to besides the invitees. It is a **disclosure** — the sign card names those organizations in the sentence a signer reads before signing — and not an access control: phase 1 has no sign-in for an organization, and nothing in this field lets anyone new open the document. On a `public` document it has no meaning and is not shown.
+`addressed_to` is a **disclosure**, not an access control: phase 1 has no sign-in for an organization, and nothing in this field lets anyone new open the document.
+
+A document written before `audience` existed carries no value for it, and reads as `closed` with no `addressed_to` until an operator sets one (`api/admin-cli.md` → `docs update`). `closed` is the undeclared state: nothing is published for anyone to read until someone says so. An operator sets the audience before anyone is invited, so only pre-field records are ever read this way.
+
+`show_signatories` is the separate question of whether the *signatory list* is shown at all, and it is orthogonal to both: a `public` document may show only counts, and a `closed` one may show a full list to its invitees.
 
 ### Versions
 

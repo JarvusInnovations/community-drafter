@@ -13,7 +13,7 @@ Response:
   instance: { name },
   person:   { id, name },
   document: { slug, title, state, phase, opened_at, comments_close_at, signing_closes_at,
-              capacities, show_signatories, audience, list_visible_to, reply_to, sender_name },
+              capacities, show_signatories, audience, addressed_to, reply_to, sender_name },
   version:  { number, summary, published_at, final, html, is_current },   // ?v=<n> selects
   versions: [{ number, summary, published_at, final, dispositions }],
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
@@ -28,6 +28,8 @@ Response:
   notify:   { channel, every_revision, daily_digest, phase_changes, my_comments_addressed, reminders, forced: [..] }
 }
 ```
+
+`audience` and `addressed_to` are the document's stored values (`../data-model.md` § Audience); a document stored without `audience` reads `closed` and `addressed_to` is `[]`. They are here because the sign card's who-sees sentence is built from them and `show_signatories` (`../behaviors/signatures.md` § Consent at signing). `public_access` is **not** in the bundle: it governs who may read the draft, which is not a fact a signer is asked to stand behind.
 
 Side effect: records an open (batched).
 
