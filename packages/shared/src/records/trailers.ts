@@ -54,6 +54,17 @@ export const JUDGEMENTS = ["sign", "sign_conditional", "comment", "decline"] as 
 export type Judgement = (typeof JUDGEMENTS)[number];
 
 /**
+ * `Signature` trailer values (`specs/behaviors/signatures.md` § Signing:
+ * "Signing through comment mode is the same signature by another door").
+ * Set on a `submit` commit that also writes the participation's `signature`
+ * table, so the sign/resign/revoke history reads the same whichever door the
+ * signature came through.
+ */
+export const SIGNATURE_TRAILERS = ["sign", "resign", "revoke"] as const;
+
+export type SignatureTrailer = (typeof SIGNATURE_TRAILERS)[number];
+
+/**
  * The full trailer set. All fields are optional here — which trailers apply
  * to a given commit depends on its `Action` (see the table in
  * `specs/data-model.md`); the storage layer's `commit()` wrapper is what
@@ -70,6 +81,7 @@ export interface Trailers {
   Notes?: string;
   Submission?: string;
   Judgement?: Judgement;
+  Signature?: SignatureTrailer;
   Disposed?: string;
   Reason?: string;
   "Request-Id"?: string;

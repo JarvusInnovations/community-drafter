@@ -173,3 +173,75 @@ describe("DELETE /i/:token/api/signature", () => {
     await server.close();
   });
 });
+
+describe("sign → remove → sign again", () => {
+  /**
+   * Issue #63. `specs/behaviors/signatures.md` § Signing: "The re-signature
+   * is a new signature: everywhere a signature's time is shown ... it is the
+   * time of the commit that put the signature currently in force — the
+   * `resign` commit, not the superseded `sign` one."
+   */
+  it("reports the re-signature's own time, not the first signature's", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const token = "f".repeat(20);
+    await seedDocument(server, {
+      slug: "doc-resign",
+      comments_close_at: new Date(Date.now() + 3_600_000).toISOString(),
+      signing_closes_at: new Date(Date.now() + 7_200_000).toISOString(),
+    });
+    await seedParticipant(server, { document: "doc-resign", person: "jane-doe", token });
+
+    const first = await server.inject({
+      method: "POST",
+      url: `/i/${token}/api/signature`,
+      payload: {
+        capacity: "official",
+        display_name: "Jane Doe",
+        org: "Acme Coalition",
+        title: "Chair",
+        authorized: true,
+      },
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().resigned_at).toBeUndefined();
+
+    const revoke = await server.inject({
+      method: "DELETE",
+      url: `/i/${token}/api/signature`,
+      payload: { reason: "board wants to reread it" },
+    });
+    expect(revoke.statusCode).toBe(200);
+
+    const again = await server.inject({
+      method: "POST",
+      url: `/i/${token}/api/signature`,
+      payload: {
+        capacity: "official",
+        display_name: "Jane Doe",
+        org: "Acme Coalition",
+        title: "Chair",
+        authorized: true,
+      },
+    });
+    expect(again.statusCode).toBe(200);
+    const body = again.json();
+
+    // The signature in force is the third action's; the card reads
+    // `resigned_at` because it is at least as late as the first `sign`.
+    expect(body.revoked).toBe(false);
+    expect(body.revoked_at).toBeUndefined();
+    expect(typeof body.resigned_at).toBe("string");
+    expect(body.resigned_at >= body.signed_at).toBe(true);
+
+    const participation = server.storage.readModel.getParticipation("doc-resign", "jane-doe");
+    expect(participation?.signatureEvents.map((event) => event.action)).toEqual([
+      "sign",
+      "revoke",
+      "resign",
+    ]);
+
+    await server.close();
+  });
+});

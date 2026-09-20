@@ -100,6 +100,97 @@ describe("POST /i/:token/api/submit", () => {
     const position = server.storage.readModel.getPosition("doc-sign-conditional", "jane-doe");
     expect(position?.judgement).toBe("sign_conditional");
 
+    // Issue #59: a signature made through comment mode is the same
+    // signature by another door (`specs/behaviors/signatures.md` § Signing)
+    // — the `submit` commit carries the `Signature` trailer, so it reads
+    // back with `signed_at` exactly as the sign route's does.
+    expect(typeof body.signature.signed_at).toBe("string");
+    expect(body.signature.signed_at).not.toBe("");
+    expect(participation?.signatureEvents.map((event) => event.action)).toEqual(["sign"]);
+
+    await server.close();
+  });
+
+  it("a conditional signature carries signed_at just like a direct one", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, { slug: "doc-audit-parity" });
+    await seedParticipant(server, {
+      document: "doc-audit-parity",
+      person: "jane-doe",
+      token: TOKEN_A,
+    });
+    await seedParticipant(server, {
+      document: "doc-audit-parity",
+      person: "john-doe",
+      token: "b".repeat(20),
+    });
+
+    // Direct signature.
+    const direct = await server.inject({
+      method: "POST",
+      url: `/i/${"b".repeat(20)}/api/signature`,
+      payload: { capacity: "personal", display_name: "John Doe", version: 1 },
+    });
+    expect(direct.statusCode).toBe(200);
+
+    // Conditional signature through comment mode.
+    await server.inject({
+      method: "POST",
+      url: `/i/${TOKEN_A}/api/draft/comments`,
+      payload: { version: 1, body: "One change please.", client_id: "c-1" },
+    });
+    const conditional = await server.inject({
+      method: "POST",
+      url: `/i/${TOKEN_A}/api/submit`,
+      payload: {
+        version: 1,
+        judgement: "sign_conditional",
+        pending: 0,
+        signature: { capacity: "personal", display_name: "Jane Doe" },
+      },
+    });
+    expect(conditional.statusCode).toBe(200);
+
+    const directKeys = Object.keys(direct.json()).sort();
+    const conditionalKeys = Object.keys(conditional.json().signature).sort();
+    expect(conditionalKeys).toEqual(directKeys);
+
+    await server.close();
+  });
+
+  it("declining through submit records the revocation as a signature event", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, { slug: "doc-submit-decline" });
+    await seedParticipant(server, {
+      document: "doc-submit-decline",
+      person: "jane-doe",
+      token: TOKEN_A,
+    });
+
+    await server.inject({
+      method: "POST",
+      url: `/i/${TOKEN_A}/api/signature`,
+      payload: { capacity: "personal", display_name: "Jane Doe", version: 1 },
+    });
+    const declined = await server.inject({
+      method: "POST",
+      url: `/i/${TOKEN_A}/api/submit`,
+      payload: { version: 1, judgement: "decline", pending: 0 },
+    });
+    expect(declined.statusCode).toBe(200);
+    expect(declined.json().signature.revoked).toBe(true);
+    expect(typeof declined.json().signature.revoked_at).toBe("string");
+
+    const participation = server.storage.readModel.getParticipation(
+      "doc-submit-decline",
+      "jane-doe",
+    );
+    expect(participation?.signatureEvents.map((event) => event.action)).toEqual(["sign", "revoke"]);
+
     await server.close();
   });
 
