@@ -233,10 +233,12 @@ describe("admin signatures, submissions, notifications and instance", () => {
     const whoami = await server.inject({
       method: "GET",
       url: "/admin/api/whoami",
-      headers: adminHeaders("test-suite"),
+      headers: adminHeaders(),
     });
     expect(whoami.statusCode).toBe(200);
-    expect(JSON.parse(whoami.body)).toEqual({ actor: "cli:test-suite", capability: "admin" });
+    const whoamiBody = JSON.parse(whoami.body);
+    expect(whoamiBody.email).toBe("team@example.org");
+    expect(whoamiBody.transport).toBe("bearer");
 
     await server.close();
   });

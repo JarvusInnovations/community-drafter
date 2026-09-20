@@ -2,7 +2,7 @@ import type { Capacity } from "@community-drafter/shared";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { toCsv } from "../../lib/csv.ts";
 import { prefOn } from "../../lib/notify.ts";
 import { participationStatus } from "../../lib/participation-status.ts";
@@ -88,7 +88,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams }>(
     "/documents/:slug/invitations/import",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -192,7 +192,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: DocumentParams; Querystring: ListInvitationsQuery }>(
     "/documents/:slug/invitations",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -236,7 +236,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: SendBody }>(
     "/documents/:slug/invitations/send",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -311,7 +311,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: LinksBody }>(
     "/documents/:slug/invitations/links",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request, reply) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -373,7 +373,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: PersonParams }>(
     "/documents/:slug/invitations/:person/revoke-link",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -403,7 +403,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: PersonParams }>(
     "/documents/:slug/invitations/:person/reissue-link",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -437,7 +437,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: PersonParams; Body: ExpireBody }>(
     "/documents/:slug/invitations/:person/expire",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -470,7 +470,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: RemindBody }>(
     "/documents/:slug/invitations/remind",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

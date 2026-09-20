@@ -5,6 +5,7 @@ import documentsRoute from "./documents.ts";
 import instanceRoute from "./instance.ts";
 import invitationsRoute from "./invitations.ts";
 import adminNotificationsRoute from "./notifications.ts";
+import operatorsRoute from "./operators.ts";
 import adminSignaturesRoute from "./signatures.ts";
 import adminSubmissionsRoute from "./submissions.ts";
 import adminVersionsRoute from "./versions.ts";
@@ -20,6 +21,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(viewAsRoute);
   await fastify.register(activityRoute);
   await fastify.register(adminNotificationsRoute);
+  await fastify.register(operatorsRoute);
   await fastify.register(instanceRoute);
 };
 

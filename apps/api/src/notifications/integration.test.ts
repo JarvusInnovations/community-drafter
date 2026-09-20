@@ -104,7 +104,7 @@ describe("forced-on sends for a current signer with every optional preference of
     await server.storage.commit(
       "settings",
       {
-        actor: { kind: "cli", label: "test" },
+        actor: { kind: "system" },
         subject: "settings: doc-forced (test time travel)",
         document: "doc-forced",
       },
@@ -126,7 +126,7 @@ describe("forced-on sends for a current signer with every optional preference of
     await server.storage.commit(
       "settings",
       {
-        actor: { kind: "cli", label: "test" },
+        actor: { kind: "system" },
         subject: "settings: doc-forced (closing soon)",
         document: "doc-forced",
       },

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { derivePhase } from "../../phase/phase.ts";
 import { buildParticipantBundle } from "../participant/bundle.ts";
 import { notFoundDocument } from "./context.ts";
@@ -28,7 +28,7 @@ interface Query {
 const viewAsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: Params; Querystring: Query }>(
     "/documents/:slug/participations/:person/bundle",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

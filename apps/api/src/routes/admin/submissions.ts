@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
 import { resolveVersion } from "../../lib/versions.ts";
 import type { SubmissionEntry } from "../../storage/read-model.ts";
@@ -60,7 +60,7 @@ function submissionView(fastify: FastifyInstance, entry: SubmissionEntry) {
 const adminSubmissionsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams; Querystring: ListSubmissionsQuery }>(
     "/documents/:slug/submissions",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -85,7 +85,7 @@ const adminSubmissionsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<{ Params: DocumentParams; Querystring: FeedbackExportQuery }>(
     "/documents/:slug/feedback-export",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request, reply) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

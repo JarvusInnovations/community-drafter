@@ -8,30 +8,54 @@ import type {
 } from "@community-drafter/shared";
 
 import { app } from "../app.ts";
-import type { AuthPluginOptions } from "../auth/plugin.ts";
-import type { GoogleAuth, GoogleIdentity } from "../auth/google.ts";
+import { mintOperatorToken } from "../auth/tokens.ts";
 import { FakeMailer, type Mailer } from "../lib/mailer/index.ts";
 import type { Actor } from "../storage/actor.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 
-export const TEST_ACTOR: Actor = { kind: "admin", email: "team@example.org" };
+export const TEST_ACTOR = { kind: "operator", email: "team@example.org" } as const satisfies Actor;
 
-export const TEST_ADMIN_TOKEN = "s3cr3t-admin-token";
+/**
+ * Fixed test-only signing secret (>= 32 bytes, `env.ts`'s boot check) so
+ * `TEST_ADMIN_TOKEN` below can be minted once, at module load, independent
+ * of any particular server instance — every `buildTestServer()` call sets
+ * this same `AUTH_SECRET` unless a test explicitly overrides it (none
+ * currently do).
+ */
+export const TEST_AUTH_SECRET = "test-only-auth-secret-32-bytes-minimum!!";
+
+/**
+ * A `purpose: cli` bearer token for `TEST_ACTOR`, minted directly through
+ * `auth/tokens.ts` rather than the HTTP device-code dance — the "dev
+ * shortcut" the plan calls for, applied at the test-harness layer. Resolves
+ * once at module load (top-level await), so every import sees the final
+ * string. `buildTestServer()`'s default `BOOTSTRAP_OPERATOR_EMAIL` creates
+ * the matching operator record at boot, so this token authenticates
+ * against any freshly built test server without further setup.
+ */
+export const TEST_ADMIN_TOKEN = (
+  await mintOperatorToken({
+    purpose: "cli",
+    email: TEST_ACTOR.email,
+    name: "Team",
+    kind: "person",
+    secret: TEST_AUTH_SECRET,
+  })
+).token;
 
 export interface BuildTestServerOptions {
   /** Defaults to a fresh `FakeMailer` — pass one in to assert on `.sent`/force failures. */
   mailer?: Mailer;
   /** Test-only override for the digest/closing-soon schedulers' poll interval. */
   schedulerIntervalMs?: number;
-  /** Test-only overrides for admin OAuth (`auth/plugin.ts`) — e.g. `googleAuth: fakeGoogleAuth(...)`. */
-  auth?: AuthPluginOptions;
-  /** Set `COOKIE_SECRET`/`GOOGLE_CLIENT_ID`/etc. before boot; defaults keep prior test behavior. */
+  /** Set env vars before boot (e.g. `DEV_ADMIN_EMAIL`, or `undefined` to unset one of the defaults below). */
   env?: Record<string, string | undefined>;
 }
 
 export async function buildTestServer(opts: BuildTestServerOptions = {}) {
   process.env.NODE_ENV = "test";
-  process.env.ADMIN_TOKEN = TEST_ADMIN_TOKEN;
+  process.env.AUTH_SECRET = TEST_AUTH_SECRET;
+  process.env.BOOTSTRAP_OPERATOR_EMAIL = TEST_ACTOR.email;
   for (const [key, value] of Object.entries(opts.env ?? {})) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -48,26 +72,14 @@ export async function buildTestServer(opts: BuildTestServerOptions = {}) {
       mailer,
       schedulerIntervalMs: opts.schedulerIntervalMs,
     },
-    auth: opts.auth,
   });
   await server.ready();
 
   return { server, dataDir, cleanup, mailer };
 }
 
-/** A `GoogleAuth` stub — `exchangeCode` always returns `identity` (or `null` to simulate failure). */
-export function fakeGoogleAuth(identity: GoogleIdentity | null): GoogleAuth {
-  return {
-    authUrl: (redirectUri, state) =>
-      `https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`,
-    exchangeCode: async () => identity,
-  };
-}
-
-export function adminHeaders(actorLabel?: string): Record<string, string> {
-  const headers: Record<string, string> = { authorization: `Bearer ${TEST_ADMIN_TOKEN}` };
-  if (actorLabel) headers["x-actor"] = actorLabel;
-  return headers;
+export function adminHeaders(): Record<string, string> {
+  return { authorization: `Bearer ${TEST_ADMIN_TOKEN}` };
 }
 
 export interface SeedDocumentOptions {
@@ -83,6 +95,9 @@ export interface SeedDocumentOptions {
   public_access?: PublicAccess;
   reply_to?: string;
   sender_name?: string;
+  /** Defaults to `[TEST_ACTOR.email]` — pass explicit operators for scoping tests. */
+  operators?: string[];
+  created_by?: string;
 }
 
 export async function seedDocument(
@@ -106,6 +121,8 @@ export async function seedDocument(
         public_access: opts.public_access,
         reply_to: opts.reply_to,
         sender_name: opts.sender_name,
+        created_by: opts.created_by ?? opts.operators?.[0] ?? TEST_ACTOR.email,
+        operators: opts.operators ?? [TEST_ACTOR.email],
       });
     },
   );

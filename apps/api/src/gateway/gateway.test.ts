@@ -1,13 +1,24 @@
+import { createHmac } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import Fastify from "fastify";
 
 import { app } from "../app.ts";
+import { mintOperatorToken } from "../auth/tokens.ts";
+import {
+  adminHeaders,
+  seedDocument,
+  TEST_ACTOR,
+  TEST_AUTH_SECRET,
+} from "../routes/test-support.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 import {
-  ADMIN_ROUTE,
+  DOCUMENT_SCOPED_ROUTE,
+  OPERATOR_ROUTE,
   participantWriteLimiter,
   PARTICIPANT_ROUTE,
   tokenFailureLimiter,
+  WEBHOOK_ROUTE,
 } from "./gateway.ts";
 
 const cleanups: Array<() => void> = [];
@@ -22,7 +33,8 @@ beforeEach(() => {
 
 async function buildServer() {
   process.env.NODE_ENV = "test";
-  process.env.ADMIN_TOKEN = "s3cr3t-admin-token";
+  process.env.AUTH_SECRET = TEST_AUTH_SECRET;
+  process.env.BOOTSTRAP_OPERATOR_EMAIL = TEST_ACTOR.email;
   const { dataDir, cleanup } = await createTestDataRepo();
   cleanups.push(cleanup);
 
@@ -35,7 +47,29 @@ async function buildServer() {
   // Test-only routes exercising each capability, added after `app` so the
   // gateway hook (registered inside `app` via a chain of `fp`-wrapped
   // plugins) already covers the whole instance.
-  server.get("/__test/admin-only", { config: ADMIN_ROUTE }, async () => ({ ok: true }));
+  server.get("/__test/operator-only", { config: OPERATOR_ROUTE }, async (request) => ({
+    principal: request.principal,
+  }));
+  server.get<{ Params: { slug: string } }>(
+    "/__test/scoped/:slug",
+    { config: DOCUMENT_SCOPED_ROUTE },
+    async () => ({ ok: true }),
+  );
+  // Raw-body capture for the webhook test below, scoped to this throwaway
+  // instance only — mirrors `routes/admin/instance.ts`'s own parser.
+  server.addContentTypeParser(
+    "application/json",
+    { parseAs: "buffer" },
+    (request, body: Buffer, done) => {
+      request.rawBody = body;
+      try {
+        done(null, body.length ? JSON.parse(body.toString("utf8")) : {});
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+  server.post("/__test/webhook", { config: WEBHOOK_ROUTE }, async () => ({ ok: true }));
   server.get("/__test/undeclared", async () => ({ ok: true }));
   server.get(
     "/i/:token/__test/participant-only",
@@ -60,17 +94,17 @@ describe("gateway: deny by default", () => {
   });
 });
 
-describe("gateway: admin bearer", () => {
+describe("gateway: operator bearer", () => {
   it("401s a missing or wrong bearer token", async () => {
     const { server } = await buildServer();
 
-    const missing = await server.inject({ method: "GET", url: "/__test/admin-only" });
+    const missing = await server.inject({ method: "GET", url: "/__test/operator-only" });
     expect(missing.statusCode).toBe(401);
     expect(missing.json().error).toBe("unauthenticated");
 
     const wrong = await server.inject({
       method: "GET",
-      url: "/__test/admin-only",
+      url: "/__test/operator-only",
       headers: { authorization: "Bearer nope" },
     });
     expect(wrong.statusCode).toBe(401);
@@ -78,14 +112,130 @@ describe("gateway: admin bearer", () => {
     await server.close();
   });
 
-  it("200s the correct bearer token", async () => {
+  it("200s a valid bearer token for an active operator", async () => {
     const { server } = await buildServer();
     const response = await server.inject({
       method: "GET",
-      url: "/__test/admin-only",
-      headers: { authorization: "Bearer s3cr3t-admin-token" },
+      url: "/__test/operator-only",
+      headers: adminHeaders(),
     });
     expect(response.statusCode).toBe(200);
+    expect(response.json().principal).toEqual({
+      kind: "operator",
+      email: TEST_ACTOR.email,
+      // The bootstrap operator's `name` (`operators-bootstrap.ts`) — live
+      // state, not the bearer token's own `name` claim (`Team`), per
+      // "authorization comes from live state, never token claims."
+      name: TEST_ACTOR.email,
+      operatorKind: "person",
+      transport: "bearer",
+      exp: expect.any(Number),
+    });
+
+    await server.close();
+  });
+
+  it("401s a well-formed token for an operator that no longer exists", async () => {
+    const { server } = await buildServer();
+    const minted = await mintOperatorToken({
+      purpose: "cli",
+      email: "ghost@example.org",
+      name: "Ghost",
+      kind: "person",
+      secret: TEST_AUTH_SECRET,
+    });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__test/operator-only",
+      headers: { authorization: `Bearer ${minted.token}` },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error).toBe("unauthenticated");
+
+    await server.close();
+  });
+});
+
+describe("gateway: document scoping", () => {
+  it("404s a document-scoped route for an operator not on the document", async () => {
+    const { server } = await buildServer();
+
+    await seedDocument(server, { slug: "scoped-doc", operators: ["someone-else@example.org"] });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__test/scoped/scoped-doc",
+      headers: adminHeaders(),
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toBe("not_found");
+
+    await server.close();
+  });
+
+  it("200s a document-scoped route for a current operator of the document", async () => {
+    const { server } = await buildServer();
+    await seedDocument(server, { slug: "my-doc", operators: [TEST_ACTOR.email] });
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__test/scoped/my-doc",
+      headers: adminHeaders(),
+    });
+    expect(response.statusCode).toBe(200);
+
+    await server.close();
+  });
+
+  it("404s (not_found, same as unknown) an unknown document, identically to an unscoped one", async () => {
+    const { server } = await buildServer();
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__test/scoped/does-not-exist",
+      headers: adminHeaders(),
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toBe("not_found");
+
+    await server.close();
+  });
+});
+
+describe("gateway: webhook capability", () => {
+  it("401s a missing or wrong signature, 200s a valid one", async () => {
+    // `@fastify/env` reads env vars once at boot, so this must be set
+    // before `buildServer()` registers the app, not after.
+    process.env.DATA_REPO_WEBHOOK_SECRET = "webhook-secret";
+    const { server } = await buildServer();
+
+    const missing = await server.inject({ method: "POST", url: "/__test/webhook", payload: {} });
+    expect(missing.statusCode).toBe(401);
+
+    const body = JSON.stringify({ hello: "world" });
+    const wrongSig = createHmac("sha256", "wrong-secret").update(body).digest("hex");
+    const wrong = await server.inject({
+      method: "POST",
+      url: "/__test/webhook",
+      headers: { "x-hub-signature-256": `sha256=${wrongSig}`, "content-type": "application/json" },
+      payload: body,
+    });
+    expect(wrong.statusCode).toBe(401);
+
+    const correctSig = createHmac("sha256", "webhook-secret").update(body).digest("hex");
+    const valid = await server.inject({
+      method: "POST",
+      url: "/__test/webhook",
+      headers: {
+        "x-hub-signature-256": `sha256=${correctSig}`,
+        "content-type": "application/json",
+      },
+      payload: body,
+    });
+    expect(valid.statusCode).toBe(200);
+
+    delete process.env.DATA_REPO_WEBHOOK_SECRET;
     await server.close();
   });
 });
@@ -93,7 +243,7 @@ describe("gateway: admin bearer", () => {
 describe("gateway: participant token resolution", () => {
   it("produces byte-identical 404 bodies for unknown, revoked and expired tokens", async () => {
     const { server } = await buildServer();
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = TEST_ACTOR;
 
     await server.storage.commit(
       "invite",
@@ -106,6 +256,8 @@ describe("gateway: participant token resolution", () => {
           body: "text",
           comments_close_at: "2099-01-01T00:00:00Z",
           signing_closes_at: "2099-02-01T00:00:00Z",
+          created_by: actor.email,
+          operators: [actor.email],
         });
         await tx.people.upsert({
           id: "revoked-person",
@@ -166,13 +318,20 @@ describe("gateway: participant token resolution", () => {
 
   it("resolves a valid token to a participant principal", async () => {
     const { server } = await buildServer();
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = TEST_ACTOR;
 
     await server.storage.commit(
       "invite",
       { actor, subject: "invite: jane-doe on doc-b", document: "doc-b" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc-b", title: "Doc B", state: "open", body: "text" });
+        await tx.documents.upsert({
+          slug: "doc-b",
+          title: "Doc B",
+          state: "open",
+          body: "text",
+          created_by: actor.email,
+          operators: [actor.email],
+        });
         await tx.people.upsert({
           id: "jane-doe",
           name: "Jane Doe",
@@ -205,13 +364,20 @@ describe("gateway: participant token resolution", () => {
 
   it("rate-limits participant writes at 60/min per token", async () => {
     const { server } = await buildServer();
-    const actor = { kind: "admin" as const, email: "team@example.org" };
+    const actor = TEST_ACTOR;
 
     await server.storage.commit(
       "invite",
       { actor, subject: "invite: jane-doe on doc-c", document: "doc-c" },
       async (tx) => {
-        await tx.documents.upsert({ slug: "doc-c", title: "Doc C", state: "open", body: "text" });
+        await tx.documents.upsert({
+          slug: "doc-c",
+          title: "Doc C",
+          state: "open",
+          body: "text",
+          created_by: actor.email,
+          operators: [actor.email],
+        });
         await tx.people.upsert({
           id: "jane-doe",
           name: "Jane Doe",

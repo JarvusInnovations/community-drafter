@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { ADMIN_ROUTE } from "../../gateway/gateway.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -25,7 +25,7 @@ interface RetryBody {
 const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: DocumentParams }>(
     "/documents/:slug/notifications",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
@@ -45,7 +45,7 @@ const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: DocumentParams; Body: RetryBody }>(
     "/documents/:slug/notifications/retry",
-    { config: ADMIN_ROUTE },
+    { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);

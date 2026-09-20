@@ -29,7 +29,7 @@ describe("NotificationDispatcher", () => {
     const first = await server.notifications.deliver({
       document: "doc-idem",
       eventKey: "closing-soon",
-      actor: { kind: "cli", label: "test" },
+      actor: { kind: "system" },
       targets: [
         {
           person: "jane-doe",
@@ -44,7 +44,7 @@ describe("NotificationDispatcher", () => {
     const second = await server.notifications.deliver({
       document: "doc-idem",
       eventKey: "closing-soon",
-      actor: { kind: "cli", label: "test" },
+      actor: { kind: "system" },
       targets: [
         {
           person: "jane-doe",
@@ -79,7 +79,7 @@ describe("NotificationDispatcher", () => {
     const result = await server.notifications.deliver({
       document: "doc-batch",
       eventKey: "closed",
-      actor: { kind: "cli", label: "test" },
+      actor: { kind: "system" },
       targets: ["alice", "bob", "carol"].map((person) => ({
         person,
         markNotified: true,
@@ -109,7 +109,7 @@ describe("NotificationDispatcher", () => {
     const result = await server.notifications.deliver({
       document: "doc-retry",
       eventKey: "closed",
-      actor: { kind: "cli", label: "test" },
+      actor: { kind: "system" },
       targets: [
         {
           person: "jane-doe",
@@ -124,11 +124,7 @@ describe("NotificationDispatcher", () => {
     const participation = server.storage.readModel.getParticipation("doc-retry", "jane-doe");
     expect(participation?.record.notified?.closed).toBeUndefined();
 
-    const retried = await server.notifications.retry(
-      "doc-retry",
-      {},
-      { kind: "cli", label: "test" },
-    );
+    const retried = await server.notifications.retry("doc-retry", {}, { kind: "system" });
     expect(retried.retried).toBe(1);
     expect(retried.sent).toBe(1);
     expect(server.notifications.failedCount("doc-retry")).toBe(0);
@@ -152,7 +148,7 @@ describe("NotificationDispatcher", () => {
     await server.notifications.deliver({
       document: "doc-status",
       eventKey: "closed",
-      actor: { kind: "cli", label: "test" },
+      actor: { kind: "system" },
       targets: [
         {
           person: "jane-doe",

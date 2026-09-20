@@ -1,17 +1,20 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
-import { ApiError, forbidden, LINK_NOT_FOUND } from "../errors.ts";
-import { constantTimeEquals } from "../lib/tokens.ts";
+import { ApiError, forbidden, LINK_NOT_FOUND, notFoundDocument } from "../errors.ts";
 import type { Capability } from "./capability.ts";
 import { FixedWindowLimiter } from "./rate-limit.ts";
 
 export {
-  ADMIN_ROUTE,
+  DOCUMENT_SCOPED_ROUTE,
+  OPERATOR_ROUTE,
   PARTICIPANT_ROUTE,
   PUBLIC_ROUTE,
-  type AdminPrincipal,
+  WEBHOOK_ROUTE,
   type Capability,
+  type OperatorPrincipal,
   type ParticipantPrincipal,
   type Principal,
 } from "./capability.ts";
@@ -21,13 +24,6 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 /** Exported so tests can reset counters between cases without a fresh module load. */
 export const tokenFailureLimiter = new FixedWindowLimiter(30, 60_000);
 export const participantWriteLimiter = new FixedWindowLimiter(60, 60_000);
-
-function actorLabelFromHeader(request: FastifyRequest): string {
-  const header = request.headers["x-actor"];
-  const value = Array.isArray(header) ? header[0] : header;
-  const trimmed = value?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : "cli";
-}
 
 /**
  * `specs/api/conventions.md` § Admin API: "cookie authenticated writes"
@@ -42,37 +38,60 @@ function hasCsrfHeader(request: FastifyRequest): boolean {
 }
 
 /**
- * `specs/api/conventions.md`: "Bearer and cookie are never mixed on one
- * request; a present `Authorization` header is decisive." A present header
- * resolves via bearer or fails outright — there is no fallback to the
- * cookie transport below. When the header is absent, `admin-dashboard`'s
- * cookie-session transport (Google OAuth via `auth/plugin.ts`) is tried
- * instead: cookie-authenticated writes additionally require the CSRF
- * header (`hasCsrfHeader` above).
+ * `specs/behaviors/operators.md` § Sessions: "Every request with a token
+ * loads the operator record; `active = false` or a missing record means
+ * 401, regardless of the token's validity." Missing record → the generic
+ * `unauthenticated` (the token itself might be fine, but nothing about it
+ * is disclosed); present-but-inactive → the more specific `operator_inactive`
+ * so a deactivated operator's own client can say why.
  */
-function resolveAdmin(request: FastifyRequest, fastify: FastifyInstance): void {
+function loadActiveOperator(
+  fastify: FastifyInstance,
+  email: string,
+): { email: string; name: string; kind: "person" | "bot" } {
+  const record = fastify.storage.readModel.getOperatorByEmail(email);
+  if (!record) {
+    throw new ApiError("unauthenticated", "No operator record for this token.");
+  }
+  if (!record.active) {
+    throw new ApiError("operator_inactive", "This operator account has been deactivated.");
+  }
+  return { email: record.email, name: record.name, kind: record.kind };
+}
+
+/**
+ * `specs/behaviors/operators.md` § Sessions + `specs/api/conventions.md`:
+ * "Bearer and cookie are never mixed on one request; a present
+ * `Authorization` header is decisive." A present header resolves via
+ * bearer or fails outright — never falls back to the cookie below.
+ */
+async function resolveOperator(request: FastifyRequest, fastify: FastifyInstance): Promise<void> {
   const authHeader = request.headers.authorization;
+
   if (authHeader) {
     if (!authHeader.startsWith("Bearer ")) {
-      throw new ApiError("unauthenticated", "An admin bearer token is required.");
+      throw new ApiError("unauthenticated", "An operator bearer token is required.");
     }
-
-    const provided = authHeader.slice("Bearer ".length).trim();
-    const expected = fastify.config.ADMIN_TOKEN;
-    if (!expected || !constantTimeEquals(provided, expected)) {
-      throw new ApiError("unauthenticated", "The admin bearer token is invalid.");
+    const token = authHeader.slice("Bearer ".length).trim();
+    const verified = await fastify.auth.verifyBearer(token);
+    if (!verified) {
+      throw new ApiError("unauthenticated", "The bearer token is invalid or expired.");
     }
-
+    const operator = loadActiveOperator(fastify, verified.sub);
     request.principal = {
-      kind: "admin",
-      actor: { kind: "cli", label: actorLabelFromHeader(request) },
+      kind: "operator",
+      email: operator.email,
+      name: operator.name,
+      operatorKind: operator.kind,
+      transport: "bearer",
+      exp: verified.exp,
     };
     return;
   }
 
-  const session = fastify.auth.resolveSession(request.headers.cookie);
-  if (!session) {
-    throw new ApiError("unauthenticated", "An admin session or bearer token is required.");
+  const verified = await fastify.auth.resolveCookie(request.headers.cookie);
+  if (!verified) {
+    throw new ApiError("unauthenticated", "An operator session or bearer token is required.");
   }
   if (WRITE_METHODS.has(request.method) && !hasCsrfHeader(request)) {
     throw new ApiError(
@@ -80,11 +99,63 @@ function resolveAdmin(request: FastifyRequest, fastify: FastifyInstance): void {
       "Cookie-authenticated writes require the X-Requested-With: drafter header.",
     );
   }
-
+  const operator = loadActiveOperator(fastify, verified.sub);
   request.principal = {
-    kind: "admin",
-    actor: { kind: "admin", email: session.email },
+    kind: "operator",
+    email: operator.email,
+    name: operator.name,
+    operatorKind: operator.kind,
+    transport: "cookie",
+    exp: verified.exp,
   };
+}
+
+/**
+ * `specs/api/admin.md`: "Document routes are scoped: a caller who is not
+ * one of the document's operators gets 404 `not_found`, identical to an
+ * unknown slug" — so document existence is never disclosed to a non-member
+ * either. Every `documentScoped` route names its document via a `:slug`
+ * route param.
+ */
+function enforceDocumentScope(request: FastifyRequest, fastify: FastifyInstance): void {
+  const principal = request.principal;
+  if (!principal || principal.kind !== "operator") {
+    throw forbidden("operator");
+  }
+  const slug = (request.params as Record<string, string | undefined>).slug;
+  if (!slug) {
+    throw new Error("documentScoped route reached with no :slug param");
+  }
+  const entry = fastify.storage.readModel.getDocument(slug);
+  if (!entry || !entry.record.operators?.includes(principal.email)) {
+    throw notFoundDocument(slug);
+  }
+}
+
+/**
+ * `specs/behaviors/operators.md` § Data-repository refresh (webhook):
+ * "authenticated by an HMAC signature over the body with
+ * `DATA_REPO_WEBHOOK_SECRET` (GitHub's `X-Hub-Signature-256`)." Never an
+ * operator token — this is the one capability with no notion of a
+ * principal at all.
+ */
+function resolveWebhook(request: FastifyRequest, fastify: FastifyInstance): void {
+  const secret = fastify.config.DATA_REPO_WEBHOOK_SECRET;
+  const header = request.headers["x-hub-signature-256"];
+  const signature = Array.isArray(header) ? header[0] : header;
+
+  if (!secret || !signature || !signature.startsWith("sha256=")) {
+    throw new ApiError("unauthenticated", "A valid webhook signature is required.");
+  }
+
+  const raw = request.rawBody ?? Buffer.alloc(0);
+  const expected = `sha256=${createHmac("sha256", secret).update(raw).digest("hex")}`;
+
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new ApiError("unauthenticated", "A valid webhook signature is required.");
+  }
 }
 
 /**
@@ -133,21 +204,27 @@ function resolveParticipant(request: FastifyRequest, fastify: FastifyInstance): 
  * The single global gateway hook (`jarvus-fastify` § Authentication: "one
  * global hook covers everything"). Every matched route must declare
  * `config.capability`; a missing declaration is denied at the *highest*
- * privilege (`forbidden`), never treated as open
- * (`plans/api-core.md` Validation: "An undeclared route returns 403").
+ * privilege (`forbidden`), never treated as open.
  */
 const gatewayPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", async (request) => {
     const capability = request.routeOptions.config.capability as Capability | undefined;
 
     if (capability === undefined) {
-      throw forbidden("admin");
+      throw forbidden("operator");
     }
     if (capability === "public") {
       return;
     }
-    if (capability === "admin") {
-      resolveAdmin(request, fastify);
+    if (capability === "webhook") {
+      resolveWebhook(request, fastify);
+      return;
+    }
+    if (capability === "operator") {
+      await resolveOperator(request, fastify);
+      if (request.routeOptions.config.documentScoped) {
+        enforceDocumentScope(request, fastify);
+      }
       return;
     }
     if (capability === "participant") {
