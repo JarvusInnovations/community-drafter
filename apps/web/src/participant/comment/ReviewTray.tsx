@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 
-import { type SubmitInput } from "../api.ts";
+import { ApiError, type SubmitInput } from "../api.ts";
+import { AutoTextarea } from "../components/AutoTextarea.tsx";
 import { copy } from "../copy.ts";
 import { formatAbsolute } from "../format.ts";
 import {
@@ -19,6 +20,7 @@ type DisabledReason =
   | "nothingChanged"
   | "unsaved"
   | "needsSignature"
+  | "needsAttestation"
   | null;
 
 function SignatureFields({
@@ -253,6 +255,11 @@ export function ReviewTray({
 }: ReviewTrayProps): JSX.Element {
   const [judgement, setJudgement] = useState<SubmissionJudgement | null>(null);
   const [signature, setSignature] = useState<NonNullable<SubmitInput["signature"]> | null>(null);
+  // `specs/screens/comment-mode.md` § Review tray: "A submission the server
+  // refuses is never swallowed" (issue #64 — a 400 from `POST submit` was an
+  // uncaught promise rejection and the button looked dead).
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const isCurrentSigner = Boolean(bundle.signature && !bundle.signature.revoked);
   const hasComments = inlineComments.length > 0 || Boolean(general?.body.trim());
@@ -273,20 +280,34 @@ export function ReviewTray({
     disabledReason = "unsaved";
   } else if (needsNewSignature && !signature?.display_name?.trim()) {
     disabledReason = "needsSignature";
+  } else if (
+    needsNewSignature &&
+    signature?.capacity === "official" &&
+    signature.authorized !== true
+  ) {
+    disabledReason = "needsAttestation";
   }
 
   const submitLabel = judgement ? copy.commentMode.submitButton[judgement] : "Submit";
 
   async function handleSubmit(): Promise<void> {
-    if (!judgement || disabledReason) {
+    if (!judgement || disabledReason || sending) {
       return;
     }
-    await onSubmit({
-      version,
-      judgement,
-      pending: pendingCount,
-      signature: needsNewSignature && signature ? signature : undefined,
-    });
+    setSubmitError(null);
+    setSending(true);
+    try {
+      await onSubmit({
+        version,
+        judgement,
+        pending: pendingCount,
+        signature: needsNewSignature && signature ? signature : undefined,
+      });
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? copy.phaseClosedMessage(err) : copy.genericError);
+    } finally {
+      setSending(false);
+    }
   }
 
   // § Design "Review tray": a drag-handle bar (phone bottom sheet only,
@@ -381,12 +402,12 @@ export function ReviewTray({
 
         <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
           {copy.commentMode.generalLabel}
-          <textarea
+          <AutoTextarea
             value={general?.body ?? ""}
             placeholder={copy.commentMode.generalPlaceholder}
             onChange={(event) => onEditGeneral(event.target.value)}
             rows={3}
-            className="rounded-xl border border-border bg-card p-2.5 text-sm font-normal text-foreground"
+            className="resize-none rounded-xl border border-border bg-card p-2.5 text-sm font-normal text-foreground"
           />
         </label>
         {general ? (
@@ -406,14 +427,19 @@ export function ReviewTray({
 
         <button
           type="submit"
-          disabled={Boolean(disabledReason) || submitting}
+          disabled={Boolean(disabledReason) || submitting || sending}
           className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
         >
-          {submitting ? "…" : submitLabel}
+          {submitting || sending ? "…" : submitLabel}
         </button>
         {disabledReason ? (
           <p className="text-xs text-muted-foreground">
             {copy.commentMode.submitDisabledReason[disabledReason]}
+          </p>
+        ) : null}
+        {submitError ? (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {submitError}
           </p>
         ) : null}
 
