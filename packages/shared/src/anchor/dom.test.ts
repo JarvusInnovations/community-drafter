@@ -6,7 +6,8 @@ import { describe, expect, it } from "bun:test";
  * itself has no top-level DOM access, i.e. it's safe to *import* under Bun
  * (per `plans/render-and-diff.md`: "keep it importable without executing
  * in Bun tests"). Functional coverage of DOM behavior is unverified under
- * this test runner; see the PR description.
+ * this test runner — `apps/web/src/participant/comment/anchor-dom.test.ts`
+ * covers it against happy-dom, where a real document exists.
  */
 describe("anchor/dom", () => {
   it("imports cleanly under Bun (no top-level DOM access) and exports its functions", async () => {
