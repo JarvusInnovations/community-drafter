@@ -114,6 +114,33 @@
     @apply text-primary underline underline-offset-2;
   }
 
+  /*
+   * Tables are part of real statements (signatory lists, ratio tables), and
+   * `specs/screens/version-history.md` § Display Rules "Compare" requires one
+   * to still read as a table in the redline. `display: block` lets a wide
+   * table scroll inside the column on a phone instead of widening the page.
+   */
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.85em;
+    font-size: 0.95em;
+  }
+
+  .doc-body th,
+  .doc-body td {
+    @apply border border-border;
+    padding: 0.4em 0.6em;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .doc-body th {
+    @apply bg-muted font-semibold;
+  }
+
   .doc-heading-anchor {
     @apply text-muted-foreground no-underline;
     position: absolute;
@@ -149,6 +176,44 @@
   }
   .diff-block[data-status="removed"] {
     @apply border-destructive border-l-2 pl-3 opacity-70;
+  }
+
+  /*
+   * `specs/behaviors/versioning.md` § Diff step 4: a table whose shape
+   * changed is shown twice, stacked — the whole old table struck through and
+   * labelled as removed, above the whole new table underlined and labelled as
+   * added. The decoration goes on the cells because `text-decoration` on a
+   * table box does not reach them.
+   */
+  .doc-body .diff-stack > del,
+  .doc-body .diff-stack > ins {
+    display: block;
+    text-decoration: none;
+  }
+
+  .doc-body .diff-stack-label {
+    @apply text-xs font-semibold tracking-wide uppercase;
+    margin-bottom: 0.3em;
+  }
+
+  .doc-body .diff-stack-label[data-change="removed"] {
+    @apply text-destructive;
+  }
+
+  .doc-body .diff-stack-label[data-change="added"] {
+    @apply text-ok;
+  }
+
+  .doc-body .diff-stack > del th,
+  .doc-body .diff-stack > del td {
+    @apply text-destructive;
+    text-decoration: line-through;
+  }
+
+  .doc-body .diff-stack > ins th,
+  .doc-body .diff-stack > ins td {
+    @apply text-ok;
+    text-decoration: underline;
   }
 
   /*

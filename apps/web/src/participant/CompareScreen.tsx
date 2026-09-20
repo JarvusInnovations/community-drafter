@@ -133,11 +133,7 @@ export function CompareScreen(): JSX.Element {
       {state.status === "ready" ? (
         <>
           <p className="mt-3 text-sm text-muted-foreground">
-            {copy.compare.summary(
-              state.result.summary.changed,
-              state.result.summary.added,
-              state.result.summary.removed,
-            )}
+            {copy.compare.summary(state.result.summary.items)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{copy.compare.legend}</p>
 

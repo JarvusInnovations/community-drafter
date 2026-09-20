@@ -18,9 +18,9 @@ All versions derived from the document record's body-changing commits (number, d
 **Read a version**: the document screen layout in read-only form with the "you're reading an older version" banner (`screens/document.md`). Participants see their own comments made against that version.
 
 **Compare**
-- Header: "What changed from version 2 to version 3", the summary of the `to` version, the change summary line ("4 paragraphs changed, 1 added, 0 removed"), and two selectors to change `from` and `to`. When `from` and `to` are the same version (including a document with a single version), the page says there is nothing to compare yet instead of requesting a diff.
-- Body: the redline per `behaviors/versioning.md`: deletions struck, insertions highlighted; whole added/removed blocks marked in the margin. A toggle "Hide unchanged paragraphs" defaults on when the document exceeds 30 blocks, off otherwise.
-- A legend explains the two styles in one line. Color is never the only signal (strike-through and underline are used in addition to color).
+- Header: "What changed from version 2 to version 3", the summary of the `to` version, the change summary line ("2 paragraphs changed, 1 table changed"; "No changes" when the two versions render identically), and two selectors to change `from` and `to`. When `from` and `to` are the same version (including a document with a single version), the page says there is nothing to compare yet instead of requesting a diff.
+- Body: the redline per `behaviors/versioning.md`: deletions struck, insertions highlighted; whole added/removed blocks marked in the margin. A deletion and the insertion replacing it are always separated, so a reworded phrase still reads as words. A table reads as a table: cells redlined in place when the table kept its shape, otherwise the old table above the new one, each labelled. A toggle "Hide unchanged paragraphs" defaults on when the document exceeds 30 blocks, off otherwise.
+- A legend explains the two styles in one line. Color is never the only signal (strike-through and underline are used in addition to color, and a stacked before/after table carries word labels).
 
 ## Actions
 
@@ -34,3 +34,6 @@ From the document screen's version label ("See what changed", "All versions"), f
 
 **Inherited**
 - [Versions are for normies](../principles.md#versions-are-for-normies): numbers, dates and summaries only; the comparison reads like tracked changes, not like a patch.
+
+**Local**
+- **Count and show changes the way a reader would name them.** A change is a thing on the page that looks different — a paragraph, a heading, a list item, a table — never an internal unit of the diff algorithm. Where the algorithm's units and the reader's units disagree, both the summary line and the redline follow the reader's: a table edited in five cells is one changed table, and a redline that would make a reader re-read a sentence to find the words is wrong even when it is technically minimal.
