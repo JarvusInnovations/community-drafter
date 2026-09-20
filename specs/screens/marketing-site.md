@@ -1,6 +1,6 @@
 # Screen: Marketing Site (GitHub Pages)
 
-A static homepage for the platform, published from this repository to GitHub Pages. It tells a first-time visitor what Community Drafter is, walks through how a document runs with real screenshots, and points them at the repository and the admin skill. It is not part of the running instance and never links to any document.
+A static homepage for the platform, published from this repository to GitHub Pages. It tells a first-time visitor what Community Drafter is, walks through how a document runs with real screenshots, tells an operator where they sign in and what the web console and the command line each do, and points them at the repository and the admin skill. It is not part of the running instance and never links to any document or to any particular instance.
 
 ## Route
 
@@ -14,14 +14,15 @@ None at runtime. Screenshots are static files under `site/img/`, captured from a
 
 Top to bottom, one page:
 
-1. **Hero**: the name, a one-sentence definition ("Community drafting and signing of collective statements"), a two-line elaboration in plain words (open it, sign it; comments, versions and revocation behind that), and two calls to action: "See how it works" (anchor) and "View on GitHub".
+1. **Hero**: the name, a one-sentence definition ("Community drafting and signing of collective statements"), a two-line elaboration in plain words (open it, sign it; comments, versions and revocation behind that), and three calls to action: "See how it works" (anchor), "View on GitHub", and a quiet "I run documents" anchor down to *Getting in*, so an operator who arrives already knowing what the tool is has a path off the hero.
 2. **What it is**: three short cards: the participant's experience (one screen, no account), the team's experience (publish versions with a one-line changelog, answer comments in rounds), the record (every action is a commit in a private git repo).
-3. **How it works**: numbered steps, each with a phone-width screenshot and two or three sentences: personal link and the sign card; sign now, remove later; inline comments and a submission with a position; versions with a changelog and a redline; the final list of signatories in personal or official capacity.
-4. **Principles**: five one-line principles lifted from `specs/principles.md` (sign first; the clock is real; say exactly who signed; nothing pending is lost; the record is a git repo), each with its one-sentence why.
-5. **For teams**: how to run one: install the admin skill, create, publish, open, invite, export feedback, publish again; a code block with the commands.
-6. **Footer**: repository link, license, "built by Jarvus Innovations", and a note that the pilot deployment serves a civic coalition while the tool is generic.
+3. **Getting in**: what an operator does next, in four short answers, because a first-time operator arrives here with an email address and at most an instance URL. (a) *Where you sign in*: your instance's `/admin`, with a link emailed to your operator address — no password, and there is nothing to sign into on this site. (b) *What you get*: a web console for reading a document — progress, people, submissions, versions, view-as — alongside the command line. (c) *What the command line is for*: everything that writes — create, publish, open, import, invite, remind, export — and it is what an agent drives. (d) *How to get an instance*: ask whoever runs yours for an operator account, or self-host from the repository. Ends with a "Sign in to your instance" note explaining the address is `<your-instance>/admin`, since this site links to no instance of its own.
+4. **How it works**: numbered steps, each with a phone-width screenshot and two or three sentences: personal link and the sign card; sign now, remove later; inline comments and a submission with a position; versions with a changelog and a redline; the final list of signatories in personal or official capacity.
+5. **Principles**: five one-line principles lifted from `specs/principles.md` (sign first; the clock is real; say exactly who signed; nothing pending is lost; the record is a git repo), each with its one-sentence why.
+6. **For teams**: how to run one, naming both surfaces: the web console for reading, the admin skill for writing — install the skill, create, publish, open, invite, export feedback, publish again; a code block with the commands, and a line that the installed skill is invoked as `scripts/drafter-axi` from its own directory rather than from `PATH`.
+7. **Footer**: repository link, license, "built by Jarvus Innovations", and a note that the pilot deployment serves a civic coalition while the tool is generic.
 
-Rules: works at phone width with no horizontal scroll; light scheme only, like the app; no external scripts and no third-party requests (the font is served from the site itself); images have alt text describing the state shown; no analytics.
+Rules: works at phone width with no horizontal scroll; light scheme only, like the app; no external scripts and no third-party requests (the font is served from the site itself); images have alt text describing the state shown; no analytics. **The page names no deployment and no tenant**: it describes the platform, never the pilot organization or any other client, and the disposition label it uses for `partial` is "partly addressed" (`behaviors/review-and-judgement.md`).
 
 ## Design
 

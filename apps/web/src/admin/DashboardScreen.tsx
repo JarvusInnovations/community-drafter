@@ -281,7 +281,11 @@ export function DashboardScreen(): JSX.Element {
                   </span>{" "}
                   — {entry.subject}
                   {entry.actor ? (
-                    <span className="text-muted-foreground"> ({entry.actor})</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({entry.actor}
+                      {entry.actor_superadmin ? ` · ${copy.dashboard.superadminActor}` : ""})
+                    </span>
                   ) : null}
                 </li>
               ))}

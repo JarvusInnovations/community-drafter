@@ -43,8 +43,9 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       },
       {
         usage:
-          'operators update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
-        summary: "Update or deactivate an operator.",
+          'operators update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
+        summary:
+          "Update or deactivate an operator; --superadmin is grantable only by another superadmin.",
       },
       { usage: "operators remove <email>", summary: "Remove an operator." },
     ],
@@ -57,7 +58,11 @@ export const COMMAND_GROUPS: CommandGroup[] = [
           'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--public none|read|participate] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
         summary: "Create a document in draft; the caller becomes its first operator.",
       },
-      { usage: "docs show <slug>", summary: "Dashboard numbers, versions, and schedule." },
+      {
+        usage: "docs show <slug>",
+        summary:
+          "Dashboard numbers, versions, and schedule; prints public_url when the document is publicly readable.",
+      },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",
         summary: "Open commenting and signing, and send invitations.",
@@ -95,7 +100,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         usage:
           'versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--final] [--dispositions <file.json>]',
         summary:
-          "Publish a new version in one commit; prints the version number, commit subject, and notification counts.",
+          "Publish a new version in one commit; prints the version number, commit subject, and notification counts. A --dispositions entry's outcome is one of accepted, partial, declined or noted.",
       },
       {
         usage: "versions compare <slug> <from> <to> [--unchanged]",
@@ -107,9 +112,10 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     group: "People",
     commands: [
       {
-        usage: "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official]",
+        usage:
+          "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]",
         summary:
-          "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly).",
+          "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags, and --dry-run shows what each row would do first. Run `people import --help` for the full field list.",
       },
       {
         usage:
@@ -121,8 +127,13 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         summary: "Export personal sign-in links (recorded).",
       },
       {
-        usage: "people send <slug> [--only-unsent] [--person a,b]",
-        summary: "Send invitations.",
+        usage: "people remove <slug> <person>",
+        summary: "Take back a staged invitation that was never sent.",
+      },
+      {
+        usage: "people send <slug> [--only-unsent] [--person a,b] [--dry-run]",
+        summary:
+          "Send invitations; --dry-run lists who would receive one and who is skipped and why.",
       },
       {
         usage: "people remind <slug> --target unopened|opened-not-acted [--dry-run]",

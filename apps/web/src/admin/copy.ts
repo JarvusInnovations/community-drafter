@@ -4,14 +4,11 @@ export const copy = {
   loading: "Loading…",
   genericError: "Something went wrong. Try again.",
 
-  // `specs/screens/admin-dashboard.md` § Design "Frame": "the sticky top bar
-  // shows the instance name." There's no admin-facing endpoint yet that
-  // exposes the operator's `INSTANCE_NAME` env value (only the participant
-  // bundle and outbound email carry it) — adding one is a backend change,
-  // out of scope for this visual-only restyle — so this mirrors the same
-  // literal fallback the backend itself uses when `INSTANCE_NAME` is unset
-  // (`apps/api/src/auth/routes.ts`, `apps/api/src/routes/participant/bundle.ts`).
-  // Follow-up: thread the real value through `GET /auth/session`.
+  // `specs/screens/admin-dashboard.md` § Design "Frame": the top bar shows
+  // the configured instance name, read from `GET /auth/session`'s
+  // `instance_name`. This literal is only the fallback for a session that
+  // predates that field — the same one the backend uses when
+  // `INSTANCE_NAME` is unset (`apps/api/src/auth/routes.ts`).
   instanceName: "Community Drafter",
 
   signIn: {
@@ -99,9 +96,16 @@ export const copy = {
     versions: "Versions",
     publishHint: "Publishing is CLI-only. To publish a new version:",
     publishCommand: (slug: string) =>
-      `drafter-axi versions publish ${slug} --body <file.md> --summary "…"`,
+      `drafter-axi versions publish ${slug} --file <file.md> --summary "…"`,
     recentActivity: "Recent activity",
     noActivity: "No activity yet.",
+    /**
+     * `specs/behaviors/operators.md` § Superadmins: an actor who is not one
+     * of this document's operators but holds the flag is labeled, so the
+     * document's own operators can tell an instance administrator acting
+     * with standing from a write that should not have been possible.
+     */
+    superadminActor: "superadmin",
     notificationHealth: "Notification health",
     sentLabel: "Sent",
     pendingLabel: "Pending",

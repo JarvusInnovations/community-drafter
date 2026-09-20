@@ -27,6 +27,19 @@ const activityRoute: FastifyPluginAsync = async (fastify) => {
         entries = entries.filter((entry) => entry.trailers.Person === request.query.person);
       }
 
+      // `specs/behaviors/operators.md` § Superadmins: an actor absent from
+      // this document's operator list is otherwise indistinguishable from
+      // an unauthorized write, so a superadmin acting with standing is
+      // labeled. Derived at read time from the two records — the `Actor`
+      // trailer itself stays the plain email.
+      const documentOperators = new Set(
+        (document.record.operators ?? []).map((email) => email.toLowerCase()),
+      );
+      const isOutsideSuperadmin = (actor: string): boolean => {
+        if (!actor || documentOperators.has(actor.toLowerCase())) return false;
+        return fastify.storage.readModel.getOperatorByEmail(actor)?.superadmin === true;
+      };
+
       return entries.slice(0, limit).map((entry) => ({
         commit: entry.commit,
         date: entry.at,
@@ -37,6 +50,7 @@ const activityRoute: FastifyPluginAsync = async (fastify) => {
         judgement: entry.trailers.Judgement,
         reason: entry.trailers.Reason,
         actor: entry.actor,
+        actor_superadmin: isOutsideSuperadmin(entry.actor) || undefined,
       }));
     },
   );

@@ -15,6 +15,7 @@ export function makeBundle(overrides: {
   versions?: Bundle["versions"];
   submissions?: Bundle["submissions"];
   signatories?: Bundle["signatories"];
+  prefill?: Partial<Bundle["prefill"]>;
 }): Bundle {
   return {
     instance: { name: "Community Drafter" },
@@ -59,7 +60,7 @@ export function makeBundle(overrides: {
       unlisted: 0,
       list: [],
     },
-    prefill: { name: "Jane Doe", suggested_capacity: "personal" },
+    prefill: { name: "Jane Doe", suggested_capacity: "personal", ...overrides.prefill },
     notify: {
       channel: "email",
       every_revision: false,

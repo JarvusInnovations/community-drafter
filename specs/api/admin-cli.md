@@ -6,6 +6,8 @@ An agent-facing command-line tool over `api/admin.md`, built to the AXI conventi
 
 This is the **primary admin interface** of the system, and it ships as a **skill** in this repository (`skills/drafter-axi/`) whose `scripts/` holds the committed, self-contained bundle built from `packages/cli/` per `axi-skills`. An adopting team installs it into *their* repo (`npx skills add JarvusInnovations/community-drafter --skill drafter-axi`), and their own agent drives documents from there: import invitees from that repo's own gitsheets people sheet, publish revisions its agent drafted, read progress every session. The CLI is not published to npm; the bundle in the skill is the artifact, and a CI drift gate keeps it in sync with the source.
 
+`SKILL.md` opens with a **quickstart written for a person**, not for an agent: sign in, create, publish, open, invite, revise — six numbered steps with the literal commands, plus the one line that says the web console at `<instance>/admin` is where you read what happened. The agent-facing material (TOON, the disposition loop, the session hook, the generated command reference) follows it. A first-time operator who reads only the top of the file can run a document; an agent that reads the whole file loses nothing.
+
 ## Configuration
 
 The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. The profile is selected by `--profile <name>`, else the `DRAFTER_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `DRAFTER_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
@@ -48,8 +50,17 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 
 - Every mutation prints the resulting record's key fields and the commit subject.
 - `people list` and `docs show` never print tokens or emails unless `--contacts` is passed (emails only, still never tokens).
+- **`docs create`, `docs show` and `docs open` print `public_url`** — `<instance>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
 - Errors map API `error` codes to exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other; the message is the API's `message`.
 - The home view includes `help[]` lines suggesting the next likely command, per AXI.
+- **One invocation form per surface.** Everything the CLI itself emits — `help[]` hints, error suggestions, hook output, `--help` usage lines — writes commands as `drafter-axi <command> …`, never a resolved path. The resolved path of the bundled shim (which is not on `PATH`) appears exactly once, as the home view's `invoke_as` field, which is where a reader learns how to turn those hints into a runnable command. `SKILL.md` is the other surface and uses `scripts/drafter-axi` throughout, stated once at its top; within either surface the form never varies.
+
+## Help
+
+`--help` on a command is the command's whole contract, because an agent (or a first-time operator) will not read the spec:
+
+- **`people import --help`** lists the row fields by their exact names — `email` and `name` required; `phone`, `org`, `role`, `descriptor`, `external_id`, `suggested_capacity`, `tags` optional — says that any other key is ignored (so `organization` or `title` silently does nothing), and points at `--dry-run` as the way to see what a file would do before it writes.
+- **`versions publish --help`** lists the four disposition outcomes with one line each: `accepted` (incorporated), `partial` (partly addressed, note expected), `declined` (not incorporated, note required), `noted` (read and noted, no text change) — per `behaviors/review-and-judgement.md`. An `outcome` outside that set is a validation error, never a silent pass.
 
 ## Session hook
 

@@ -39,9 +39,27 @@ compare <slug> <from> <to> [--unchanged]
 publish is one commit: the document body, disposition fields on any submissions
 named in --dispositions (a JSON array of {submission, comment, outcome, note?}),
 and a signing_closes_at extension if the document is mid-signing. Prints the
-version number, the commit subject, and notification counts.`;
+version number, the commit subject, and notification counts.
+
+--dispositions outcomes — exactly one of these four; anything else is rejected:
+  accepted  Incorporated in this version. Note optional.
+  partial   Partly addressed in this version. Note expected, saying which part.
+  declined  Not incorporated. Note required — it is what the commenter is told.
+  noted     Read and noted; no text change. Note optional.
+
+Each entry is {submission: <id>, comment: <id>, outcome: <one of the four>,
+note?: "<text>"}. Run feedback export <slug> to get the ids to fill in.`;
 
 const BODY_PREVIEW_CHARS = 800;
+
+/**
+ * `specs/api/admin-cli.md` § Help: every place that mentions the
+ * dispositions file names the four allowed outcomes, so a bad `outcome` is
+ * never something the caller has to discover from a schema dump
+ * (`behaviors/review-and-judgement.md` § Dispositions).
+ */
+const DISPOSITIONS_SHAPE =
+  "The file must be a JSON array of {submission, comment, outcome, note?}, where outcome is accepted (incorporated), partial (partly addressed), declined (not incorporated, note required) or noted (read, no text change)";
 
 /** Strip the redline's `<ins>`/`<del>` HTML into terminal-readable `{+...+}`/`{-...-}` markers. */
 function toTerminalText(html: string): string {
@@ -67,12 +85,12 @@ function parseDispositions(text: string): DispositionRecord[] {
     throw new AxiError(
       `--dispositions file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       "USAGE",
-      ["The file must be a JSON array of {submission, comment, outcome, note?}"],
+      [DISPOSITIONS_SHAPE],
     );
   }
   if (!Array.isArray(parsed)) {
     throw new AxiError("--dispositions file must contain a JSON array", "USAGE", [
-      "The file must be a JSON array of {submission, comment, outcome, note?}",
+      DISPOSITIONS_SHAPE,
     ]);
   }
   return parsed as DispositionRecord[];

@@ -65,7 +65,7 @@ export function AdminLayout(): JSX.Element {
               end
               className="text-sm font-extrabold tracking-tight text-foreground"
             >
-              {copy.instanceName}
+              {contextValue.session.instance_name || copy.instanceName}
             </NavLink>
             <div className="flex items-center gap-4 text-sm">
               <NavLink to="/admin/operators" className="font-medium text-primary">

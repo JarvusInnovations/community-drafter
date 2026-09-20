@@ -7,7 +7,7 @@ import {
   str,
   type FlagSpec,
 } from "../flags.js";
-import { cliInvocation } from "../invocation.js";
+import { resolveConfig } from "../config.js";
 import { compact, computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
 import type {
   DocOperatorAddResult,
@@ -61,9 +61,23 @@ operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
 
-Every mutation prints the document's key fields and the commit subject.`;
+Every mutation prints the document's key fields and the commit subject. When the
+document's --public is not none, create/show/open also print public_url — the
+<instance>/d/<slug> address anyone with the link can read.`;
 
-function detailObject(doc: DocumentSummary): Record<string, unknown> {
+/**
+ * `specs/api/admin-cli.md` § Output rules: a document whose `public_access`
+ * is not `none` prints the address anyone with the link can read, so it
+ * never has to be assembled by hand from the instance URL and the slug.
+ * `none` prints no such field. The instance URL comes from the resolved
+ * profile, already stripped of a trailing slash.
+ */
+function publicUrl(doc: DocumentSummary, instanceUrl: string): string | undefined {
+  if (!doc.public_access || doc.public_access === "none") return undefined;
+  return `${instanceUrl}/d/${doc.slug}`;
+}
+
+function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string, unknown> {
   return compact({
     slug: doc.slug,
     title: doc.title,
@@ -78,6 +92,7 @@ function detailObject(doc: DocumentSummary): Record<string, unknown> {
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
     public_access: doc.public_access,
+    public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
     commit: doc.commit,
@@ -88,7 +103,11 @@ function detailObject(doc: DocumentSummary): Record<string, unknown> {
 export async function docsCommand(args: string[]): Promise<string> {
   const { sub, parsed } = parseSubcommand("docs", args, DOCS_FLAGS);
   const client = clientFrom(parsed);
-  const cli = cliInvocation();
+  // `specs/api/admin-cli.md` § Output rules: emitted commands always read
+  // `drafter-axi …`; the home view's `invoke_as` is the one place the
+  // resolved shim path is printed.
+  const cli = "drafter-axi";
+  const instanceUrl = resolveConfig({ profile: str(parsed, "--profile") }).url;
 
   switch (sub) {
     case "create": {
@@ -124,7 +143,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       const doc = await client.post<DocumentSummary>("/documents", body);
       return render(parsed, doc, () =>
         joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([
             `Run \`${cli} versions publish ${slug} --file <path> --summary "..."\` to publish a first version`,
           ]),
@@ -137,7 +156,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       const doc = await client.get<DocumentDetail>(`/documents/${encodeURIComponent(slug)}`);
       return render(parsed, doc, () =>
         joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           doc.versions.length === 0
             ? renderObject({ versions: "no published versions yet" })
             : renderList("versions", doc.versions, [
@@ -181,7 +200,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       );
       return render(parsed, doc, () =>
         joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([
             comments.note,
             signing.note,
@@ -218,7 +237,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       );
       return render(parsed, doc, () =>
         joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([comments?.note, signing?.note].filter((n): n is string => Boolean(n))),
         ),
       );
@@ -229,7 +248,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       const doc = await client.post<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}/close`,
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
 
     case "reopen": {
@@ -257,7 +276,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       );
       return render(parsed, doc, () =>
         joinBlocks(
-          renderObject(detailObject(doc)),
+          renderObject(detailObject(doc, instanceUrl)),
           renderHelp([comments?.note, signing.note].filter((n): n is string => Boolean(n))),
         ),
       );
@@ -282,7 +301,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         `/documents/${encodeURIComponent(slug)}/withdraw`,
         body,
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
 
     case "operators": {
