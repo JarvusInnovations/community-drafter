@@ -306,7 +306,9 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     const home = await run([]);
     expect(home.exitCode).toBe(0);
     expect(home.output).toMatch(/signed_in: .*<[^>]+@[^>]+>/u);
-    expect(home.output).toContain(`instance: ${harness.url}`);
+    expect(home.output).toMatch(
+      new RegExp(`instance: "?${harness.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"?`, "u"),
+    );
     expect(home.output).toContain("profile: (DRAFTER_TOKEN from the environment)");
     expect(home.output.indexOf("signed_in")).toBeLessThan(home.output.indexOf("documents"));
   });
