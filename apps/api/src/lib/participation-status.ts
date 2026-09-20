@@ -10,7 +10,7 @@ export type ParticipationStatus =
   | "drafting"
   | "commented"
   | "signed"
-  | "signed (conditional)"
+  | "signed_conditional"
   | "declined";
 
 export function participationStatus(
@@ -19,7 +19,7 @@ export function participationStatus(
 ): ParticipationStatus {
   const signature = entry.record.signature;
   if (signature && !signature.revoked) {
-    return signature.conditional ? "signed (conditional)" : "signed";
+    return signature.conditional ? "signed_conditional" : "signed";
   }
 
   const submissions = fastify.storage.readModel
