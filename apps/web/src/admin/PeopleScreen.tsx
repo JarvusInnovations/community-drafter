@@ -42,7 +42,10 @@ const SOURCES = ["admin", "crm", "public"];
  * value falls back to a plain muted pill instead of throwing.
  */
 function statusPill(status: string): { tone: PillTone; strike?: boolean; label: string } {
-  switch (status as ParticipationStatus) {
+  // The API's literal for a conditional signature (issue #38) gets the same pill.
+  const normalized: ParticipationStatus | string =
+    status === "signed (conditional)" ? "signed_conditional" : status;
+  switch (normalized as ParticipationStatus) {
     case "unopened":
       return { tone: "muted", label: "unopened" };
     case "opened":
