@@ -58,10 +58,12 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/documents", { config: OPERATOR_ROUTE }, async (request) => {
     const principal = request.principal!;
     const email = principal.kind === "operator" ? principal.email : "";
-    // `specs/api/admin.md`: "List documents → returns only the caller's documents."
+    // `specs/api/admin.md`: "List documents → returns only the caller's
+    // documents"; a superadmin sees every document (`behaviors/operators.md`).
+    const superadmin = principal.kind === "operator" && principal.superadmin;
     return fastify.storage.readModel
       .listDocuments()
-      .filter((entry) => entry.record.operators?.includes(email))
+      .filter((entry) => superadmin || entry.record.operators?.includes(email))
       .map((entry) => documentSummary(fastify, entry));
   });
 

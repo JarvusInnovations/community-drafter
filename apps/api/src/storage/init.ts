@@ -92,3 +92,55 @@ export async function initDataRepo(opts: InitDataRepoOptions): Promise<InitDataR
   const commitHash = (await runGit(["rev-parse", "HEAD"], dataDir)).trim();
   return { commitHash, sheets: SHEET_NAMES };
 }
+
+export interface SyncSheetConfigsOptions {
+  dataDir: string;
+  sourceConfigDir?: string;
+  author?: { name: string; email: string };
+}
+
+/**
+ * Boot-time sheet-config migration (issue #27): an existing data repo whose
+ * `.gitsheets/<name>.toml` files are missing or differ from this build's
+ * gets them written and committed in one commit, so a schema addition in
+ * the app (a new optional field) never fails validation against a stale
+ * config in the data repo. gitsheets reads configs from the committed
+ * tree, so the commit is what makes the change effective. Returns the
+ * sheets it changed; an up-to-date repo is a no-op with no commit.
+ */
+export async function syncSheetConfigs(opts: SyncSheetConfigsOptions): Promise<string[]> {
+  const {
+    dataDir,
+    sourceConfigDir = DEFAULT_SOURCE_CONFIG_DIR,
+    author = { name: "community-drafter", email: "bootstrap@community-drafter.local" },
+  } = opts;
+  const targetConfigDir = join(dataDir, ".gitsheets");
+  mkdirSync(targetConfigDir, { recursive: true });
+
+  const changed: string[] = [];
+  for (const name of SHEET_NAMES) {
+    const contents = readFileSync(join(sourceConfigDir, `${name}.toml`), "utf8");
+    const target = join(targetConfigDir, `${name}.toml`);
+    const current = existsSync(target) ? readFileSync(target, "utf8") : null;
+    if (current !== contents) {
+      writeFileSync(target, contents);
+      changed.push(name);
+    }
+  }
+  if (changed.length === 0) return changed;
+
+  await runGit(["add", ".gitsheets"], dataDir);
+  await runGit(
+    [
+      "-c",
+      `user.name=${author.name}`,
+      "-c",
+      `user.email=${author.email}`,
+      "commit",
+      "-m",
+      `chore(gitsheets): update ${changed.join(", ")} sheet config`,
+    ],
+    dataDir,
+  );
+  return changed;
+}

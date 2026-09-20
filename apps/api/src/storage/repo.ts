@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { openRepo, openStore } from "gitsheets";
 
+import { syncSheetConfigs } from "./init.ts";
+
 import { validators, type DataStore } from "./schemas.ts";
 
 export interface OpenDataRepoOptions {
@@ -63,6 +65,13 @@ export async function openDataRepo(opts: OpenDataRepoOptions): Promise<DataRepoH
     await cloneInto(dataDir, repoUrl, branch);
   } else {
     log(`storage: opening existing data repo at ${dataDir}`);
+  }
+
+  // Issue #27: bring the data repo's sheet configs up to this build's before
+  // anything reads or writes through them.
+  const synced = await syncSheetConfigs({ dataDir });
+  if (synced.length > 0) {
+    log(`storage: updated sheet configs in the data repo: ${synced.join(", ")}`);
   }
 
   const repo = await openRepo({ gitDir: join(dataDir, ".git"), workTree: dataDir });

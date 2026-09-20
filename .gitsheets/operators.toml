@@ -38,3 +38,7 @@ type = 'string'
 
 [gitsheet.schema.properties.notes]
 type = 'string'
+
+# specs/behaviors/operators.md § Superadmins: sees and may act on every document.
+[gitsheet.schema.properties.superadmin]
+type = 'boolean'

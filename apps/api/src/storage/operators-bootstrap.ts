@@ -80,3 +80,26 @@ export async function migrateLegacyDocuments(opts: BootstrapOptions): Promise<vo
   for (const slug of legacy) await readModel.refreshDocument(slug);
   log(`storage: migrated ${legacy.length} legacy document(s) to created_by/operators=${email}`);
 }
+
+/**
+ * `specs/behaviors/operators.md` § Superadmins: "At boot the operator named
+ * by `BOOTSTRAP_OPERATOR_EMAIL`, if it exists and lacks the flag, is made a
+ * superadmin in a commit attributed to `system`, so an instance always has
+ * one." Idempotent; a no-op when unset, unknown, or already flagged.
+ */
+export async function ensureBootstrapSuperadmin(opts: BootstrapOptions): Promise<void> {
+  const { readModel, commit, bootstrapOperatorEmail, log } = opts;
+  if (!bootstrapOperatorEmail) return;
+  const email = bootstrapOperatorEmail.trim().toLowerCase();
+  const operator = readModel.getOperatorByEmail(email);
+  if (!operator || operator.superadmin === true) return;
+
+  await commit(
+    "operator-update",
+    { actor: { kind: "system" }, subject: `operator-update: ${email} (superadmin bootstrap)` },
+    async (tx) => {
+      await tx.operators.patch({ id: operator.id }, { superadmin: true });
+    },
+  );
+  log(`storage: made bootstrap operator ${email} a superadmin`);
+}

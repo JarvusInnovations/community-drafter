@@ -11,7 +11,11 @@ import {
   type CommitResult,
   type DataStoreTx,
 } from "./commit.ts";
-import { bootstrapOperator, migrateLegacyDocuments } from "./operators-bootstrap.ts";
+import {
+  bootstrapOperator,
+  ensureBootstrapSuperadmin,
+  migrateLegacyDocuments,
+} from "./operators-bootstrap.ts";
 import { openDataRepo } from "./repo.ts";
 import { ReadModel } from "./read-model.ts";
 import type { DataStore } from "./schemas.ts";
@@ -90,6 +94,12 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
   // attributed to `system`. Must run before the gateway/routes can serve
   // any traffic, so it happens here rather than on an `onReady` hook.
   await bootstrapOperator({
+    readModel,
+    commit: boundCommit,
+    bootstrapOperatorEmail: fastify.config.BOOTSTRAP_OPERATOR_EMAIL,
+    log: (message) => fastify.log.info(message),
+  });
+  await ensureBootstrapSuperadmin({
     readModel,
     commit: boundCommit,
     bootstrapOperatorEmail: fastify.config.BOOTSTRAP_OPERATOR_EMAIL,

@@ -30,6 +30,7 @@ interface CreateOperatorBody {
 interface PatchOperatorBody {
   name?: string;
   active?: boolean;
+  superadmin?: boolean;
   title?: string;
   org?: string;
   notes?: string;
@@ -44,6 +45,7 @@ function operatorView(o: {
   name: string;
   kind: OperatorKind;
   active: boolean;
+  superadmin?: boolean;
   title?: string;
   org?: string;
 }) {
@@ -52,6 +54,7 @@ function operatorView(o: {
     name: o.name,
     kind: o.kind,
     active: o.active,
+    superadmin: o.superadmin === true,
     title: o.title,
     org: o.org,
   };
@@ -152,7 +155,21 @@ const operatorsRoute: FastifyPluginAsync = async (fastify) => {
         );
       }
 
-      const allowedKeys = ["name", "active", "title", "org", "notes"] as const;
+      // `behaviors/operators.md` § Superadmins: only a superadmin grants or
+      // revokes the flag, and never on themself.
+      if (request.body.superadmin !== undefined) {
+        const caller = fastify.storage.readModel.getOperatorByEmail(callerEmail);
+        if (caller?.superadmin !== true) {
+          throw new ApiError("forbidden", "Only a superadmin can change the superadmin flag.");
+        }
+        if (callerEmail === email) {
+          throw new ApiError("validation_failed", "You cannot change your own superadmin flag.", {
+            field: "superadmin",
+          });
+        }
+      }
+
+      const allowedKeys = ["name", "active", "superadmin", "title", "org", "notes"] as const;
       const patch: Record<string, unknown> = {};
       for (const key of allowedKeys) {
         if (request.body[key] !== undefined) patch[key] = request.body[key];
