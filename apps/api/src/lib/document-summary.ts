@@ -51,12 +51,13 @@ export function documentSummary(
     sender_name: entry.record.sender_name,
     reply_to: entry.record.reply_to,
     capacities: entry.record.capacities,
+    // `specs/api/admin.md`: every document shape carries `audience` and
+    // `addressed_to` as stored, beside `public_access`; nothing is derived
+    // from anything. A record written before `audience` existed reads
+    // `closed` (`specs/data-model.md` § Audience).
     public_access: entry.record.public_access,
-    // `specs/api/admin.md`: every document shape carries `audience` derived
-    // from `public_access`, so no consumer does the mapping itself and the
-    // CLI and the dashboard cannot disagree about it.
     audience: audienceOf(entry.record),
-    list_visible_to: entry.record.list_visible_to,
+    addressed_to: entry.record.addressed_to,
     show_signatories: entry.record.show_signatories,
     revocation_window_hours: entry.record.revocation_window_hours,
     tags: entry.record.tags,

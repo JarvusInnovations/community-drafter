@@ -1,7 +1,7 @@
 import {
   type Audience,
+  audienceOf,
   type Capacity,
-  publicAccessForAudience,
   type PublicAccess,
   type ShowSignatories,
 } from "@community-drafter/shared";
@@ -23,10 +23,10 @@ interface CreateDocumentBody {
   slug: string;
   title: string;
   capacities?: Capacity[];
-  audience?: Audience;
+  audience: Audience;
+  addressed_to?: string[];
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
-  list_visible_to?: string[];
   sender_name: string;
   reply_to: string;
   revocation_window_hours?: number;
@@ -37,9 +37,9 @@ interface PatchDocumentBody {
   title?: string;
   capacities?: Capacity[];
   audience?: Audience;
+  addressed_to?: string[];
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
-  list_visible_to?: string[];
   sender_name?: string;
   reply_to?: string;
   revocation_window_hours?: number;
@@ -109,28 +109,25 @@ function deadlineChanges(
 }
 
 /**
- * `specs/data-model.md` § Audience + `specs/api/admin.md` § Documents: the
- * audience lives in `public_access` and nowhere else. `audience` is the
- * spelling callers prefer; `public_access` stays available for the phase-2
- * `participate` value. Passing both is fine only when they agree about who
- * the document is for.
+ * `specs/data-model.md` § Audience + `specs/api/admin.md` § Documents:
+ * `addressed_to` is required when the audience is `closed`, because a
+ * closed statement that names no recipient tells a signer nothing about who
+ * will read their name. The check runs against the document as it will be
+ * *after* the write, so a patch that moves only one of the pair is still
+ * judged on the pair.
+ *
+ * The audience itself is stored as given and is never written to (or read
+ * from) `public_access`: one says who the finished statement goes to, the
+ * other who may read the working draft.
  */
-function resolvePublicAccess(
-  audience: Audience | undefined,
-  publicAccess: PublicAccess | undefined,
-): PublicAccess | undefined {
-  if (audience === undefined) return publicAccess;
-  const fromAudience = publicAccessForAudience(audience);
-  if (publicAccess === undefined) return fromAudience;
-  const agree = (publicAccess === "none") === (audience === "closed");
-  if (!agree) {
-    throw new ApiError(
-      "validation_failed",
-      `audience '${audience}' and public_access '${publicAccess}' disagree about who this document is for.`,
-      { field: "audience" },
-    );
-  }
-  return publicAccess;
+function assertAddressedTo(audience: Audience, addressedTo: string[] | undefined): void {
+  if (audience !== "closed") return;
+  if (addressedTo !== undefined && addressedTo.length > 0) return;
+  throw new ApiError(
+    "validation_failed",
+    "A closed document must name who the statement is addressed to.",
+    { field: "addressed_to" },
+  );
 }
 
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
@@ -153,7 +150,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       schema: {
         body: {
           type: "object",
-          required: ["slug", "title", "sender_name", "reply_to"],
+          required: ["slug", "title", "audience", "sender_name", "reply_to"],
           properties: {
             slug: { type: "string" },
             title: { type: "string", minLength: 1 },
@@ -162,9 +159,9 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
               items: { type: "string", enum: ["personal", "official"] },
             },
             audience: { type: "string", enum: ["public", "closed"] },
+            addressed_to: { type: "array", items: { type: "string" } },
             public_access: { type: "string", enum: ["none", "read", "participate"] },
             show_signatories: { type: "string", enum: ["list", "count", "none"] },
-            list_visible_to: { type: "array", items: { type: "string" } },
             sender_name: { type: "string" },
             reply_to: { type: "string" },
             revocation_window_hours: { type: "integer", minimum: 1 },
@@ -175,6 +172,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const body = request.body;
+      assertAddressedTo(body.audience, body.addressed_to);
       if (fastify.storage.readModel.getDocument(body.slug)) {
         throw new ApiError("validation_failed", `A document '${body.slug}' already exists.`, {
           field: "slug",
@@ -201,9 +199,10 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             title: body.title,
             state: "draft",
             capacities: body.capacities,
-            public_access: resolvePublicAccess(body.audience, body.public_access),
+            audience: body.audience,
+            addressed_to: body.addressed_to,
+            public_access: body.public_access,
             show_signatories: body.show_signatories,
-            list_visible_to: body.list_visible_to,
             created_by: callerEmail,
             operators: [callerEmail],
             sender_name: body.sender_name,
@@ -242,12 +241,22 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       if (!entry) throw notFoundDocument(request.params.slug);
       const slug = entry.record.slug;
 
+      // `specs/api/admin.md`: the `closed` requirement is checked against
+      // the document as it will be after the patch, so setting the audience
+      // and its recipients in one request works and setting only one of
+      // them cannot leave the pair inconsistent.
+      assertAddressedTo(
+        request.body.audience ?? audienceOf(entry.record),
+        request.body.addressed_to ?? entry.record.addressed_to,
+      );
+
       const allowedKeys = [
         "title",
         "capacities",
+        "audience",
+        "addressed_to",
         "public_access",
         "show_signatories",
-        "list_visible_to",
         "sender_name",
         "reply_to",
         "revocation_window_hours",
@@ -257,10 +266,6 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       for (const key of allowedKeys) {
         if (request.body[key] !== undefined) patch[key] = request.body[key];
       }
-      // `audience` is a spelling of `public_access` (`specs/data-model.md`
-      // § Audience), so it lands on that one field rather than beside it.
-      const resolvedAccess = resolvePublicAccess(request.body.audience, request.body.public_access);
-      if (resolvedAccess !== undefined) patch.public_access = resolvedAccess;
 
       const result = await fastify.storage.commit(
         "settings",

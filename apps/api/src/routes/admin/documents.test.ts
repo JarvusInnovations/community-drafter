@@ -104,6 +104,7 @@ describe("POST /admin/api/documents/:slug/open", () => {
         owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
 
@@ -137,6 +138,7 @@ describe("POST /admin/api/documents/:slug/open", () => {
         owner: "team",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     await server.inject({
@@ -186,6 +188,7 @@ describe("POST /admin/api/documents/:slug/open deadline validation", () => {
         title: "Doc Dates",
         sender_name: "Team",
         reply_to: "t@example.org",
+        audience: "public",
       },
     });
     await server.inject({
@@ -248,6 +251,7 @@ describe("POST /admin/api/documents/:slug/open counts the invitations it deliver
         title: "Doc Blast",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     await server.inject({

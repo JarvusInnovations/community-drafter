@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { FakeMailer } from "../../lib/mailer/index.ts";
-import { adminHeaders, buildTestServer, seedDocument, seedParticipant } from "../test-support.ts";
+import {
+  adminHeaders,
+  buildTestServer,
+  seedDocument,
+  seedParticipant,
+  TEST_ACTOR,
+} from "../test-support.ts";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -185,12 +191,18 @@ describe("a listing edit sends the signer a confirmation", () => {
   });
 });
 
-/** `specs/data-model.md` § Audience — one home in the record, derived everywhere. */
+/**
+ * `specs/data-model.md` § Audience — a stored field, orthogonal to
+ * `public_access`: who the finished statement goes to versus who may read
+ * the working draft.
+ */
 describe("audience", () => {
-  it("defaults to closed on create, and `--audience public` writes public_access: read", async () => {
+  it("stores what it is given and leaves public_access alone", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
 
+    // A letter to a named body whose draft anyone with the link may read —
+    // the combination #87's derivation could not express.
     const closed = await server.inject({
       method: "POST",
       url: "/admin/api/documents",
@@ -201,16 +213,18 @@ describe("audience", () => {
         sender_name: "The Team",
         reply_to: "team@example.org",
         audience: "closed",
-        list_visible_to: ["City Arts Council"],
+        addressed_to: ["St. Brigid Parish Council"],
+        public_access: "read",
       },
     });
     expect(closed.statusCode).toBe(201);
     expect(closed.json()).toMatchObject({
       audience: "closed",
-      public_access: "none",
-      list_visible_to: ["City Arts Council"],
+      addressed_to: ["St. Brigid Parish Council"],
+      public_access: "read",
     });
 
+    // ... and a public statement drafted invitee-only.
     const open = await server.inject({
       method: "POST",
       url: "/admin/api/documents",
@@ -224,27 +238,15 @@ describe("audience", () => {
       },
     });
     expect(open.statusCode).toBe(201);
-    expect(open.json()).toMatchObject({ audience: "public", public_access: "read" });
+    expect(open.json()).toMatchObject({ audience: "public" });
+    expect(open.json().public_access ?? "none").toBe("none");
 
     await server.close();
   });
 
-  it("derives `public` for a document created before the word existed", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
-    await seedDocument(server, { slug: "doc-legacy", public_access: "read" });
-
-    const response = await server.inject({
-      method: "GET",
-      url: "/admin/api/documents/doc-legacy",
-      headers: adminHeaders(),
-    });
-    expect(response.json()).toMatchObject({ audience: "public", public_access: "read" });
-
-    await server.close();
-  });
-
-  it("refuses an `audience` and a `public_access` that disagree", async () => {
+  // `specs/api/conventions.md`: a body that misses a required field fails
+  // Fastify's own schema — 400 `invalid_request` — before any handler runs.
+  it("refuses a create with no `audience`, naming the field", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
 
@@ -253,31 +255,127 @@ describe("audience", () => {
       url: "/admin/api/documents",
       headers: adminHeaders(),
       payload: {
-        slug: "doc-conflict",
-        title: "Conflict",
+        slug: "doc-no-audience",
+        title: "No audience",
+        sender_name: "The Team",
+        reply_to: "team@example.org",
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: "invalid_request" });
+    expect(response.json().message).toContain("audience");
+
+    await server.close();
+  });
+
+  it("refuses a closed document with no `addressed_to`", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents",
+      headers: adminHeaders(),
+      payload: {
+        slug: "doc-unaddressed",
+        title: "Unaddressed",
         sender_name: "The Team",
         reply_to: "team@example.org",
         audience: "closed",
-        public_access: "read",
       },
     });
     expect(response.statusCode).toBe(422);
     expect(response.json()).toMatchObject({
       error: "validation_failed",
-      details: { field: "audience" },
+      details: { field: "addressed_to" },
     });
 
     await server.close();
   });
 
-  it("reaches the participant bundle, with the organizations a closed list is shared with", async () => {
+  it("reads a document written before the field existed as closed", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await server.storage.commit(
+      "create",
+      { actor: TEST_ACTOR, subject: "create: doc-legacy", document: "doc-legacy" },
+      async (tx) => {
+        await tx.documents.upsert({
+          slug: "doc-legacy",
+          title: "Legacy",
+          state: "open",
+          body: "Hello world.",
+          public_access: "read",
+          created_by: TEST_ACTOR.email,
+          operators: [TEST_ACTOR.email],
+        });
+      },
+    );
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-legacy",
+      headers: adminHeaders(),
+    });
+    expect(response.json()).toMatchObject({ audience: "closed", public_access: "read" });
+    expect(response.json().addressed_to).toBeUndefined();
+
+    await server.close();
+  });
+
+  it("round-trips both fields through PATCH, and refuses closing without recipients", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-update", audience: "public" });
+
+    const refused = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/documents/doc-update",
+      headers: adminHeaders(),
+      payload: { audience: "closed" },
+    });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json()).toMatchObject({ details: { field: "addressed_to" } });
+
+    const accepted = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/documents/doc-update",
+      headers: adminHeaders(),
+      payload: { audience: "closed", addressed_to: ["City Arts Council"] },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toMatchObject({
+      audience: "closed",
+      addressed_to: ["City Arts Council"],
+    });
+
+    // Back to public, with the recipients left in place — `addressed_to`
+    // is allowed on a public document.
+    const reopened = await server.inject({
+      method: "PATCH",
+      url: "/admin/api/documents/doc-update",
+      headers: adminHeaders(),
+      payload: { audience: "public" },
+    });
+    expect(reopened.statusCode).toBe(200);
+    expect(reopened.json()).toMatchObject({
+      audience: "public",
+      addressed_to: ["City Arts Council"],
+    });
+
+    await server.close();
+  });
+
+  it("reaches the participant bundle with the recipients, and without public_access", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
     await seedDocument(server, {
       slug: "doc-bundle",
       comments_close_at: new Date(Date.now() + 3_600_000).toISOString(),
       signing_closes_at: new Date(Date.now() + 7_200_000).toISOString(),
-      list_visible_to: ["City Arts Council"],
+      audience: "closed",
+      addressed_to: ["St. Brigid Parish Council"],
+      public_access: "read",
     });
     await seedParticipant(server, {
       document: "doc-bundle",
@@ -289,10 +387,12 @@ describe("audience", () => {
       method: "GET",
       url: `/i/${"bundletoken123456789"}/api/bundle`,
     });
-    expect(response.json().document).toMatchObject({
+    const document = response.json().document;
+    expect(document).toMatchObject({
       audience: "closed",
-      list_visible_to: ["City Arts Council"],
+      addressed_to: ["St. Brigid Parish Council"],
     });
+    expect(document.public_access).toBeUndefined();
 
     await server.close();
   });
