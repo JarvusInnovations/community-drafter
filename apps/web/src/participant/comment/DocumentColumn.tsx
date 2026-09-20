@@ -98,15 +98,22 @@ export function DocumentColumn({
     window.getSelection()?.removeAllRanges();
   }
 
+  // § Design "Document column": the floating "Comment" button is "anchored
+  // just above the selection" — position it by its bottom edge so it grows
+  // upward from the selection's top rather than downward from its bottom.
+  const anchorStyle = pending
+    ? { bottom: `${window.innerHeight - pending.rect.top + 8}px`, left: pending.rect.left }
+    : undefined;
+
   return (
     <div className="relative">
-      <div ref={containerRef} className="doc-body mt-4 px-4" data-testid="comment-document-body" />
+      <div ref={containerRef} className="doc-body" data-testid="comment-document-body" />
 
       {pending && !composerOpen ? (
         <button
           type="button"
-          className="fixed z-20 rounded bg-foreground px-3 py-1.5 text-sm font-semibold text-background shadow-lg"
-          style={{ top: pending.rect.bottom + 8, left: pending.rect.left }}
+          className="fixed z-20 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-[0_4px_10px_rgba(36,87,245,0.28)]"
+          style={anchorStyle}
           onClick={() => setComposerOpen(true)}
         >
           {copy.commentMode.commentButton}
@@ -115,8 +122,8 @@ export function DocumentColumn({
 
       {pending && composerOpen ? (
         <div
-          className="fixed z-20 flex w-72 flex-col gap-2 rounded border border-border bg-background p-3 shadow-lg"
-          style={{ top: pending.rect.bottom + 8, left: pending.rect.left }}
+          className="fixed z-20 flex w-72 flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)]"
+          style={anchorStyle}
         >
           <textarea
             autoFocus
@@ -128,12 +135,12 @@ export function DocumentColumn({
               }
             }}
             rows={3}
-            className="w-full rounded border border-border p-2 text-sm"
+            className="w-full rounded-xl border border-border bg-card p-2.5 text-sm text-foreground"
           />
-          <div className="flex justify-end gap-2 text-sm">
+          <div className="flex justify-end gap-3 text-xs">
             <button
               type="button"
-              className="rounded border border-border px-2 py-1"
+              className="font-medium text-muted-foreground"
               onClick={() => {
                 setComposerOpen(false);
                 setPending(null);
@@ -144,7 +151,7 @@ export function DocumentColumn({
             </button>
             <button
               type="button"
-              className="rounded bg-foreground px-2 py-1 text-background"
+              className="rounded-lg bg-primary px-3 py-1.5 font-bold text-white shadow-[0_4px_10px_rgba(36,87,245,0.28)]"
               onClick={handleAdd}
             >
               {copy.commentMode.composerAdd}

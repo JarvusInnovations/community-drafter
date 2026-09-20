@@ -122,27 +122,46 @@ export function CommentModeScreen(): JSX.Element {
   if (confirmation) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
-        <h1 className="text-lg font-semibold text-foreground">
-          {copy.commentMode.confirmation.heading}
-        </h1>
-        <p className="text-muted-foreground">
-          {copy.commentMode.confirmation.body(
-            copy.submissions.judgementLabel(confirmation.judgement),
-          )}
-        </p>
-        <Link to={`/i/${token}`} className="underline">
-          {copy.commentMode.confirmation.backToDocument}
-        </Link>
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            {copy.commentMode.confirmation.heading}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {copy.commentMode.confirmation.body(
+              copy.submissions.judgementLabel(confirmation.judgement),
+            )}
+          </p>
+          <Link to={`/i/${token}`} className="mt-4 inline-block font-medium text-primary">
+            {copy.commentMode.confirmation.backToDocument}
+          </Link>
+        </div>
       </main>
     );
   }
 
+  const isCurrentVersion = effectiveVersion === bundle.version.number;
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2 text-sm">
-        <span>{copy.phase.label(bundle.document.phase)}</span>
-        <span className="text-muted-foreground">{signatureLine}</span>
-        <Link to={`/i/${token}`} className="underline">
+    <main className="mx-auto max-w-[1120px] px-5 pb-[60vh] lg:pb-10">
+      {/*
+       * `specs/screens/comment-mode.md` § Design "Frame": beneath the
+       * sticky top bar (`InstanceBar`, rendered by `ParticipantLayout`) a
+       * slim second bar holds the version chip, the one-line signature
+       * status, and "Back to document" on the right.
+       */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={
+              "rounded-full px-2.5 py-0.5 text-xs font-bold " +
+              (isCurrentVersion ? "bg-ok-soft text-ok" : "bg-muted text-muted-foreground")
+            }
+          >
+            {copy.versionLabel.chip(effectiveVersion, isCurrentVersion)}
+          </span>
+          <span className="text-muted-foreground">{signatureLine}</span>
+        </div>
+        <Link to={`/i/${token}`} className="font-medium text-primary">
           {copy.commentMode.backToDocument}
         </Link>
       </div>
@@ -157,8 +176,8 @@ export function CommentModeScreen(): JSX.Element {
         />
       ) : null}
 
-      <div className="flex flex-1 flex-col md:flex-row">
-        <div className="flex-1">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <section className="min-w-0 rounded-2xl border border-border bg-card p-5">
           <DocumentColumn
             html={html}
             version={effectiveVersion}
@@ -166,8 +185,19 @@ export function CommentModeScreen(): JSX.Element {
             onAddComment={(anchor, body) => tray.addInline(anchor, body)}
             onHighlightClick={setFocusedId}
           />
-        </div>
-        <aside className="w-full border-t border-border md:w-96 md:border-l md:border-t-0">
+        </section>
+
+        {/*
+         * § Design "Review tray": a card, sticky on wide screens (360 px,
+         * right column); on narrow screens the same element becomes a
+         * fixed bottom sheet — the responsive classes below switch it
+         * between the two, so state never has to live in two component
+         * instances.
+         */}
+        <aside
+          className="fixed inset-x-0 bottom-0 z-20 max-h-[70vh] rounded-t-2xl border-t border-border bg-card shadow-[0_-8px_24px_rgba(0,0,0,0.16)] lg:sticky lg:top-16 lg:z-auto lg:max-h-none lg:rounded-2xl lg:border lg:shadow-none"
+          aria-label={copy.commentMode.trayHeading(tray.draftVersion ?? bundle.version.number)}
+        >
           <ReviewTray
             bundle={bundle}
             draftVersion={tray.draftVersion}
@@ -187,6 +217,6 @@ export function CommentModeScreen(): JSX.Element {
           />
         </aside>
       </div>
-    </div>
+    </main>
   );
 }

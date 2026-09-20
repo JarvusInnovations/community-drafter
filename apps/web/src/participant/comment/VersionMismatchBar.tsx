@@ -19,15 +19,20 @@ export function VersionMismatchBar({
   moving: boolean;
 }): JSX.Element {
   return (
-    <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm dark:border-amber-700 dark:bg-amber-950/40">
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">
       <span>{copy.commentMode.mismatch.message(draftVersion, currentVersion)}</span>
-      <span className="flex gap-3">
-        <button type="button" className="underline" onClick={onKeep} disabled={moving}>
+      <span className="flex gap-4 text-foreground">
+        <button
+          type="button"
+          className="underline disabled:opacity-60"
+          onClick={onKeep}
+          disabled={moving}
+        >
           {copy.commentMode.mismatch.keep(draftVersion)}
         </button>
         <button
           type="button"
-          className="font-semibold underline"
+          className="font-semibold underline disabled:opacity-60"
           onClick={onMove}
           disabled={moving}
         >

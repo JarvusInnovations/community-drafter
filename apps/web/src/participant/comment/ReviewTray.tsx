@@ -60,8 +60,8 @@ function SignatureFields({
   useEffect(() => emit(), []);
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-border p-2.5 text-sm">
-      <p className="font-semibold text-foreground">{copy.commentMode.signatureFieldsHeading}</p>
+    <div className="flex flex-col gap-2 rounded-xl border border-border p-3 text-sm">
+      <p className="font-bold text-foreground">{copy.commentMode.signatureFieldsHeading}</p>
       {capacities.length > 1 ? (
         <fieldset className="flex flex-col gap-1">
           <label className="flex items-center gap-2">
@@ -91,7 +91,7 @@ function SignatureFields({
         </fieldset>
       ) : null}
 
-      <label className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
         {copy.signForm.nameLabel}
         <input
           type="text"
@@ -100,13 +100,13 @@ function SignatureFields({
             setDisplayName(event.target.value);
             emit({ display_name: event.target.value });
           }}
-          className="rounded border border-border p-2"
+          className="rounded-xl border border-border bg-card p-2.5 font-normal text-foreground"
         />
       </label>
 
       {isOfficial ? (
         <>
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
             {copy.signForm.orgLabel}
             <input
               type="text"
@@ -115,10 +115,10 @@ function SignatureFields({
                 setOrg(event.target.value);
                 emit({ org: event.target.value });
               }}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card p-2.5 font-normal text-foreground"
             />
           </label>
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
             {copy.signForm.titleLabel}
             <input
               type="text"
@@ -127,7 +127,7 @@ function SignatureFields({
                 setTitle(event.target.value);
                 emit({ title: event.target.value });
               }}
-              className="rounded border border-border p-2"
+              className="rounded-xl border border-border bg-card p-2.5 font-normal text-foreground"
             />
           </label>
           <label className="flex items-start gap-2">
@@ -138,12 +138,13 @@ function SignatureFields({
                 setAuthorized(event.target.checked);
                 emit({ authorized: event.target.checked });
               }}
+              className="mt-0.5"
             />
             <span>{copy.signForm.attestation(org)}</span>
           </label>
         </>
       ) : (
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
           {copy.signForm.descriptorLabel}
           <input
             type="text"
@@ -152,7 +153,7 @@ function SignatureFields({
               setDescriptor(event.target.value);
               emit({ descriptor: event.target.value });
             }}
-            className="rounded border border-border p-2"
+            className="rounded-xl border border-border bg-card p-2.5 font-normal text-foreground"
           />
         </label>
       )}
@@ -171,14 +172,14 @@ function EarlierSubmissions({
   }
 
   return (
-    <details className="rounded border border-border p-2.5">
-      <summary className="cursor-pointer text-sm font-semibold text-foreground">
+    <details className="rounded-xl border border-border p-3">
+      <summary className="cursor-pointer text-sm font-bold text-foreground">
         {copy.commentMode.earlierSubmissions.heading}
       </summary>
       <ul className="mt-2 flex flex-col gap-3">
         {submitted.map((submission) => (
           <li key={submission.id} className="text-sm">
-            <p className="font-medium text-foreground">
+            <p className="font-semibold text-foreground">
               {copy.submissions.versionLabel(submission.version)} ·{" "}
               {formatAbsolute(submission.submitted_at)} ·{" "}
               {copy.submissions.judgementLabel(submission.judgement)}
@@ -189,7 +190,7 @@ function EarlierSubmissions({
                   <li key={comment.id} className="text-muted-foreground">
                     <span>{comment.body}</span>
                     {comment.disposition ? (
-                      <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-xs">
+                      <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs font-semibold">
                         {copy.submissions.dispositionLabel(comment.disposition.outcome)}
                       </span>
                     ) : null}
@@ -283,91 +284,113 @@ export function ReviewTray({
     });
   }
 
+  // § Design "Review tray": a drag-handle bar (phone bottom sheet only,
+  // hidden at `lg`), a header that stays visible, and a scrollable body
+  // capped at ~55vh on phones (uncapped once the tray is a plain sticky
+  // column at `lg`).
+  const dragHandle = (
+    <div className="flex justify-center pt-2 lg:hidden" aria-hidden="true">
+      <span className="h-1.5 w-10 rounded-full bg-border" />
+    </div>
+  );
+
   if (!phaseCommenting) {
     return (
-      <div className="flex flex-col gap-3 p-3">
-        <p className="text-sm text-foreground">{copy.commentMode.trayHeading(version)}</p>
-        <p className="text-sm text-muted-foreground">
-          {copy.commentMode.phaseClosed.message(formatAbsolute(bundle.document.comments_close_at))}
-        </p>
-        <ul className="flex flex-col gap-2">
-          {inlineComments.map((comment) => (
-            <li key={comment.id} className="rounded border border-border p-2 text-sm">
-              {comment.body}
-            </li>
-          ))}
-        </ul>
-        <EarlierSubmissions submissions={earlierSubmissions} />
+      <div className="flex max-h-[70vh] flex-col lg:max-h-none">
+        {dragHandle}
+        <div className="flex-none border-b border-border px-4 py-3 lg:px-5">
+          <h2 className="text-sm font-bold text-foreground">
+            {copy.commentMode.trayHeading(version)}
+          </h2>
+        </div>
+        <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto px-4 py-4 lg:max-h-none lg:px-5">
+          <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">
+            {copy.commentMode.phaseClosed.message(
+              formatAbsolute(bundle.document.comments_close_at),
+            )}
+          </p>
+          <ul className="flex flex-col gap-2">
+            {inlineComments.map((comment) => (
+              <li key={comment.id} className="rounded-xl border border-border p-3 text-sm">
+                {comment.body}
+              </li>
+            ))}
+          </ul>
+          <EarlierSubmissions submissions={earlierSubmissions} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">
+    <div className="flex max-h-[70vh] flex-col lg:max-h-none">
+      {dragHandle}
+      <div className="flex-none border-b border-border px-4 py-3 lg:px-5">
+        <h2 className="text-sm font-bold text-foreground">
           {copy.commentMode.trayHeading(version)}
         </h2>
         <p className="text-xs text-muted-foreground">{copy.commentMode.traySummary(totalCount)}</p>
       </div>
 
-      {inlineComments.length === 0 && !general ? (
-        <p className="text-sm text-muted-foreground">{copy.commentMode.trayEmpty}</p>
-      ) : null}
+      <div className="flex max-h-[55vh] flex-col gap-4 overflow-y-auto px-4 py-4 lg:max-h-none lg:px-5">
+        {inlineComments.length === 0 && !general ? (
+          <p className="text-sm text-muted-foreground">{copy.commentMode.trayEmpty}</p>
+        ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {inlineComments.map((comment) => (
-          <TrayItem
-            key={comment.id}
-            comment={comment}
-            focused={focusedId === comment.id}
-            onEdit={(body) => onEditComment(comment.id, body)}
-            onCommit={() => onCommitComment(comment.id)}
-            onDelete={() => onRemoveComment(comment.id)}
+        <ul className="flex flex-col gap-2">
+          {inlineComments.map((comment) => (
+            <TrayItem
+              key={comment.id}
+              comment={comment}
+              focused={focusedId === comment.id}
+              onEdit={(body) => onEditComment(comment.id, body)}
+              onCommit={() => onCommitComment(comment.id)}
+              onDelete={() => onRemoveComment(comment.id)}
+            />
+          ))}
+        </ul>
+
+        <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
+          {copy.commentMode.generalLabel}
+          <textarea
+            value={general?.body ?? ""}
+            placeholder={copy.commentMode.generalPlaceholder}
+            onChange={(event) => onEditGeneral(event.target.value)}
+            rows={3}
+            className="rounded-xl border border-border bg-card p-2.5 text-sm font-normal text-foreground"
           />
-        ))}
-      </ul>
+        </label>
+        {general ? (
+          <p className="-mt-2.5 text-xs text-muted-foreground">
+            {copy.commentMode.itemState[general.status]}
+          </p>
+        ) : null}
 
-      <label className="flex flex-col gap-1 text-sm">
-        {copy.commentMode.generalLabel}
-        <textarea
-          value={general?.body ?? ""}
-          placeholder={copy.commentMode.generalPlaceholder}
-          onChange={(event) => onEditGeneral(event.target.value)}
-          rows={3}
-          className="rounded border border-border p-2 text-sm"
+        <JudgementPicker
+          value={judgement}
+          onChange={setJudgement}
+          isCurrentSigner={isCurrentSigner}
+          hasComments={hasComments}
         />
-      </label>
-      {general ? (
-        <p className="-mt-2 text-xs text-muted-foreground">
-          {copy.commentMode.itemState[general.status]}
-        </p>
-      ) : null}
 
-      <JudgementPicker
-        value={judgement}
-        onChange={setJudgement}
-        isCurrentSigner={isCurrentSigner}
-        hasComments={hasComments}
-      />
+        {needsNewSignature ? <SignatureFields bundle={bundle} onChange={setSignature} /> : null}
 
-      {needsNewSignature ? <SignatureFields bundle={bundle} onChange={setSignature} /> : null}
+        <button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={Boolean(disabledReason) || submitting}
+          className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+        >
+          {submitting ? "…" : submitLabel}
+        </button>
+        {disabledReason ? (
+          <p className="text-xs text-muted-foreground">
+            {copy.commentMode.submitDisabledReason[disabledReason]}
+          </p>
+        ) : null}
 
-      <button
-        type="button"
-        onClick={() => void handleSubmit()}
-        disabled={Boolean(disabledReason) || submitting}
-        className="rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-      >
-        {submitting ? "…" : submitLabel}
-      </button>
-      {disabledReason ? (
-        <p className="text-xs text-muted-foreground">
-          {copy.commentMode.submitDisabledReason[disabledReason]}
-        </p>
-      ) : null}
-
-      <EarlierSubmissions submissions={earlierSubmissions} />
+        <EarlierSubmissions submissions={earlierSubmissions} />
+      </div>
     </div>
   );
 }

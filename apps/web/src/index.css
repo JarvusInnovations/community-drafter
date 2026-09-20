@@ -150,4 +150,25 @@
   .diff-block[data-status="removed"] {
     @apply border-destructive border-l-2 pl-3 opacity-70;
   }
+
+  /*
+   * `specs/screens/comment-mode.md` § Design "Document column": the
+   * participant's own pending comments get the pale-blue tint and a blue
+   * underline; their own already-submitted comments get the neutral muted
+   * tint and a dotted underline. Custom classes (not inline Tailwind
+   * utilities) because `highlights.ts` assigns `mark.className` directly in
+   * plain DOM code, outside JSX.
+   */
+  .drafter-highlight-pending {
+    @apply bg-primary-soft cursor-pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-decoration-thickness: 2px;
+  }
+  .drafter-highlight-submitted {
+    @apply bg-muted cursor-pointer;
+    text-decoration: underline dotted;
+    text-decoration-color: var(--color-muted-foreground);
+    text-decoration-thickness: 2px;
+  }
 }
