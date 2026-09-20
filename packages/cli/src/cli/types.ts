@@ -107,6 +107,8 @@ export interface ImportResult {
   people_updated: number;
   invitations_created: number;
   skipped_existing: number;
+  dry_run?: boolean;
+  rows?: Array<{ email: string; name: string; person: string; action: string; changes: string[] }>;
   commit?: string | null;
 }
 
@@ -152,6 +154,9 @@ export interface InvitationRow {
 
 export interface SendResult {
   queued: number;
+  dry_run?: boolean;
+  would_send?: Array<{ person: string; name: string }>;
+  skipped?: Array<{ person: string; reason: string }>;
   csv?: string;
   commit?: string | null;
 }

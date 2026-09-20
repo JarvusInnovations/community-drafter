@@ -29,25 +29,35 @@ import type {
 import { clientFrom, readFileOrStdin, render } from "./common.js";
 
 const PEOPLE_FLAGS: Record<string, FlagSpec> = {
-  import: { positionals: 2, value: ["--suggested-capacity"] },
+  import: { positionals: 2, value: ["--suggested-capacity"], boolean: ["--dry-run"] },
   list: { positionals: 1, value: ["--status", "--source", "-q"], boolean: ["--contacts"] },
   links: { positionals: 1, value: ["--person", "--out"] },
-  send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent"] },
+  send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
+  remove: { positionals: 2 },
   remind: { positionals: 1, value: ["--target"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 },
 };
 
-export const PEOPLE_HELP = `usage: drafter-axi people <import|list|links|send|remind|revoke-link|reissue-link> ...
+export const PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link> ...
 
-import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official]
+import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
-       a gitsheets people sheet's NDJSON export works directly.
+       a gitsheets people sheet's NDJSON export works directly. Each row may carry
+       email, name, phone, org, role, descriptor, external_id, suggested_capacity.
+       --dry-run shows what every row would do (new person, existing person and
+       which fields would change, or already invited) without writing anything.
 list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]
-       Never prints tokens; emails only with --contacts.
+       Never prints tokens; emails only with --contacts. Staged invitations that
+       have not been sent yet show status not_sent.
+remove <slug> <person>
+       Take back a staged invitation that was never sent. Once sent or acted on,
+       the record stays (use revoke-link instead).
 links <slug> [--person a,b] [--out <file.csv>]
        The only command that returns tokens — recorded as an admin event.
-send <slug> [--only-unsent] [--person a,b]
+send <slug> [--only-unsent] [--person a,b] [--dry-run]
+       Sends invitations to everyone not yet sent (or to --person, even if sent).
+       --dry-run lists who would receive one and who is skipped and why.
 remind <slug> --target unopened|opened-not-acted [--dry-run]
 revoke-link <slug> <person>
 reissue-link <slug> <person>
@@ -151,16 +161,31 @@ export async function peopleCommand(args: string[]): Promise<string> {
           if (row.suggested_capacity === undefined) row.suggested_capacity = suggestedCapacity;
         }
       }
+      const dryRun = bool(parsed, "--dry-run");
       const ndjson = rows.map((row) => JSON.stringify(row)).join("\n");
       const result = await client.postText<ImportResult>(
-        `/documents/${encodeURIComponent(slug)}/invitations/import`,
+        `/documents/${encodeURIComponent(slug)}/invitations/import${dryRun ? "?dry_run=1" : ""}`,
         ndjson,
         "application/x-ndjson",
       );
+      const { rows: planRows, ...counts } = result;
+      type PlanRow = NonNullable<ImportResult["rows"]>[number];
       return render(parsed, result, () =>
         joinBlocks(
-          renderObject(result),
-          renderHelp([`Run \`drafter-axi people list ${slug}\` to see the imported invitees`]),
+          renderObject(counts),
+          planRows && planRows.length > 0
+            ? renderList("rows", planRows, [
+                computed<PlanRow>("person", (r) => r.person),
+                computed<PlanRow>("name", (r) => r.name),
+                computed<PlanRow>("action", (r) => r.action),
+                computed<PlanRow>("changes", (r) => r.changes.join(",")),
+              ])
+            : "",
+          renderHelp(
+            dryRun
+              ? [`Nothing was written. Run again without --dry-run to import`]
+              : [`Run \`drafter-axi people list ${slug}\` to see the imported invitees`],
+          ),
         ),
       );
     }
@@ -232,18 +257,72 @@ export async function peopleCommand(args: string[]): Promise<string> {
     case "send": {
       const slug = requirePositional(parsed, 0, "slug", "drafter-axi people send <slug>");
       const person = csv(str(parsed, "--person"));
+      const dryRun = bool(parsed, "--dry-run");
       const result = await client.post<SendResult>(
         `/documents/${encodeURIComponent(slug)}/invitations/send`,
         {
           only_unsent: bool(parsed, "--only-unsent") || undefined,
           person: person.length > 0 ? person : undefined,
+          dry_run: dryRun || undefined,
         },
       );
+      type Skipped = NonNullable<SendResult["skipped"]>[number];
+      type Would = NonNullable<SendResult["would_send"]>[number];
+      const skippedBlock =
+        result.skipped && result.skipped.length > 0
+          ? renderList("skipped", result.skipped, [
+              computed<Skipped>("person", (s) => s.person),
+              computed<Skipped>("reason", (s) => s.reason),
+            ])
+          : "";
+      if (dryRun) {
+        const would = result.would_send ?? [];
+        return render(parsed, result, () =>
+          joinBlocks(
+            renderObject({ dry_run: true, would_send: would.length }),
+            would.length > 0
+              ? renderList("would_send", would, [
+                  computed<Would>("person", (w) => w.person),
+                  computed<Would>("name", (w) => w.name),
+                ])
+              : "",
+            skippedBlock,
+            renderHelp([`Nothing was sent. Run again without --dry-run to send`]),
+          ),
+        );
+      }
       return render(parsed, result, () =>
-        renderObject({
-          queued: result.queued,
-          mailer_export: result.csv ? "included (rerun with --json to capture)" : undefined,
-        }),
+        joinBlocks(
+          renderObject({
+            queued: result.queued,
+            mailer_export: result.csv ? "included (rerun with --json to capture)" : undefined,
+          }),
+          skippedBlock,
+        ),
+      );
+    }
+
+    case "remove": {
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "drafter-axi people remove <slug> <person>",
+      );
+      const personId = requirePositional(
+        parsed,
+        1,
+        "person",
+        "drafter-axi people remove <slug> <person>",
+      );
+      const result = await client.delete<{ ok: boolean; commit?: string | null }>(
+        `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(personId)}`,
+      );
+      return render(parsed, result, () =>
+        joinBlocks(
+          renderObject(result),
+          renderHelp([`Removed the staged invitation for ${personId}`]),
+        ),
       );
     }
 
