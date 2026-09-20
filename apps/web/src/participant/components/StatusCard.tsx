@@ -227,6 +227,7 @@ export function StatusCard({
           {editing ? (
             <EditSignatureForm
               signature={signature}
+              document={bundle.document}
               token={token}
               onSaved={async () => {
                 // Refetch before closing the form so the heading and live
@@ -240,6 +241,19 @@ export function StatusCard({
             />
           ) : (
             <>
+              {/*
+               * `specs/behaviors/signatures.md` § Conditional signatures:
+               * marked for the signer on their own card and for the team in
+               * their views; the public list stays uniform.
+               */}
+              {state === "signed_conditional" ? (
+                <p>
+                  <span className="rounded-full bg-amber-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-amber">
+                    {copy.signed.conditionalMarker}
+                  </span>
+                </p>
+              ) : null}
+
               <h2
                 ref={headingRef}
                 tabIndex={-1}

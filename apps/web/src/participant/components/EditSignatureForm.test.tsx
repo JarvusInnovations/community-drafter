@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
+import { makeBundle } from "../__fixtures__/bundle.ts";
 import { EditSignatureForm } from "./EditSignatureForm.tsx";
 
 afterEach(cleanup);
@@ -16,6 +17,8 @@ const SIGNATURE = {
   revoked: false,
   signed_at: "2026-09-20T17:23:00Z",
 };
+
+const DOCUMENT = makeBundle({}).document;
 
 /**
  * Issue #62: the first click on Save did nothing at all — no error, no
@@ -39,6 +42,7 @@ describe("EditSignatureForm — Save takes one press", () => {
     render(
       <EditSignatureForm
         signature={SIGNATURE}
+        document={DOCUMENT}
         token="test-token"
         onSaved={() => {
           saved += 1;
@@ -48,7 +52,7 @@ describe("EditSignatureForm — Save takes one press", () => {
       />,
     );
 
-    const title = screen.getByLabelText("Your title (optional)");
+    const title = screen.getByLabelText("Your title");
     fireEvent.change(title, { target: { value: "President" } });
     title.focus();
 
@@ -70,6 +74,7 @@ describe("EditSignatureForm — Save takes one press", () => {
     render(
       <EditSignatureForm
         signature={SIGNATURE}
+        document={DOCUMENT}
         token="test-token"
         onSaved={() => Promise.resolve()}
         onCancel={() => {}}

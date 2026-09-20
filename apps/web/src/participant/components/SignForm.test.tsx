@@ -49,6 +49,7 @@ describe("SignForm — capacity fields and the attestation gate", () => {
     fireEvent.change(screen.getByLabelText("Organization"), {
       target: { value: "Save the Academy Coalition" },
     });
+    fireEvent.change(screen.getByLabelText("Your title"), { target: { value: "Chair" } });
     // Deliberately leave the attestation checkbox unchecked.
     fireEvent.click(screen.getByRole("button", { name: /^Sign for/u }));
 
@@ -87,6 +88,7 @@ describe("SignForm — capacity fields and the attestation gate", () => {
     fireEvent.change(screen.getByLabelText("Organization"), {
       target: { value: "Save the Academy Coalition" },
     });
+    fireEvent.change(screen.getByLabelText("Your title"), { target: { value: "Chair" } });
     fireEvent.click(
       screen.getByText("I am authorized to sign this on behalf of Save the Academy Coalition."),
     );
@@ -98,6 +100,94 @@ describe("SignForm — capacity fields and the attestation gate", () => {
     expect(posted?.capacity).toBe("official");
     expect(posted?.org).toBe("Save the Academy Coalition");
     expect(posted?.authorized).toBe(true);
+    expect(posted?.title).toBe("Chair");
+    // `specs/behaviors/signatures.md` § Consent at signing: the listing
+    // choice travels with the signature, decided before it exists.
+    expect(posted?.listed).toBe(true);
     expect(signedCalled).toBe(true);
+  });
+
+  /**
+   * `specs/behaviors/signatures.md` § Capacity: "Official capacity requires
+   * a title" (issue #81, decided 2026-09-20).
+   */
+  it("official capacity refuses a blank title, before the attestation gate", async () => {
+    const bundle = makeBundle({});
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    fireEvent.click(screen.getByLabelText("On behalf of an organization"));
+    fireEvent.change(screen.getByLabelText("Organization"), {
+      target: { value: "Save the Academy Coalition" },
+    });
+    // The field carries `required`, so the empty case never reaches the
+    // handler; whitespace is what slips past it and has to be caught here.
+    fireEvent.change(screen.getByLabelText("Your title"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: /^Sign for/u }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Add your title before signing for an organization.");
+    expect(fetchCalled).toBe(false);
+  });
+});
+
+/**
+ * `specs/behaviors/signatures.md` § Consent at signing +
+ * `specs/screens/document.md` § Display Rules 3: the sentence and the
+ * checkbox are on the card *before* the signature exists (issue #70 — the
+ * skeptic could not tell who would see their name).
+ */
+describe("SignForm — who sees your name, and the listing choice", () => {
+  it("names the invited people on a closed document, and the organizations the list is shared with", () => {
+    const bundle = makeBundle({
+      document: {
+        audience: "closed",
+        list_visible_to: ["St. Brigid Parish Council", "City Arts Council"],
+      },
+    });
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    expect(
+      screen.getByText(
+        /only the people invited to this document can see\. The team also shares the list with St\. Brigid Parish Council and City Arts Council\./u,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByLabelText(/List my name on the signatory list/u)).toBeTruthy();
+  });
+
+  it("says anyone with the link can read the list on a public document", () => {
+    const bundle = makeBundle({ document: { audience: "public", list_visible_to: [] } });
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    expect(screen.getByText(/which anyone with the link can read\./u)).toBeTruthy();
+    const listed = screen.getByLabelText(/List my name publicly/u) as HTMLInputElement;
+    expect(listed.checked).toBe(true);
+  });
+
+  it("offers no listing choice when no list is shown at all", () => {
+    const bundle = makeBundle({ document: { audience: "public", show_signatories: "count" } });
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    expect(screen.getByText(/Only the number of signatories is shown/u)).toBeTruthy();
+    expect(screen.queryByLabelText(/List my name/u)).toBeNull();
+  });
+
+  it("sends listed: false when the signer turns the listing off before signing", async () => {
+    let posted: Record<string, unknown> | undefined;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      posted = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ capacity: "personal" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const bundle = makeBundle({});
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    fireEvent.click(screen.getByLabelText(/List my name on the signatory list/u));
+    fireEvent.click(screen.getByRole("button", { name: /^Sign as/u }));
+
+    await screen.findByText(/Signing…|Sign as/u);
+    expect(posted?.listed).toBe(false);
   });
 });

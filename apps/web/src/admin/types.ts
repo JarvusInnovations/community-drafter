@@ -36,6 +36,9 @@ export interface DocumentSummary {
   reply_to?: string;
   capacities?: Capacity[];
   public_access?: "none" | "read" | "participate";
+  /** `specs/data-model.md` § Audience — derived server-side from `public_access`. */
+  audience: "public" | "closed";
+  list_visible_to?: string[];
   show_signatories?: ShowSignatories;
   revocation_window_hours?: number;
   tags?: string[];

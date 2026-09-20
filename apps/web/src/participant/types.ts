@@ -12,6 +12,8 @@
 
 export type Capacity = "personal" | "official";
 export type ShowSignatories = "list" | "count" | "none";
+/** `specs/data-model.md` § Audience — derived server-side from `public_access`. */
+export type Audience = "public" | "closed";
 export type DocumentState = "draft" | "open" | "closed" | "withdrawn";
 export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
 export type Judgement = "sign" | "sign_conditional" | "decline" | string;
@@ -45,6 +47,9 @@ export interface DocumentInfo {
   signing_closes_at?: string;
   capacities: Capacity[];
   show_signatories: ShowSignatories;
+  audience: Audience;
+  /** Organizations a closed document's signatory list is shared with (`specs/data-model.md` § Audience). */
+  list_visible_to: string[];
   reply_to?: string;
   sender_name?: string;
 }

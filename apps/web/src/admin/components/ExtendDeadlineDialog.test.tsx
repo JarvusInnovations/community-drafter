@@ -11,6 +11,7 @@ const DOCUMENT: DocumentDetail = {
   title: "Coalition Charter",
   state: "open",
   phase: "commenting",
+  audience: "closed" as const,
   comments_close_at: "2026-09-23T21:00:00Z",
   signing_closes_at: "2026-09-30T21:00:00Z",
   counts: {

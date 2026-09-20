@@ -10,7 +10,13 @@
  */
 import { type ApiError } from "./api.ts";
 import { formatAbsolute } from "./format.ts";
-import { type DiffSummaryItem, type Phase, type SignatureView } from "./types.ts";
+import {
+  type Audience,
+  type DiffSummaryItem,
+  type Phase,
+  type ShowSignatories,
+  type SignatureView,
+} from "./types.ts";
 
 /** Just the fields the signed-state line reads off a signature. */
 export type SignedWho = Pick<
@@ -107,10 +113,44 @@ export const copy = {
     descriptorLabel: "How would you like to be described? (optional)",
     descriptorHint: "your neighborhood, profession, or organization",
     orgLabel: "Organization",
-    titleLabel: "Your title (optional)",
+    /**
+     * `specs/behaviors/signatures.md` § Capacity: "Official capacity
+     * requires a title" — the field is no longer marked optional, because
+     * it no longer is (issue #81, decided 2026-09-20).
+     */
+    titleLabel: "Your title",
+    titleHint: "Chair, Executive Director, Principal…",
     attestation: (org: string) =>
       `I am authorized to sign this on behalf of ${org || "this organization"}.`,
-    listedLabel: "List my name publicly",
+    /** § Consent at signing: the wording follows the audience, because "publicly" is not true of a closed document. */
+    listedLabel: (audience: Audience) =>
+      audience === "public" ? "List my name publicly" : "List my name on the signatory list",
+    listedHint: "Leave this off and your signature is still counted — just not named.",
+    /**
+     * § Consent at signing: one sentence, above the button, saying who will
+     * see this name. It never promises more privacy than the document's
+     * settings give.
+     */
+    whoSees(audience: Audience, show: ShowSignatories): string {
+      if (show === "none") {
+        return "No signatory list is shown for this document; your name goes to the team.";
+      }
+      if (show === "count") {
+        return "Only the number of signatories is shown; your name goes to the team.";
+      }
+      return audience === "public"
+        ? "Your name will appear on the signatory list, which anyone with the link can read."
+        : "Your name will appear on the signatory list, which only the people invited to this document can see.";
+    },
+    /** The second sentence, when a closed document's list is shared beyond its invitees. */
+    alsoSharedWith(organizations: string[]): string {
+      const named =
+        organizations.length === 1
+          ? organizations[0]
+          : `${organizations.slice(0, -1).join(", ")} and ${organizations[organizations.length - 1]}`;
+      return `The team also shares the list with ${named}.`;
+    },
+    titleError: "Add your title before signing for an organization.",
     signButton: (name: string) => `Sign as ${name || "…"}`,
     /**
      * `specs/screens/document.md` § Display Rules 3: in official capacity
@@ -154,8 +194,19 @@ export const copy = {
     changeListing: "Change how you're listed",
     remove: "Remove my name",
     addComments: "Add comments",
+    /** § Conditional signatures: marked on the signer's own card, never in public. */
+    conditionalMarker: "Conditional",
     conditionalNote:
       "You signed conditionally; we'll show you what changed when the final version is published.",
+    /**
+     * `specs/screens/document.md` § Display Rules 3, *Change how you're
+     * listed*: a changed organization is a new claim of authority, so the
+     * attestation comes back unchecked and Save waits for it (issue #70).
+     */
+    reattestNote: (org: string) =>
+      `You're changing the organization to ${org || "another organization"}. Confirm you're authorized to sign for it.`,
+    reattestError: (org: string) =>
+      `Check the box confirming you're authorized to sign for ${org || "the organization you named"} before saving.`,
     /**
      * `specs/screens/document.md` § Display Rules 3, *Behind the current
      * version*: a fact, not a scolding. The signature stands; the two
@@ -374,6 +425,8 @@ export const copy = {
       nothingChanged: "Nothing has changed since your last submission.",
       unsaved: "Some comments are still saving — wait a moment before submitting.",
       needsSignature: "Add your name to sign.",
+      /** `specs/behaviors/signatures.md` § Capacity: official capacity requires a title. */
+      needsTitle: "Add your title to sign for an organization.",
       /** `specs/screens/comment-mode.md` § Review tray: official capacity without the attestation. */
       needsAttestation: "Check the box confirming you're authorized to sign for your organization.",
     },
