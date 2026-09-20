@@ -12,7 +12,9 @@ type LoadState =
   | { status: "ready"; document: DocumentDetail };
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `border-b-2 px-3 py-2 text-sm ${isActive ? "border-foreground font-semibold" : "border-transparent text-muted-foreground"}`;
+  `border-b-2 px-3 py-2.5 text-sm font-semibold ${
+    isActive ? "border-primary text-primary" : "border-transparent text-muted-foreground"
+  }`;
 
 /** Layout for the whole `/admin/d/:slug/*` family: fetches the document once, shares it via context. */
 export function DocumentLayout(): JSX.Element {
@@ -44,11 +46,11 @@ export function DocumentLayout(): JSX.Element {
   );
 
   if (state.status === "loading") {
-    return <main className="p-6 text-muted-foreground">{copy.loading}</main>;
+    return <main className="mx-auto max-w-[1120px] p-5 text-muted-foreground">{copy.loading}</main>;
   }
   if (state.status === "error" || !contextValue) {
     return (
-      <main className="p-6 text-destructive" role="alert">
+      <main className="mx-auto max-w-[1120px] p-5 text-destructive" role="alert">
         {state.status === "error" ? state.message : copy.genericError}
       </main>
     );
@@ -56,22 +58,26 @@ export function DocumentLayout(): JSX.Element {
 
   return (
     <DocumentContext.Provider value={contextValue}>
-      <div className="border-b border-border px-4">
-        <h1 className="pt-4 text-xl font-semibold">{contextValue.document.title}</h1>
-        <nav className="mt-2 flex gap-1">
-          <NavLink to={`/admin/d/${slug}`} className={tabClass} end>
-            Dashboard
-          </NavLink>
-          <NavLink to={`/admin/d/${slug}/people`} className={tabClass}>
-            People
-          </NavLink>
-          <NavLink to={`/admin/d/${slug}/submissions`} className={tabClass}>
-            Submissions
-          </NavLink>
-          <NavLink to={`/admin/d/${slug}/versions`} className={tabClass}>
-            Versions
-          </NavLink>
-        </nav>
+      <div className="border-b border-border">
+        <div className="mx-auto max-w-[1120px] px-5">
+          <h1 className="pt-5 text-xl font-bold tracking-tight text-foreground">
+            {contextValue.document.title}
+          </h1>
+          <nav className="-mx-5 mt-3 flex gap-1 overflow-x-auto px-5">
+            <NavLink to={`/admin/d/${slug}`} className={tabClass} end>
+              Dashboard
+            </NavLink>
+            <NavLink to={`/admin/d/${slug}/people`} className={tabClass}>
+              People
+            </NavLink>
+            <NavLink to={`/admin/d/${slug}/submissions`} className={tabClass}>
+              Submissions
+            </NavLink>
+            <NavLink to={`/admin/d/${slug}/versions`} className={tabClass}>
+              Versions
+            </NavLink>
+          </nav>
+        </div>
       </div>
       <Outlet />
     </DocumentContext.Provider>

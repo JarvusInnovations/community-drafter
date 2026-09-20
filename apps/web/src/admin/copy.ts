@@ -4,6 +4,16 @@ export const copy = {
   loading: "Loading…",
   genericError: "Something went wrong. Try again.",
 
+  // `specs/screens/admin-dashboard.md` § Design "Frame": "the sticky top bar
+  // shows the instance name." There's no admin-facing endpoint yet that
+  // exposes the operator's `INSTANCE_NAME` env value (only the participant
+  // bundle and outbound email carry it) — adding one is a backend change,
+  // out of scope for this visual-only restyle — so this mirrors the same
+  // literal fallback the backend itself uses when `INSTANCE_NAME` is unset
+  // (`apps/api/src/auth/routes.ts`, `apps/api/src/routes/participant/bundle.ts`).
+  // Follow-up: thread the real value through `GET /auth/session`.
+  instanceName: "Community Drafter",
+
   signIn: {
     heading: "Sign in",
     body: "Enter your operator email address and we'll send you a sign-in link.",
@@ -28,7 +38,6 @@ export const copy = {
   },
 
   nav: {
-    documents: "Documents",
     operators: "Operators",
     signOut: "Sign out",
   },

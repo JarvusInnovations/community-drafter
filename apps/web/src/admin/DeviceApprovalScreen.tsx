@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from "react-router";
 
 import { ApiError, approveDevice, getSession, logout } from "./api.ts";
 import { copy } from "./copy.ts";
+import { primaryButtonClass, quietButtonClass } from "./styles.ts";
 import { type SessionInfo } from "./types.ts";
 
 type State =
@@ -68,9 +69,11 @@ export function DeviceApprovalScreen(): JSX.Element {
   if (state.status === "invalid") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-center text-foreground">
-        <p role="alert" className="text-destructive">
-          {copy.device.invalidCode}
-        </p>
+        <div className="w-full max-w-[420px] rounded-2xl border border-border bg-card p-6">
+          <p role="alert" className="text-destructive">
+            {copy.device.invalidCode}
+          </p>
+        </div>
       </main>
     );
   }
@@ -103,42 +106,48 @@ export function DeviceApprovalScreen(): JSX.Element {
   if (state.status === "approved") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-center text-foreground">
-        <h1 className="text-xl font-semibold">{copy.device.heading}</h1>
-        <p role="status" className="text-muted-foreground">
-          {copy.device.approved}
-        </p>
+        <div className="w-full max-w-[420px] rounded-2xl border border-border bg-card p-6">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            {copy.device.heading}
+          </h1>
+          <p role="status" className="mt-3 text-muted-foreground">
+            {copy.device.approved}
+          </p>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground">
-      <h1 className="text-xl font-semibold">{copy.device.heading}</h1>
-      <p className="text-muted-foreground">{copy.device.body(code ?? "")}</p>
-      <p className="text-2xl font-mono tracking-widest">{code}</p>
-      <p className="text-muted-foreground">{copy.device.signedInAs(state.session.email)}</p>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => void handleApprove()}
-          disabled={busy}
-          className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-        >
-          {copy.device.approve}
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleNotMe()}
-          disabled={busy}
-          className="rounded border border-border px-4 py-2 text-sm disabled:opacity-60"
-        >
-          {copy.device.notMe}
-        </button>
+      <div className="w-full max-w-[420px] rounded-2xl border border-border bg-card p-6">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">{copy.device.heading}</h1>
+        <p className="mt-2 text-muted-foreground">{copy.device.body(code ?? "")}</p>
+        <p className="mt-3 text-2xl font-mono font-bold tracking-widest text-foreground">{code}</p>
+        <p className="mt-2 text-muted-foreground">{copy.device.signedInAs(state.session.email)}</p>
+        {error ? (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleApprove()}
+            disabled={busy}
+            className={primaryButtonClass}
+          >
+            {copy.device.approve}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleNotMe()}
+            disabled={busy}
+            className={quietButtonClass}
+          >
+            {copy.device.notMe}
+          </button>
+        </div>
       </div>
     </main>
   );
