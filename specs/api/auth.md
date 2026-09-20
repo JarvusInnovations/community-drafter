@@ -4,7 +4,7 @@ Operator sign-in and sessions. All under `/auth`, `public` capability unless sta
 
 ## `POST /auth/login`
 
-Body `{ email, return? }`. Always 202 `{ ok: true }` regardless of whether the email is an operator. When it is an active operator, emails a magic link to `<PUBLIC_URL>/auth/callback?code=<code>` whose return path is `return` (validated) or `/admin`. The **code** is 24 random base62 characters that maps, in memory and for 15 minutes, to the signed magic token; the token itself never appears in a URL or an email, so the link stays short and does not look like a credential payload. Rate limits: 5 per address and 5 per source IP per 15 minutes → 429 `rate_limited`.
+Body `{ email, return? }`. Always 202 `{ ok: true }` regardless of whether the email is an operator. When it is an active operator, emails a magic link to `<PUBLIC_URL>/auth/callback?code=<code>` whose return path is `return` (validated) or `/admin`. The **code** is 24 random base62 characters that maps, in memory and for 15 minutes, to the signed magic token; the token itself never appears in a URL or an email, so the link stays short and does not look like a credential payload. Rate limits: 5 per address and 5 per source IP per 15 minutes by default (`AUTH_LOGIN_RATE_LIMIT` sets the per-window count, for test environments that sign many operators in from one machine) → 429 `rate_limited`.
 
 ## `GET /auth/callback?code=`
 

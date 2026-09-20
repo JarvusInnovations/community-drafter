@@ -4,3 +4,6 @@ image_tag                = "sha-7e188a9"
 public_url               = "https://drafter.jarv.us"
 mailer                   = "postmark"
 bootstrap_operator_email = "chris@jarv.us"
+
+# Raised for the simulated campaign run of 2026-09-20 (many operators signing in from one machine); return to 5 afterwards.
+auth_login_rate_limit = 500

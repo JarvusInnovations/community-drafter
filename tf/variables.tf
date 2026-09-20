@@ -81,3 +81,9 @@ variable "bootstrap_operator_email" {
   type        = string
   default     = null
 }
+
+variable "auth_login_rate_limit" {
+  description = "Sign-in requests allowed per address and per source IP per 15 minutes (specs/api/auth.md; AUTH_LOGIN_RATE_LIMIT). Raise only for test runs that sign many operators in from one machine."
+  type        = number
+  default     = 5
+}

@@ -139,9 +139,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     usedMagicJti: new UsedJtiStore(),
     magicCodes: new MagicCodeStore(),
     loginRateLimiters: {
-      // `specs/api/auth.md`: "5 per address and 5 per source IP per 15 minutes".
-      perEmail: new FixedWindowLimiter(5, 15 * 60_000),
-      perIp: new FixedWindowLimiter(5, 15 * 60_000),
+      // `specs/api/auth.md`: "5 per address and 5 per source IP per 15 minutes"
+      // by default; `AUTH_LOGIN_RATE_LIMIT` raises both for test runs.
+      perEmail: new FixedWindowLimiter(fastify.config.AUTH_LOGIN_RATE_LIMIT, 15 * 60_000),
+      perIp: new FixedWindowLimiter(fastify.config.AUTH_LOGIN_RATE_LIMIT, 15 * 60_000),
     },
     mint,
     verifyBearer,
