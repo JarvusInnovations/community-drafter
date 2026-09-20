@@ -1,4 +1,4 @@
-import { clearProfileToken, resolveLoginUrl, writeProfile } from "../config.js";
+import { clearProfileToken, resolveLoginUrl, resolveProfileName, writeProfile } from "../config.js";
 import { pollDeviceToken, startDeviceLogin } from "../device-login.js";
 import { parseFlags, requirePositional, str, type FlagSpec } from "../flags.js";
 import { joinBlocks, renderHelp, renderObject } from "../output.js";
@@ -45,7 +45,7 @@ export async function loginCommand(args: string[]): Promise<string> {
   )
     .trim()
     .toLowerCase();
-  const profile = str(parsed, "--profile") ?? "default";
+  const profile = resolveProfileName(str(parsed, "--profile"));
   const url = resolveLoginUrl(str(parsed, "--url"));
 
   const start = await startDeviceLogin(url, email);
@@ -75,7 +75,7 @@ export async function loginCommand(args: string[]): Promise<string> {
 
 export async function logoutCommand(args: string[]): Promise<string> {
   const parsed = parseFlags("logout", args, LOGOUT_FLAGS);
-  const profile = str(parsed, "--profile") ?? "default";
+  const profile = resolveProfileName(str(parsed, "--profile"));
   const cleared = clearProfileToken(profile);
   return render(parsed, { signed_out: cleared }, () => renderObject({ signed_out: cleared }));
 }

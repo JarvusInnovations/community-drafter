@@ -115,9 +115,19 @@ export interface ResolveConfigOptions {
 
 const LOGIN_HINT = "Run `drafter-axi login <email> --url <instance>` to sign in";
 
+/**
+ * `specs/api/admin-cli.md`: the profile is selected by `--profile <name>`,
+ * else `DRAFTER_PROFILE`, else `default` — so a bot exports
+ * `DRAFTER_PROFILE=<bot>` once and never touches the human's default profile.
+ */
+export function resolveProfileName(flagValue?: string): string {
+  const fromEnv = process.env.DRAFTER_PROFILE?.trim();
+  return flagValue ?? (fromEnv && fromEnv.length > 0 ? fromEnv : "default");
+}
+
 /** Used by every command except `login` itself. */
 export function resolveConfig(options: ResolveConfigOptions = {}): DrafterConfig {
-  const profile = options.profile ?? "default";
+  const profile = resolveProfileName(options.profile);
   const stored = readProfile(profile);
 
   const url = process.env.DRAFTER_URL ?? stored.url;

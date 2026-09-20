@@ -41,7 +41,9 @@ const PUBLIC_ROOT_FILES = ["favicon.svg", "icons.svg"];
  * `/admin`, and a `/admin/*` wildcard alone does not match that bare path
  * (it fell through to the gateway's default-deny 403 before this fix).
  */
-const SPA_SHELL_PREFIXES = ["/i/*", "/d/*", "/admin", "/admin/*"];
+// `/auth/device` is the device-approval *page* (`specs/screens/admin-dashboard.md`);
+// the JSON endpoints under `/auth/device/*` are POSTs and keep precedence.
+const SPA_SHELL_PREFIXES = ["/i/*", "/d/*", "/admin", "/admin/*", "/auth/device"];
 
 /**
  * `specs/screens/public-and-embed.md`: `/d/<slug>/embed` and
