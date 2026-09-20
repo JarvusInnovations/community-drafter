@@ -1,11 +1,12 @@
 ---
-status: in-progress
+status: done
 depends: []
 specs:
   - specs/screens/version-history.md
   - specs/behaviors/versioning.md
   - specs/api/participant.md
 issues: [69]
+pr: 82
 ---
 
 # Plan: redline-quality
@@ -27,18 +28,26 @@ Make the compare view readable for real revisions (#69): a reworded sentence kee
 
 ## Validation
 
-- [ ] The v2→v3 compare of `casn-sb412-stock-medications` reads correctly at 390 and 1280 (screenshots).
-- [ ] Shared diff tests cover word boundaries and atomic blocks.
-- [ ] #69 closed by the PR.
+- [x] A revision of the shape that broke — a reworded sentence, a changed number, a changed table cell, an added list item, and a table that gains a column — reads correctly at 390 and 1280 (screenshots on PR #82). Verified against a throwaway data repo seeded in the worktree rather than the named sim-run document: the plan predates the rule that browser checks never touch the real data repo, and the fixtures reproduce the same edits.
+- [x] Shared diff tests cover word boundaries (`<del>four</del> <ins>five</ins>`, and no `</del><ins>` anywhere) and whole-table comparison in both the shape-kept and shape-changed forms.
+- [x] #69 closed by the PR.
 
 ## Risks / unknowns
 
-- Atomic-block treatment loses inline detail inside tables; acceptable for readability.
+- Atomic-block treatment loses inline detail inside tables; acceptable for readability. Narrowed in practice: only a table whose *shape* changed loses inline detail. A table that kept its rows and columns is still redlined cell by cell, so the common "one cell reworded" revision reads as well as prose does.
 
 ## Notes
 
-(closeout)
+- **The redline aligns units, not blocks.** The fix that matters is structural: `diff/units.ts` collapses a table's cells into one unit before alignment, so the LCS never tries to match a cell against a paragraph. Everything else — the summary counts, the whole-table before/after, the in-place cell redline — falls out of that. `alignBlocks` is generic over `{ id, text }` so both unit kinds go through the same alignment.
+- **Table containers ride on the blocks, not beside them.** `render/block-ids.ts` attaches a shared `container` (id, text, HTML, shape) to each cell rather than returning a second list, so `diffVersions(Block[], Block[])` kept its signature and neither compare route nor the render cache changed. Commentable blocks are exactly what they were, so comment anchoring is untouched.
+- **The separator rule is narrower than "space between runs".** A space is inserted only where a deletion meets an insertion *and* neither side already carries whitespace. Inserting one unconditionally would have broken suffix edits: `Friday<ins> at noon</ins>.` must stay as it is.
+- **`diffWordsWithSpace` splits on punctuation too.** "1:750" → "1:700" comes out as `1:<del>750</del> <ins>700</ins>`, not a whole-token swap. Readable, but worth knowing before writing a golden assertion against a number change.
+- **Tables had no CSS at all.** `.doc-body` never styled `table`/`th`/`td`, so a signatory table rendered as run-together text on the document screen as well as the compare screen. Added with `display: block` so a wide table scrolls inside the column instead of widening the page on a phone.
+- The "Removed"/"Added" labels on a stacked table are emitted by the shared diff rather than the web copy module, because the spec places the label in the redline itself and the redline is rendered server-side.
 
 ## Follow-ups
 
-(closeout)
+- Issue [#83](https://github.com/JarvusInnovations/community-drafter/issues/83) — a whole added or removed list item loses its bullet on the compare screen, because each block is wrapped in its own `div` outside the `ul`. Pre-existing, visible in the PR screenshots.
+- Issue [#84](https://github.com/JarvusInnovations/community-drafter/issues/84) — fenced code blocks never appear in a comparison at all: they are not emitted as blocks, so a changed code block is silently invisible. Making them comparable means deciding whether they are commentable, which is a change to `behaviors/inline-comments.md` § Block identity.
+- None for blockquotes: the plan proposed treating them atomically, but their paragraphs already align as paragraphs and read better that way. The spec now says tables only.
+- `format_only` blocks still render as a plain unredlined block; `behaviors/versioning.md` § Diff step 6 asks for "a small marginal note". Out of scope here — tracked by the existing gap, not re-filed.
