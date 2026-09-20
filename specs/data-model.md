@@ -22,7 +22,7 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove` | every commit |
 | `Document` | slug | every commit about a document |
 | `Person` | slug | every commit about a person's action |
 | `Actor` | an operator's email, `participant`, or `system` (bootstrap) | every commit |
@@ -146,7 +146,7 @@ Signed-at, revoked-at, re-signed-at and the revoke reason are not fields: they a
 
 A person's **position** (latest judgement) is not a field either: it is the latest `submitted` record in `submissions` for this person and document. The read model caches it.
 
-Derived participant status for the dashboard: `unopened` → `opened` → `drafting` (has a `draft` submission) → `commented` / `signed` / `signed (conditional)` / `declined`.
+Derived participant status for the dashboard: `not_sent` (staged, no `sent_at`) → `unopened` → `opened` → `drafting` (has a `draft` submission) → `commented` / `signed` / `signed (conditional)` / `declined`.
 
 ## `submissions`
 

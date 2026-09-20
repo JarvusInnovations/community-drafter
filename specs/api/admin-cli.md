@@ -30,10 +30,11 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `versions list <slug>` / `versions show <slug> <n> [--body]` | read |
 | `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts |
 | `versions compare <slug> <from> <to> [--unchanged]` | text redline for a terminal |
-| `people import <slug> [file.ndjson \| -] [--suggested-capacity official]` | import invitees; accepts a gitsheets people sheet's NDJSON export directly |
-| `people list <slug> [--status signed] [--source crm] [-q name]` | statuses, no tokens |
+| `people import <slug> [file.ndjson \| -] [--suggested-capacity official] [--dry-run]` | import invitees; accepts a gitsheets people sheet's NDJSON export directly; `--dry-run` shows what each row would do without writing |
+| `people remove <slug> <person>` | remove a staged invitation that was never sent |
+| `people list <slug> [--status not_sent\|signed\|…] [--source crm] [-q name]` | statuses (staged invitations read `not_sent`), no tokens |
 | `people links <slug> [--person a,b] [--out links.csv]` | export personal links (recorded) |
-| `people send <slug> [--only-unsent]` | send invitations |
+| `people send <slug> [--only-unsent] [--person a,b] [--dry-run]` | send invitations; `--dry-run` lists who would receive one and who is skipped and why |
 | `people remind <slug> --target unopened\|opened-not-acted [--dry-run]` | reminders |
 | `people revoke-link|reissue-link <slug> <person>` | link management |
 | `signatures list <slug> [--include-revoked] [--conditional]` | signatures |
