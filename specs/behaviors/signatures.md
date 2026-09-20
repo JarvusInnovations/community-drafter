@@ -26,8 +26,16 @@ A signature is a person's name added to a specific document, in a stated capacit
 - Available in the commenting and signing phases. Signing writes the `signature` table on the participation (`Action: sign` commit, `Version` trailer = version seen), replaces a `decline` judgement, and triggers the confirmation. One commit.
 - Signing during the comment period is encouraged by the card copy: "Sign now. We'll email you when the final version is published, and you can remove your name any time until *Sep 30*." The date is `signing_closes_at`, updated live if extended.
 - Re-signing after revocation is an `Action: resign` commit setting `revoked = false`; the dates of signing, revoking and re-signing are those commits' dates. The re-signature is a new signature: everywhere a signature's time is shown to its signer or to the team, it is the time of the commit that put the signature currently in force — the `resign` commit, not the superseded `sign` one.
-- A signer who submits with `sign` or "keep" while a newer version exists produces a `submit` commit with the newer `Version` trailer; the dashboard derives from it which signers have seen the final version.
+- A signer who submits with `sign` or "keep" while a newer version exists produces a `submit` commit with the newer `Version` trailer and moves the signature onto that version (§ A signature belongs to a version).
 - Signing through comment mode is the same signature by another door. A `submit` commit that writes, re-instates or revokes the `signature` table carries a `Signature` trailer (`sign` | `resign` | `revoke`) and is read back as that signature event, so a signature made with comments has the same dates and the same audit trail as one made from the sign card.
+
+## A signature belongs to a version
+
+- Every signature carries the version its signer saw: `signature.signed_on_version`, the same number as the `Version` trailer of the commit that wrote it.
+- The number advances only when the signer says so again — **re-affirming** the signature against the newer text by pressing "Keep my name" or "Confirm my signature", or by submitting with `sign` or "keep" from comment mode. Each re-affirmation is a `sign` commit whose `Version` trailer is the version re-affirmed. Editing how a signature is listed, an operator's action, and the publication of a new version all leave it where it is: only the signer can move their name onto a version.
+- A signature whose version is lower than the document's current version is **behind**. Being behind is a fact about the signature, not a state of it: it stands, it is counted, and it is displayed publicly exactly as any other (§ Principles — public display is uniform).
+- On a record written before the field existed the number is not stored. It is read back from the `Version` trailer of the commit behind the signature in force; nothing rewrites those records to add it.
+- Both sides are told, because the product's promise is that a named signatory read what they signed. The signer's own card names the version they signed and says plainly when the text has changed since (`screens/document.md` § Display Rules 3); the team sees the version on every signature, a marker on the ones that are behind, and a count of them (`screens/admin-dashboard.md`).
 
 ## Conditional signatures
 
@@ -48,13 +56,15 @@ A signature is a person's name added to a specific document, in a stated capacit
 - `listed = false` signers are counted but not named ("and 3 others who asked not to be listed"). They are counted **once**, in that clause alone: an unlisted signer is excluded from the organizations and the individuals figures, so the three numbers in a counts line never overlap.
 - `display_approved = false` (**[phase 2]** public-source) signers are neither counted nor named until approved.
 - `show_signatories = count` shows only the counts; `none` shows nothing to participants and the public, though the admin dashboard always shows all.
-- Every participant page shows the participant's own status line prominently: "You signed on Sep 19 as Jane Doe (personal)" (the date is that of the commit behind the signature in force — the `resign` commit after a removal and re-signature, else the `sign` commit) with the change/remove actions, or "You haven't signed yet".
+- Every participant page shows the participant's own status line prominently: "You signed version 2 on Sep 19 as Jane Doe (personal)" (the version is the one the signature is attached to; the date is that of the commit behind the signature in force — the `resign` commit after a removal and re-signature, else the `sign` commit) with the change/remove actions, or "You haven't signed yet".
 
 ## Principles
 
 **Inherited**
+
 - [Say exactly who signed](../principles.md#say-exactly-who-signed): the attestation, the capacity split, the count rules, and the ban on blending other counts.
 - [Just sign it for now](../principles.md#just-sign-it-for-now): sign-during-drafting copy, revocation as a first-class button, the final-version alert.
 
 **Local**
+
 - **Public display is uniform.** Conditional, reaffirmed, or early signatures look identical in public. Differences exist for the team, not the readers of the statement.

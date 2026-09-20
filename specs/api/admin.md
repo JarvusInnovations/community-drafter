@@ -9,7 +9,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 - `GET /documents/:slug/operators` → `[{ email, name, kind, active }]`.
 - `POST /documents/:slug/operators` `{ email }` → adds an active operator from the sheet (`Action: doc-operator-add`); 422 when the email is not an active operator.
 - `DELETE /documents/:slug/operators/:email` → removes (`Action: doc-operator-remove`); 409 `last_operator` when it would leave none.
-- `GET /documents/:slug` → document + versions (from content history) + counts.
+- `GET /documents/:slug` → document + versions (from content history) + counts. The signature counts carry `behind`: live signatures attached to a version older than the current one (`behaviors/signatures.md` § A signature belongs to a version).
 - `PATCH /documents/:slug` → settings fields only (not `state`, not deadlines).
 - `POST /documents/:slug/open` `{ comments_close_at, signing_closes_at }` → opens; requires ≥ 1 version; sends the invitations that have never been sent. Deadlines are ISO 8601 with a zone (offset or `Z`), stored as UTC. Response: the document summary plus `invitations: { sent, failed, failures: [{ person, error }] }`; only the accepted messages are marked `sent_at` (`behaviors/notifications.md` § Sending), so a rejected recipient stays unsent and a later `.../invitations/send` reaches them. Errors: `validation_failed` (format, order, `comments_close_at` already past), `no_version`.
 - `POST /documents/:slug/schedule` `{ comments_close_at?, signing_closes_at? }` → extension only; `deadline_not_later` otherwise; records and announces.
@@ -42,7 +42,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## Signatures
 
-- `GET /documents/:slug/signatures?include_revoked=true` → every participation with a signature table, with person names and the sign/revoke dates from history.
+- `GET /documents/:slug/signatures?include_revoked=true` → every participation with a signature table, with person names, the sign/revoke dates from history, the version each signature is attached to, and `behind: true` on a live signature whose version is older than the document's current one.
 - `POST /documents/:slug/signatures/:person/revoke` `{ reason }` → admin revocation; confirmation email to the person.
 - `POST /documents/:slug/signatures/:person/approve-display` (**[phase 2]**).
 
