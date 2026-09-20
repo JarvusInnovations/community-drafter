@@ -31,8 +31,6 @@ export function PublicVersionLabel({
         <span>{copy.versionLabel.rest(formatAbsolute(publishedAt), summary)}</span>
         {number > 1 ? (
           <>
-            {" "}
-            ·{" "}
             <Link
               to={`/d/${slug}/history/compare?to=${number}`}
               className="font-medium text-primary"
@@ -40,8 +38,7 @@ export function PublicVersionLabel({
               {copy.versionLabel.seeWhatChanged}
             </Link>
           </>
-        ) : null}{" "}
-        ·{" "}
+        ) : null}
         <Link to={`/d/${slug}/history`} className="font-medium text-primary">
           {copy.versionLabel.allVersions}
         </Link>

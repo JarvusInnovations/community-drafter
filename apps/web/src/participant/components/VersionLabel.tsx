@@ -56,8 +56,6 @@ export function VersionLabel({
           <>
             {number > 1 ? (
               <>
-                {" "}
-                ·{" "}
                 <Link
                   to={`/i/${token}/history/compare?to=${number}`}
                   className="font-medium text-primary"
@@ -65,8 +63,7 @@ export function VersionLabel({
                   {copy.versionLabel.seeWhatChanged}
                 </Link>
               </>
-            ) : null}{" "}
-            ·{" "}
+            ) : null}
             <Link to={`/i/${token}/history`} className="font-medium text-primary">
               {copy.versionLabel.allVersions}
             </Link>
