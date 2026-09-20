@@ -79,6 +79,25 @@ verifies (`X-Hub-Signature-256`, GitHub's header shape) to pull a hand edit
 pushed to the data repo's remote into the running instance
 (`specs/behaviors/operators.md` § Data-repository refresh).
 
+Point the data repo's own webhook at that route so a push made outside the
+service (e.g. a hand edit with `gitsheets-axi`, pushed directly) is picked
+up without waiting for the next request to notice a stale clone:
+
+```sh
+gh api repos/JarvusInnovations/community-drafter-data/hooks -f name=web \
+  -f config[url]="$SERVICE_URL/admin/api/refresh" \
+  -f config[content_type]=json \
+  -f config[secret]="<the same value stored in community-drafter-webhook-secret>" \
+  -F events[]=push
+```
+
+GitHub signs each delivery with `X-Hub-Signature-256` over the raw request
+body using that secret — exactly what the route verifies. Use "Redeliver"
+on a failed delivery (repo → Settings → Webhooks) to retry after fixing a
+transient `409 refresh_busy`; a `409 refresh_diverged` means the local
+clone and the remote history disagree and needs a person to look, not a
+retry.
+
 ### 4. Bootstrap the first operator
 
 There is no admin allowlist any more — operators are records in the
@@ -133,6 +152,42 @@ project/registrar) — add the printed CNAME (`drafter` →
 `ghs.googlehosted.com.` at last check) by hand. Certificate provisioning
 finishes automatically once the record resolves; no further `tofu apply`
 needed.
+
+### 7. Signing in: a human, the CLI, and a bot operator
+
+**A human**, at `/admin/login`: enter the operator's email, follow the
+emailed magic link. Sessions last 24 hours.
+
+**The CLI** (`drafter-axi`), device-code style — there's no password or
+long-lived secret to copy around:
+
+```sh
+drafter-axi login you@jarv.us --url https://drafts.example.org
+```
+
+This sends the same magic-link email, prints an 8-character code, and
+waits. Follow the link (or have the mailbox owner follow it, for a bot —
+see below), click "Approve this device" on the page it lands on, and the
+CLI finishes on its own: it writes the instance URL, the operator's email
+and a 90-day token to `~/.config/drafter/default.toml` (mode 600). Every
+later `drafter-axi` command reads from there and refreshes the token
+silently once it's more than 30 days old; `drafter-axi logout` forgets it,
+`drafter-axi whoami` shows who's signed in and until when.
+
+**A bot operator** (`kind: bot`, created with
+`drafter-axi operators add bot@jarv.us --name "Release Bot" --kind bot`) has
+its own mailbox but no hands to click a link with. Signing it in the first
+time — and every time its 90-day token lapses without a human noticing — is
+a human's job:
+
+1. Run `drafter-axi login bot@jarv.us --url https://drafts.example.org` from
+   wherever the bot's automation will read the resulting profile (its own
+   machine/container, or a shared secret store the automation reads from).
+2. A human with access to the bot's mailbox opens the magic-link email and
+   approves the device on the page it lands on.
+3. The CLI on the bot's side finishes and saves the token — the bot signs
+   in under its own identity from then on, with its own `Actor` trailer on
+   every commit it makes.
 
 ## First boot: `init-data-repo`
 
