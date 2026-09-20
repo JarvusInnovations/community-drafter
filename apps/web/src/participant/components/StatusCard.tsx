@@ -2,7 +2,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError, deleteSignature, patchSignature, postDecline } from "../api.ts";
-import { computeCardState, currentDraftSubmission, signatureTime } from "../cardState.ts";
+import {
+  computeCardState,
+  currentDraftSubmission,
+  signatureDrift,
+  signatureTime,
+} from "../cardState.ts";
 import { copy } from "../copy.ts";
 import { formatAbsolute } from "../format.ts";
 import { type Bundle } from "../types.ts";
@@ -37,6 +42,7 @@ export function StatusCard({
   readOnly?: boolean;
 }): JSX.Element {
   const state = computeCardState(bundle);
+  const drift = signatureDrift(bundle);
   const draft = currentDraftSubmission(bundle);
   const [editing, setEditing] = useState(false);
   const [resigning, setResigning] = useState(false);
@@ -254,16 +260,42 @@ export function StatusCard({
                 </p>
               ) : null}
 
+              {/*
+               * § Display Rules 3, *Behind the current version*: its own
+               * quiet line, with the comparison defaulted to the version
+               * this signer actually signed rather than whichever version
+               * happens to precede the current one.
+               */}
+              {drift ? (
+                <p className="text-sm text-muted-foreground">
+                  {copy.signed.textChanged(drift.currentVersion)}{" "}
+                  <InertLink
+                    readOnly={readOnly}
+                    to={`/i/${token}/history/compare?from=${drift.signedVersion}&to=${drift.currentVersion}`}
+                    className="font-medium"
+                  >
+                    {copy.signed.seeWhatChanged}
+                  </InertLink>
+                </p>
+              ) : null}
+
               {canAct ? (
                 <div className="flex flex-wrap gap-3 text-sm">
-                  {state === "signed_final_pending" ? (
+                  {/*
+                   * One re-affirmation action, ever: the final version's
+                   * "Confirm my signature" stands in for "Keep my name"
+                   * when both would otherwise apply.
+                   */}
+                  {state === "signed_final_pending" || drift ? (
                     <button
                       type="button"
                       onClick={() => void handleConfirmSignature()}
                       disabled={busy || readOnly}
                       className="inline-flex min-h-8 items-center font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     >
-                      {copy.signed.confirmButton}
+                      {state === "signed_final_pending"
+                        ? copy.signed.confirmButton
+                        : copy.signed.keep}
                     </button>
                   ) : null}
                   <button
@@ -308,6 +340,7 @@ export function StatusCard({
               ? copy.closedCard.ownSigned(
                   formatAbsolute(signatureTime(signature)),
                   signature.display_name,
+                  signature.signed_on_version,
                 )
               : bundle.position?.judgement === "decline"
                 ? copy.closedCard.ownDeclined

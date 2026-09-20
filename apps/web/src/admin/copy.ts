@@ -93,6 +93,13 @@ export const copy = {
     individuals: "Individuals",
     conditional: "Conditional",
     revoked: "Revoked",
+    /**
+     * `specs/screens/admin-dashboard.md` § Funnel: the number the team
+     * needs before marking anything final — live signatures still attached
+     * to an older version (`specs/behaviors/signatures.md` § A signature
+     * belongs to a version).
+     */
+    behind: "Behind current",
     versions: "Versions",
     publishHint: "Publishing is CLI-only. To publish a new version:",
     publishCommand: (slug: string) =>
@@ -140,6 +147,9 @@ export const copy = {
     reasonRequired: "A reason is required.",
     revokeSignatureReason: "Reason for revoking this signature",
     empty: "No participations match these filters.",
+    /** The version a signature is attached to, and the marker when it is behind. */
+    signedVersion: (version: number) => `v${version}`,
+    behind: (current: number) => `behind v${current}`,
   },
 
   submissions: {

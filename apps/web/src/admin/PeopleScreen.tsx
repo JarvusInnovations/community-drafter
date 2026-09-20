@@ -16,7 +16,12 @@ import { ReasonDialog } from "./components/ReasonDialog.tsx";
 import { copy } from "./copy.ts";
 import { useAdminDocument } from "./DocumentContext.tsx";
 import { chipClass, inputClass, quietLinkClass, selectClass } from "./styles.ts";
-import { type InvitationRow, type ParticipationStatus, type SubmissionView } from "./types.ts";
+import {
+  type DocumentDetail,
+  type InvitationRow,
+  type ParticipationStatus,
+  type SubmissionView,
+} from "./types.ts";
 
 const STATUSES = [
   "not_sent",
@@ -30,6 +35,22 @@ const STATUSES = [
   "revoked",
 ];
 const SOURCES = ["admin", "crm", "public"];
+
+/**
+ * `specs/screens/admin-dashboard.md` § People: the signature column carries
+ * the version it is attached to and a "behind v3" marker when that version
+ * is older than the current one (`specs/behaviors/signatures.md` § A
+ * signature belongs to a version). A revoked signature is never behind.
+ */
+function currentVersionOf(document: DocumentDetail): number {
+  return document.versions.reduce((max, version) => Math.max(max, version.number), 0);
+}
+
+function isBehind(row: InvitationRow, currentVersion: number): boolean {
+  const signature = row.signature;
+  if (!signature || signature.revoked) return false;
+  return signature.signed_on_version !== undefined && signature.signed_on_version < currentVersion;
+}
 
 /**
  * `specs/screens/admin-dashboard.md` § Design: "status as small pills
@@ -102,6 +123,7 @@ function DraftRow({ slug, person }: { slug: string; person: string }): JSX.Eleme
 /** `/admin/d/:slug/people` — `specs/screens/admin-dashboard.md` § "People". */
 export function PeopleScreen(): JSX.Element {
   const { document } = useAdminDocument();
+  const currentVersion = currentVersionOf(document);
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<InvitationRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -294,9 +316,21 @@ export function PeopleScreen(): JSX.Element {
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{row.opens}</td>
                       <td className="px-4 py-2.5 text-foreground">
-                        {row.signature
-                          ? `${row.signature.capacity}${row.signature.conditional ? " (conditional)" : ""}${row.signature.revoked ? " (revoked)" : ""}`
-                          : "—"}
+                        {row.signature ? (
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span>
+                              {`${row.signature.capacity}${row.signature.conditional ? " (conditional)" : ""}${row.signature.revoked ? " (revoked)" : ""}`}
+                              {row.signature.signed_on_version !== undefined
+                                ? ` · ${copy.people.signedVersion(row.signature.signed_on_version)}`
+                                : ""}
+                            </span>
+                            {isBehind(row, currentVersion) ? (
+                              <Pill tone="amber">{copy.people.behind(currentVersion)}</Pill>
+                            ) : null}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex flex-wrap gap-x-3 gap-y-1">

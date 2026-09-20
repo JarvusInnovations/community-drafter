@@ -56,6 +56,9 @@ export function FunnelBar({
   );
 }
 
+const TILE_SURFACE = { ok: "bg-ok-soft", muted: "bg-muted", amber: "bg-amber-soft" } as const;
+const TILE_INK = { ok: "text-ok", muted: "text-foreground", amber: "text-amber" } as const;
+
 export function StatTile({
   label,
   value,
@@ -63,20 +66,15 @@ export function StatTile({
 }: {
   label: string;
   value: number;
-  tone?: "ok" | "muted";
+  /** `amber` is the "something to act on" tone — the behind-the-current-version count. */
+  tone?: "ok" | "muted" | "amber";
 }): JSX.Element {
   return (
-    <div
-      className={`rounded-xl border border-border px-3 py-2.5 ${
-        tone === "ok" ? "bg-ok-soft" : "bg-muted"
-      }`}
-    >
+    <div className={`rounded-xl border border-border px-3 py-2.5 ${TILE_SURFACE[tone]}`}>
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      <p className={`text-lg font-bold ${tone === "ok" ? "text-ok" : "text-foreground"}`}>
-        {value}
-      </p>
+      <p className={`text-lg font-bold ${TILE_INK[tone]}`}>{value}</p>
     </div>
   );
 }

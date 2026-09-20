@@ -66,6 +66,30 @@ export function signatureTime(signature: SignatureView): string | undefined {
   return signedAt ?? resignedAt;
 }
 
+/**
+ * `specs/behaviors/signatures.md` § A signature belongs to a version: a live
+ * signature attached to a version older than the document's current one is
+ * *behind*, and the card says so. The current version is the newest in
+ * `versions`, not `bundle.version` — the latter is whichever version is
+ * being read, and reading an older one does not move anyone's signature.
+ * `null` when there is nothing to say: no live signature, no version
+ * recorded for it, or it is already on the current text.
+ */
+export interface SignatureDrift {
+  signedVersion: number;
+  currentVersion: number;
+}
+
+export function signatureDrift(bundle: Bundle): SignatureDrift | null {
+  const { signature, versions, version } = bundle;
+  if (!signature || signature.revoked) return null;
+  const signedVersion = signature.signed_on_version;
+  if (signedVersion === undefined) return null;
+  const currentVersion = versions.reduce((max, v) => Math.max(max, v.number), version.number);
+  if (signedVersion >= currentVersion) return null;
+  return { signedVersion, currentVersion };
+}
+
 export function currentDraftSubmission(bundle: Bundle) {
   return bundle.submissions.find((submission) => submission.state === "draft");
 }

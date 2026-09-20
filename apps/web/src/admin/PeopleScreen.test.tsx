@@ -45,8 +45,24 @@ const ROW: InvitationRow = {
 
 const SECRET_TOKEN = "TotallySecretToken1234567890";
 
+function documentWithVersions(count: number): DocumentDetail {
+  return {
+    ...DOCUMENT,
+    counts: { ...DOCUMENT.counts, versions: count },
+    versions: Array.from({ length: count }, (_unused, index) => ({
+      number: index + 1,
+      summary: `Version ${index + 1}.`,
+      published_at: "2026-09-01T00:00:00Z",
+      final: false,
+      dispositions: 0,
+    })),
+  };
+}
+
 async function noopRefetch(): Promise<void> {}
 const DOCUMENT_CONTEXT_VALUE: DocumentContextValue = { document: DOCUMENT, refetch: noopRefetch };
+const AT_V2: DocumentContextValue = { document: documentWithVersions(2), refetch: noopRefetch };
+const AT_V3: DocumentContextValue = { document: documentWithVersions(3), refetch: noopRefetch };
 
 function withDocument(children: ReactNode) {
   return (
@@ -153,5 +169,83 @@ describe("PeopleScreen — tokens never render except after an explicit action",
     await waitFor(() => {
       expect(container.innerHTML).toContain(SECRET_TOKEN);
     });
+  });
+});
+
+/**
+ * `specs/screens/admin-dashboard.md` § People: the signature column carries
+ * the version it is attached to and a "behind v3" marker when that version
+ * is older than the current one (issue #67).
+ */
+describe("PeopleScreen — the version a signature is attached to", () => {
+  const SIGNED_ON_V2: InvitationRow = {
+    ...ROW,
+    status: "signed",
+    signature: {
+      capacity: "personal",
+      display_name: "Jane Doe",
+      conditional: false,
+      listed: true,
+      signed_on_version: 2,
+      revoked: false,
+      signed_at: "2026-09-19T12:00:00Z",
+    },
+  };
+
+  function renderWith(rows: InvitationRow[], versionCount: number) {
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(JSON.stringify(rows), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      )) as unknown as typeof fetch;
+
+    const context = versionCount === 3 ? AT_V3 : AT_V2;
+    return render(
+      <DocumentContext.Provider value={context}>
+        <MemoryRouter initialEntries={["/admin/d/coalition-charter/people"]}>
+          <Routes>
+            <Route path="/admin/d/:slug/people" element={<PeopleScreen />} />
+          </Routes>
+        </MemoryRouter>
+      </DocumentContext.Provider>,
+    );
+  }
+
+  it("shows the version and marks the row behind when the document has moved on", async () => {
+    renderWith([SIGNED_ON_V2], 3);
+
+    await waitFor(() => {
+      expect(screen.getByText(/personal · v2/u)).toBeTruthy();
+    });
+    expect(screen.getByText("behind v3")).toBeTruthy();
+  });
+
+  it("shows the version with no marker when the signature is on the current one", async () => {
+    renderWith([SIGNED_ON_V2], 2);
+
+    await waitFor(() => {
+      expect(screen.getByText(/personal · v2/u)).toBeTruthy();
+    });
+    expect(screen.queryByText(/^behind v/u)).toBeNull();
+  });
+
+  it("never marks a revoked signature behind", async () => {
+    renderWith(
+      [
+        {
+          ...SIGNED_ON_V2,
+          status: "revoked",
+          signature: { ...SIGNED_ON_V2.signature!, revoked: true },
+        },
+      ],
+      3,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/personal \(revoked\) · v2/u)).toBeTruthy();
+    });
+    expect(screen.queryByText(/^behind v/u)).toBeNull();
   });
 });

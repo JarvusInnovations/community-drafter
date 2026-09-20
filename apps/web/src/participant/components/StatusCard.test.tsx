@@ -74,7 +74,7 @@ describe("StatusCard — the six states", () => {
     renderCard(bundle);
 
     expect(
-      screen.getByText(/You signed on .* as Jane Doe, former Academy educator\./u),
+      screen.getByText(/You signed version 1 on .* as Jane Doe, former Academy educator\./u),
     ).toBeTruthy();
     expect(screen.getByText("Change how you're listed")).toBeTruthy();
     expect(screen.getByText("Remove my name")).toBeTruthy();
@@ -159,7 +159,7 @@ describe("StatusCard — the six states", () => {
     renderCard(bundle);
 
     expect(screen.getByText(/The signatory list closed/u)).toBeTruthy();
-    expect(screen.getByText(/You signed on .* as Jane Doe\./u)).toBeTruthy();
+    expect(screen.getByText(/You signed version 1 on .* as Jane Doe\./u)).toBeTruthy();
   });
 
   it("focus and the live region: signing moves focus to the new heading and announces it (#72)", () => {
@@ -189,11 +189,13 @@ describe("StatusCard — the six states", () => {
       </MemoryRouter>,
     );
 
-    const heading = screen.getByRole("heading", { name: /You signed on .* as Jane Doe\./u });
+    const heading = screen.getByRole("heading", {
+      name: /You signed version 1 on .* as Jane Doe\./u,
+    });
     expect(document.activeElement).toBe(heading);
 
     const status = screen.getByRole("status");
-    expect(status.textContent ?? "").toMatch(/You signed on .* as Jane Doe\./u);
+    expect(status.textContent ?? "").toMatch(/You signed version 1 on .* as Jane Doe\./u);
   });
 
   it("focus and the live region: removing a signature moves focus back to the sign form heading (#72)", () => {
@@ -259,7 +261,7 @@ describe("StatusCard — the six states", () => {
     });
     renderCard(bundle);
 
-    const line = screen.getByText(/^You signed on /u).textContent ?? "";
+    const line = screen.getByText(/^You signed version 1 on /u).textContent ?? "";
     expect(line).toContain("Sep 20");
     expect(line).not.toContain("Sep 19");
   });
@@ -286,7 +288,7 @@ describe("StatusCard — the six states", () => {
 
     expect(
       screen.getByText(
-        /You signed on .* for St\. Brigid Parish Council as Sr\. Margaret Doyle, Chair\./u,
+        /You signed version 1 on .* for St\. Brigid Parish Council as Sr\. Margaret Doyle, Chair\./u,
       ),
     ).toBeTruthy();
   });
@@ -307,5 +309,108 @@ describe("StatusCard — the six states", () => {
 
     expect(screen.getByText(/You have unsent comments on v1/u)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Continue" })).toBeTruthy();
+  });
+});
+
+/**
+ * `specs/screens/document.md` § Display Rules 3, *Behind the current
+ * version* — issue #67: the product knew which version Elena had signed and
+ * said nothing, so her name stood against text she had never read.
+ */
+describe("StatusCard — a signature behind the current version", () => {
+  const V1_V3 = [
+    {
+      number: 1,
+      summary: "Initial draft.",
+      published_at: "2026-09-01T00:00:00Z",
+      final: false,
+      dispositions: 0,
+    },
+    {
+      number: 2,
+      summary: "Second pass.",
+      published_at: "2026-09-10T00:00:00Z",
+      final: false,
+      dispositions: 0,
+    },
+    {
+      number: 3,
+      summary: "Tightened.",
+      published_at: "2026-09-20T00:00:00Z",
+      final: false,
+      dispositions: 0,
+    },
+  ];
+
+  function signedOn(version: number, extra: Record<string, unknown> = {}) {
+    return makeBundle({
+      version: { number: 3, summary: "Tightened.", published_at: "2026-09-20T00:00:00Z" },
+      versions: V1_V3,
+      signature: {
+        capacity: "personal",
+        display_name: "Elena Vasquez",
+        descriptor: "RN, school nurse",
+        conditional: false,
+        listed: true,
+        signed_on_version: version,
+        revoked: false,
+        signed_at: "2026-09-19T12:00:00Z",
+        ...extra,
+      },
+    });
+  }
+
+  it("says the text has changed, compares from the signer's own version, and offers Keep my name", () => {
+    renderCard(signedOn(2));
+
+    expect(
+      screen.getByRole("heading", {
+        name: /You signed version 2 on .* as Elena Vasquez, RN, school nurse\./u,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/The text has changed since you signed \(now version 3\)\./u),
+    ).toBeTruthy();
+
+    const compare = screen.getByRole("link", { name: "See what changed" });
+    expect(compare.getAttribute("href")).toBe("/i/test-token/history/compare?from=2&to=3");
+
+    expect(screen.getByRole("button", { name: "Keep my name" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove my name" })).toBeTruthy();
+  });
+
+  it("says nothing once the signature is on the current version", () => {
+    renderCard(signedOn(3));
+
+    expect(screen.queryByText(/The text has changed since you signed/u)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Keep my name" })).toBeNull();
+  });
+
+  it("offers only 'Confirm my signature' when a final version is what the signer is behind", () => {
+    const bundle = makeBundle({
+      version: {
+        number: 3,
+        summary: "Final text.",
+        published_at: "2026-09-20T00:00:00Z",
+        final: true,
+      },
+      versions: [...V1_V3.slice(0, 2), { ...V1_V3[2]!, final: true }],
+      signature: {
+        capacity: "personal",
+        display_name: "Elena Vasquez",
+        conditional: false,
+        listed: true,
+        signed_on_version: 2,
+        revoked: false,
+        signed_at: "2026-09-19T12:00:00Z",
+      },
+    });
+    renderCard(bundle);
+
+    expect(screen.getByRole("button", { name: "Confirm my signature" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Keep my name" })).toBeNull();
+    expect(
+      screen.getByText(/The text has changed since you signed \(now version 3\)\./u),
+    ).toBeTruthy();
   });
 });

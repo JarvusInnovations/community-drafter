@@ -10,6 +10,7 @@ import { type Bundle } from "../types.ts";
  */
 export function makeBundle(overrides: {
   document?: Partial<Bundle["document"]>;
+  version?: Partial<Bundle["version"]>;
   signature?: Bundle["signature"];
   position?: Bundle["position"];
   versions?: Bundle["versions"];
@@ -41,6 +42,7 @@ export function makeBundle(overrides: {
       final: false,
       html: "<p>The charter text.</p>",
       is_current: true,
+      ...overrides.version,
     },
     versions: overrides.versions ?? [
       {
