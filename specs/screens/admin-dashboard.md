@@ -36,7 +36,18 @@ Everything: document, versions (from body-changing commits), participations with
 
 **View as** (`/admin/d/<slug>/view-as/<person>`): renders the participant document screen for that person read-only with a persistent banner "Viewing as Jane Doe (read-only)". Every action control is disabled.
 
-## Actions
+## Design
+
+Follows `screens/document.md` § Design (tokens, top bar, cards, buttons, links). Specifics:
+
+- **Frame**: the sticky top bar shows the instance name, a "Operators" link, the signed-in operator's email and "Sign out" on the right. Pages are centered at 1120 px.
+- **Document list and dashboard**: cards. The funnel is a horizontal bar of segments (invited → sent → opened → acted) with counts beneath; signed is split into organizations and individuals as two stat tiles, conditional and revoked as small muted tiles. Deadlines reuse the timeline component from the participant screen.
+- **Tables** (people, submissions, versions, activity): a card with a header row in small muted caps, zebra-free rows separated by the border color, status as small pills (unopened muted, opened blue soft, drafting amber soft, commented blue soft, signed green soft, declined muted, revoked muted with strike), and actions as quiet blue links at the row end. Filters live in a toolbar above the table as selects and a search input in the rounded style; active filters show as removable chips.
+- **Submissions page**: each submission is a card: header row with the author avatar and name, capacity/org, version chip and judgement pill (or the amber **unsubmitted** pill), then its comments as bordered rows with heading path, quote and body, each with its disposition pill (pending muted, accepted green, partial blue, declined amber, noted muted).
+- **Dialogs** (extend deadline, revoke, reissue, operator forms): centered modal cards with a bold title, labeled inputs in the rounded style, a required reason where the spec says so, a primary confirm and a quiet cancel; success shows the resulting commit subject in a green soft banner.
+- **Sign-in and device pages**: a single centered card at 420 px with the same input and button styles.
+- **View as**: the participant screen unchanged, with a full-width amber banner pinned under the top bar.
+
 
 | Action | Effect |
 | --- | --- |

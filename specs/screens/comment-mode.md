@@ -31,7 +31,16 @@ Layout: the document occupies the main column; a **review tray** is a side panel
 
 **Version mismatch**: if the draft's version is older than current, a bar offers "Keep commenting on v2" or "Move my comments to v3" (re-anchoring per `behaviors/inline-comments.md`); the choice is recorded on the draft.
 
-## Actions
+## Design
+
+Follows `screens/document.md` § Design (same tokens, top bar, cards, buttons, links). Specifics for this screen:
+
+- **Frame**: the sticky top bar carries the phase pill; beneath it a slim second bar (card-colored, bordered) holds the version chip, the one-line signature status, and "Back to document" as a link on the right.
+- **Document column**: the rendered text in a card, same measure as the document screen. The participant's own pending comments are highlighted with the pale blue tint and a blue underline; submitted ones with the neutral muted tint and a dotted underline. The floating "Comment" button is the primary style, small, with a soft shadow, anchored just above the selection.
+- **Review tray**: a card, sticky on wide screens (360 px, right column), a bottom sheet on phones with a drag handle and a header that stays visible ("Your submission on v3 · 3 saved, not yet sent"). Items are bordered rows: heading path in small muted caps, the quote in italics, the editable body, and a state badge (Saved in green soft, Saving in muted, Not saved in amber soft, Restored in blue soft). The judgement options are bordered radio rows with the label bold and the explanation muted; the selected row takes the blue tint and border. The submit button is the primary style, full width, disabled state muted with the reason beneath.
+- **Composer** (inline comment): a card with a textarea, "Add" primary small and "Cancel" quiet.
+- **Version mismatch bar** and the phase-closed notice use the amber note style.
+
 
 | Action | Effect |
 | --- | --- |
