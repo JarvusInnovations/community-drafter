@@ -51,6 +51,13 @@ export interface MintTokenInput {
    * unknown claims.
    */
   returnPath?: string;
+  /**
+   * Test-only: overrides `iat` (and shifts `exp` by the same amount) so a
+   * suite can mint a token that already looks old — e.g. `packages/cli`'s
+   * e2e tests, which mint a `cli` token with `iat` 31 days in the past to
+   * exercise the CLI's silent-refresh path without waiting 30 real days.
+   */
+  issuedAt?: Date;
 }
 
 export interface MintedToken {
@@ -64,7 +71,8 @@ export interface MintedToken {
 export async function mintOperatorToken(input: MintTokenInput): Promise<MintedToken> {
   const id = randomBytes(18).toString("base64url");
   const ttlSeconds = ttlFor(input.purpose);
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const issuedAtSeconds = Math.floor((input.issuedAt?.getTime() ?? Date.now()) / 1000);
+  const exp = issuedAtSeconds + ttlSeconds;
 
   const idClaim = input.purpose === "magic" ? { jti: id } : { sid: id };
   const returnClaim =
@@ -79,7 +87,7 @@ export async function mintOperatorToken(input: MintTokenInput): Promise<MintedTo
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(input.email.toLowerCase())
-    .setIssuedAt()
+    .setIssuedAt(issuedAtSeconds)
     .setExpirationTime(exp)
     .sign(secretKey(input.secret));
 
