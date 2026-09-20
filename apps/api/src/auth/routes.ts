@@ -13,7 +13,7 @@ interface LoginBody {
 }
 
 interface CallbackQuery {
-  token?: string;
+  code?: string;
 }
 
 interface DeviceBody {
@@ -80,22 +80,45 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     operator: Pick<OperatorRecord, "email" | "name" | "kind">,
     request: FastifyRequest,
     returnPath: string,
+    trigger: { kind: "web" } | { kind: "device"; userCode: string },
   ): Promise<void> {
     const minted = await fastify.auth.mint(
       "magic",
       { email: operator.email, name: operator.name, kind: operator.kind },
       { returnPath },
     );
-    const link = `${authBaseUrl(request, fastify.config.PUBLIC_URL)}/auth/callback?token=${encodeURIComponent(minted.token)}`;
+    // `specs/api/auth.md`: the token never appears in a URL or an email —
+    // only a short code that maps to it in memory for the token's lifetime.
+    const code = fastify.auth.magicCodes.put(minted.token, minted.expiresAt.getTime());
+    const base = authBaseUrl(request, fastify.config.PUBLIC_URL);
+    const link = `${base}/auth/callback?code=${code}`;
     const name = instanceName();
+    const host = base.replace(/^https?:\/\//u, "");
     const fromEmail = fastify.config.INSTANCE_FROM_EMAIL ?? "no-reply@community-drafter.local";
+
+    // `specs/behaviors/notifications.md` § `operator-magic-link`.
+    const greeting = `Hi ${operator.name},`;
+    const context =
+      trigger.kind === "web"
+        ? `You asked to sign in to ${name} (${host}) on the web.`
+        : `A command line asked to sign in to ${name} (${host}) with the code ${trigger.userCode}.`;
+    const expiry = "This link works once and expires in 15 minutes.";
+    const ignore = "If you didn't request this, you can ignore this email.";
+    const button = `Sign in to ${name}`;
 
     await fastify.mailer.send({
       to: { name: operator.name, email: operator.email },
       from: { name, email: fromEmail },
       subject: `Sign in to ${name}`,
-      text: `Sign in to ${name}: ${link}\n\nThis link expires in 15 minutes and works once.`,
-      html: `<p><a href="${link}">Sign in to ${escapeHtml(name)}</a></p><p>This link expires in 15 minutes and works once.</p>`,
+      text: `${greeting}\n\n${context}\n\n${button}: ${link}\n\n${expiry}\n${ignore}\n`,
+      html:
+        `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.5;color:#1b1b1b;max-width:520px">` +
+        `<p>${escapeHtml(greeting)}</p>` +
+        `<p>${escapeHtml(context)}</p>` +
+        `<p style="margin:24px 0"><a href="${link}" style="display:inline-block;background:#1f4d3a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:8px">${escapeHtml(button)}</a></p>` +
+        `<p style="font-size:14px;color:#5d5d57">Or paste this link into your browser:<br><a href="${link}" style="color:#1f4d3a">${link}</a></p>` +
+        `<p style="font-size:14px;color:#5d5d57">${escapeHtml(expiry)}<br>${escapeHtml(ignore)}</p>` +
+        `</div>`,
       personalLink: link,
     });
   }
@@ -132,7 +155,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const operator = fastify.storage.readModel.getOperatorByEmail(email);
       if (operator?.active) {
-        await sendMagicLink(operator, request, returnPath);
+        await sendMagicLink(operator, request, returnPath, { kind: "web" });
       }
 
       reply.status(202);
@@ -202,7 +225,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         return invalidLinkPage;
       };
 
-      const token = request.query.token;
+      const code = request.query.code;
+      if (!code) return fail();
+      const token = fastify.auth.magicCodes.take(code);
       if (!token) return fail();
 
       const verified = await fastify.auth.verifyMagic(token);
@@ -281,7 +306,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const operator = fastify.storage.readModel.getOperatorByEmail(email);
       if (operator?.active) {
-        await sendMagicLink(operator, request, `/auth/device?code=${pending.userCode}`);
+        await sendMagicLink(operator, request, `/auth/device?code=${pending.userCode}`, {
+          kind: "device",
+          userCode: pending.userCode,
+        });
       }
 
       reply.status(202);

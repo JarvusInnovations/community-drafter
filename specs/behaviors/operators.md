@@ -35,9 +35,9 @@ A request by an operator who is not on the document returns 404 `not_found`, the
 ## Sign-in: magic link
 
 - The login form accepts any email address and always responds "If that address belongs to an operator, a sign-in link is on its way." No enumeration.
-- If the address matches an active operator, a **magic link** is emailed: a signed, single-purpose token valid for 15 minutes, bound to the operator's email and to a random `jti`. Following it sets the web session cookie and redirects to the requested return path (validated: must start with a single `/`). A used `jti` is remembered in memory until it expires; reuse after a restart within the window is accepted as a known limitation.
+- If the address matches an active operator, a **magic link** is emailed. Behind it is a signed, single-purpose token valid for 15 minutes, bound to the operator's email and to a random `jti`; the link itself carries only a short random code that maps to that token in memory, so the URL is short and readable. Following it sets the web session cookie and redirects to the requested return path (validated: must start with a single `/`). A used `jti` is remembered in memory until it expires; reuse after a restart within the window is accepted as a known limitation (a restart also forgets pending codes, which simply means requesting a new link).
 - Requests are rate-limited per address and per source IP (5 per 15 minutes each).
-- The message is transactional (`notifications.md`): subject "Sign in to *Instance name*", one link, no other content. It requires a working mailer; an instance without one cannot sign operators in, by design.
+- The message is transactional (`notifications.md` § `operator-magic-link`): subject "Sign in to *Instance name*", one sentence of context, a button or link, the expiry, and a line to ignore it if not requested. It requires a working mailer; an instance without one cannot sign operators in, by design.
 
 ## Sessions: signed tokens, no server-side store
 

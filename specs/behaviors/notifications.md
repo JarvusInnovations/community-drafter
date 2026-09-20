@@ -22,7 +22,7 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `signature-confirmation-<ts>` | a signature written | the signer | yes |
 | `revocation-confirmation-<ts>` | a revocation written | the signer | yes |
 | `review-receipt-<ts>` | a review submitted | the author | yes (brief; lists judgement and comment count) |
-| `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (not a participation message: no `notified` mark, no preference link; subject "Sign in to *Instance name*") |
+| `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (not a participation message: no `notified` mark, no preference link; subject "Sign in to *Instance name*"; body: greeting by name, one sentence naming the instance URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Instance name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
 | `digest-<date>` | daily job, only if anything changed that day | invitees with `daily_digest` | subscription |
 | `signing-opened` | phase becomes signing (the clock) | all invitees with `phase_changes` who have opened the link, plus every current signer regardless | subscription (signers: forced on) |
