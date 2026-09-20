@@ -77,6 +77,11 @@ figure { margin: 0; justify-self: center; min-width: 0; }
 .screen { width: 100%; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--card); }
 .screen img { aspect-ratio: 1200 / 800; object-fit: cover; object-position: top; }
 
+.getting-in { padding-top: 0; padding-bottom: 0; }
+.getting-in .card h3 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; }
+.getting-in .card code { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; font-size: 0.86em; word-break: break-word; }
+.note { max-width: 70ch; margin-top: 18px; color: var(--muted); }
+
 .principles dl { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 0; }
 .principles dl > div { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; min-width: 0; }
 .principles dt { font-weight: 700; margin-bottom: 6px; }

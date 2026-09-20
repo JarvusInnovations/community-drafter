@@ -53,7 +53,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 - **`docs create`, `docs show` and `docs open` print `public_url`** — `<instance>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
 - Errors map API `error` codes to exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other; the message is the API's `message`.
 - The home view includes `help[]` lines suggesting the next likely command, per AXI.
-- **One invocation form.** Every emitted command — `help[]` hints, error suggestions, the hook output, `--help` usage lines, the generated `SKILL.md` prose — writes commands as `drafter-axi <command> …`. The resolved path of the bundled shim (which is not on `PATH`) is printed exactly once, as the home view's `invoke_as` field; nothing else interleaves the two forms.
+- **One invocation form per surface.** Everything the CLI itself emits — `help[]` hints, error suggestions, hook output, `--help` usage lines — writes commands as `drafter-axi <command> …`, never a resolved path. The resolved path of the bundled shim (which is not on `PATH`) appears exactly once, as the home view's `invoke_as` field, which is where a reader learns how to turn those hints into a runnable command. `SKILL.md` is the other surface and uses `scripts/drafter-axi` throughout, stated once at its top; within either surface the form never varies.
 
 ## Help
 

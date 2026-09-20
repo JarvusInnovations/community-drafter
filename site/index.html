@@ -19,6 +19,7 @@
     <p class="cta">
       <a class="btn primary" href="#how">See how it works</a>
       <a class="btn" href="https://github.com/JarvusInnovations/community-drafter">View on GitHub</a>
+      <a class="btn" href="#getting-in">I run documents</a>
     </p>
   </div>
 </header>
@@ -32,12 +33,35 @@
   </div>
   <div class="card">
     <h2>For the team that drafts</h2>
-    <p>Publish versions with a one-line changelog. Read every comment as part of the submission it came in. Answer them in rounds, mark each one accepted, partly, declined or noted, and publish again.</p>
+    <p>Publish versions with a one-line changelog. Read every comment as part of the submission it came in. Answer them in rounds, mark each one accepted, partly addressed, declined or noted, and publish again.</p>
   </div>
   <div class="card">
     <h2>For the record</h2>
     <p>Every action is a commit in a private git repository: who signed, who removed their name, what changed and why. "How was this statement approved?" always has a real answer.</p>
   </div>
+</section>
+
+<section id="getting-in" class="wrap">
+  <h2 class="section-title">Getting in</h2>
+  <div class="three getting-in">
+    <div class="card">
+      <h3>Where you sign in</h3>
+      <p>At your instance, not here. Go to <code>&lt;your-instance&gt;/admin</code>, type the email address your account was made with, and follow the link that arrives. No password. This site has nothing to sign into.</p>
+    </div>
+    <div class="card">
+      <h3>What the console shows you</h3>
+      <p>Once you're in, <code>/admin</code> is a web console for reading a document: progress and deadlines, the people you invited and where each one stands, submissions and comments, versions, and "view as" to see exactly the page a given person was sent.</p>
+    </div>
+    <div class="card">
+      <h3>What the command line does</h3>
+      <p>Everything that writes. Create a document, publish a version, open it on a clock, import invitees, send and remind, export the feedback bundle. It installs as an agent skill, so your team's agent can run a document the same way you would.</p>
+    </div>
+    <div class="card">
+      <h3>How to get an instance</h3>
+      <p>If your group already runs one, ask whoever administers it to create your operator account, then sign in at their address. Otherwise the whole service is in the repository and one deployment serves any number of groups and documents.</p>
+    </div>
+  </div>
+  <p class="note">There is no directory of instances and no shared sign-in: every deployment stands alone, and the only address that matters is the one your group uses.</p>
 </section>
 
 <section id="how" class="wrap">
@@ -107,7 +131,7 @@
 
 <section class="wrap teams">
   <h2 class="section-title">Running one</h2>
-  <p>The admin interface is a command-line tool that installs as an agent skill into the repository your team, or your team's agent, already works from. Import invitees from your own contact list, publish, open, export the feedback bundle for a revision round, and publish again.</p>
+  <p>Two surfaces, one account. The <strong>web console</strong> at <code>&lt;your-instance&gt;/admin</code> is where you read a document — progress, people, submissions, versions, view-as. The <strong>admin skill</strong> is where you write: a command-line tool that installs into the repository your team, or your team's agent, already works from. Import invitees from your own contact list, publish, open, export the feedback bundle for a revision round, and publish again.</p>
 <pre><code>npx skills add JarvusInnovations/community-drafter --skill drafter-axi
 
 drafter-axi docs create our-letter --title "…" --sender-name "…" --reply-to …
@@ -117,6 +141,7 @@ drafter-axi people import our-letter invitees.ndjson
 drafter-axi people links our-letter --out links.csv
 drafter-axi feedback export our-letter --format md
 drafter-axi versions publish our-letter --file v2.md --summary "…" --dispositions d.json</code></pre>
+  <p>The installed skill is not on your <code>PATH</code>: run it as <code>scripts/drafter-axi …</code> from the skill's own directory.</p>
   <p>One instance serves any number of organizations and documents. There is no public homepage inside the product: a document is reachable only through the links made for it, plus an optional anyone-with-the-link read view and an embeddable signatory count for your own site.</p>
   <p class="cta"><a class="btn primary" href="https://github.com/JarvusInnovations/community-drafter">Read the code and the specs</a></p>
 </section>
