@@ -235,6 +235,7 @@ export interface OperatorRecord {
   name: string;
   kind: "person" | "bot";
   active: boolean;
+  superadmin?: boolean;
   title?: string;
   org?: string;
 }

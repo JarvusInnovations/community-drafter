@@ -8,7 +8,10 @@ import { clientFrom, render } from "./common.js";
 const OPERATORS_FLAGS: Record<string, FlagSpec> = {
   list: { positionals: 0 },
   add: { positionals: 1, value: ["--name", "--kind", "--title", "--org", "--notes"] },
-  update: { positionals: 1, value: ["--name", "--active", "--title", "--org", "--notes"] },
+  update: {
+    positionals: 1,
+    value: ["--name", "--active", "--superadmin", "--title", "--org", "--notes"],
+  },
   remove: { positionals: 1 },
 };
 
@@ -16,11 +19,13 @@ export const OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|rem
 
 list
 add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
-update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
+update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
 remove <email>
 
 The global operator directory (\`specs/behaviors/operators.md\`) — every
-active operator may create documents and, once added to one, act on it.
+active operator may create documents and, once added to one, act on it. A
+superadmin sees and may act on every document; only a superadmin can grant
+or revoke the flag, and never on themself.
 Every mutation prints the resulting record and the commit subject.`;
 
 function operatorSchema() {
@@ -29,17 +34,18 @@ function operatorSchema() {
     computed<OperatorRecord>("name", (o) => o.name),
     computed<OperatorRecord>("kind", (o) => o.kind),
     computed<OperatorRecord>("active", (o) => o.active),
+    computed<OperatorRecord>("superadmin", (o) => o.superadmin === true),
     computed<OperatorRecord>("title", (o) => o.title ?? ""),
     computed<OperatorRecord>("org", (o) => o.org ?? ""),
   ];
 }
 
-function parseActiveFlag(value: string | undefined): boolean | undefined {
+function parseBoolFlag(flag: string, value: string | undefined): boolean | undefined {
   if (value === undefined) return undefined;
   if (value === "true") return true;
   if (value === "false") return false;
-  throw new AxiError("--active must be true or false", "USAGE", [
-    "drafter-axi operators update <email> --active true|false",
+  throw new AxiError(`${flag} must be true or false`, "USAGE", [
+    `drafter-axi operators update <email> ${flag} true|false`,
   ]);
 }
 
@@ -85,7 +91,8 @@ export async function operatorsCommand(args: string[]): Promise<string> {
       );
       const body = compact({
         name: str(parsed, "--name"),
-        active: parseActiveFlag(str(parsed, "--active")),
+        active: parseBoolFlag("--active", str(parsed, "--active")),
+        superadmin: parseBoolFlag("--superadmin", str(parsed, "--superadmin")),
         title: str(parsed, "--title"),
         org: str(parsed, "--org"),
         notes: str(parsed, "--notes"),

@@ -1951,18 +1951,23 @@ async function notificationsCommand(args) {
 var OPERATORS_FLAGS = {
   list: { positionals: 0 },
   add: { positionals: 1, value: ["--name", "--kind", "--title", "--org", "--notes"] },
-  update: { positionals: 1, value: ["--name", "--active", "--title", "--org", "--notes"] },
+  update: {
+    positionals: 1,
+    value: ["--name", "--active", "--superadmin", "--title", "--org", "--notes"]
+  },
   remove: { positionals: 1 }
 };
 var OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|remove> ...
 
 list
 add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
-update <email> [--name "<text>"] [--active true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
+update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
 remove <email>
 
 The global operator directory (\`specs/behaviors/operators.md\`) \u2014 every
-active operator may create documents and, once added to one, act on it.
+active operator may create documents and, once added to one, act on it. A
+superadmin sees and may act on every document; only a superadmin can grant
+or revoke the flag, and never on themself.
 Every mutation prints the resulting record and the commit subject.`;
 function operatorSchema() {
   return [
@@ -1970,16 +1975,17 @@ function operatorSchema() {
     computed("name", (o) => o.name),
     computed("kind", (o) => o.kind),
     computed("active", (o) => o.active),
+    computed("superadmin", (o) => o.superadmin === true),
     computed("title", (o) => o.title ?? ""),
     computed("org", (o) => o.org ?? "")
   ];
 }
-function parseActiveFlag(value) {
+function parseBoolFlag(flag, value) {
   if (value === void 0) return void 0;
   if (value === "true") return true;
   if (value === "false") return false;
-  throw new AxiError("--active must be true or false", "USAGE", [
-    "drafter-axi operators update <email> --active true|false"
+  throw new AxiError(`${flag} must be true or false`, "USAGE", [
+    `drafter-axi operators update <email> ${flag} true|false`
   ]);
 }
 async function operatorsCommand(args) {
@@ -2021,7 +2027,8 @@ async function operatorsCommand(args) {
       );
       const body = compact({
         name: str(parsed, "--name"),
-        active: parseActiveFlag(str(parsed, "--active")),
+        active: parseBoolFlag("--active", str(parsed, "--active")),
+        superadmin: parseBoolFlag("--superadmin", str(parsed, "--superadmin")),
         title: str(parsed, "--title"),
         org: str(parsed, "--org"),
         notes: str(parsed, "--notes")
@@ -2874,7 +2881,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "661d806" : "dev";
+var VERSION = true ? "76e0bc5" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
