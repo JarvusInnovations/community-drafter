@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Navigate, Outlet, useLocation } from "react-router";
 
 import { ApiError, getSession, logout } from "./api.ts";
 import { copy } from "./copy.ts";
 import { SessionContext, type SessionContextValue } from "./SessionContext.tsx";
-import { SignInScreen } from "./SignInScreen.tsx";
 
 type LoadState =
   | { status: "loading" }
@@ -18,6 +17,7 @@ type LoadState =
  */
 export function AdminLayout(): JSX.Element {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const location = useLocation();
 
   const load = useCallback(async () => {
     try {
@@ -51,16 +51,22 @@ export function AdminLayout(): JSX.Element {
   }
 
   if (state.status === "signed-out" || !contextValue) {
-    return <SignInScreen />;
+    const returnPath = `${location.pathname}${location.search}`;
+    return <Navigate to={`/admin/login?return=${encodeURIComponent(returnPath)}`} replace />;
   }
 
   return (
     <SessionContext.Provider value={contextValue}>
       <div className="min-h-screen bg-background text-foreground">
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <NavLink to="/admin" className="font-semibold" end>
-            {copy.nav.documents}
-          </NavLink>
+          <nav className="flex items-center gap-4">
+            <NavLink to="/admin" className="font-semibold" end>
+              {copy.nav.documents}
+            </NavLink>
+            <NavLink to="/admin/operators" className="text-sm text-muted-foreground">
+              {copy.nav.operators}
+            </NavLink>
+          </nav>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span>{contextValue.session.email}</span>
             <button

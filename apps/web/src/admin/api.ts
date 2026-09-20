@@ -4,6 +4,7 @@ import {
   type DocumentSummary,
   type InvitationRow,
   type NotificationsHealth,
+  type OperatorRecord,
   type SessionInfo,
   type SubmissionView,
   type VersionDetail,
@@ -81,6 +82,92 @@ export function getSession(): Promise<SessionInfo> {
 
 export function logout(): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>("/auth/logout", { method: "POST" });
+}
+
+/**
+ * `POST /auth/login` — `specs/screens/admin-dashboard.md` § Sign-in: always
+ * 202s regardless of whether the address is an operator, so this never
+ * throws for an unrecognized email; the login screen shows the same
+ * non-disclosing sentence either way.
+ */
+export function requestLogin(email: string, returnPath?: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(returnPath ? { email, return: returnPath } : { email }),
+  });
+}
+
+/** `POST /auth/device/approve` — the device-approval page. */
+export function approveDevice(userCode: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/auth/device/approve", {
+    method: "POST",
+    body: JSON.stringify({ user_code: userCode }),
+  });
+}
+
+/** `specs/api/admin.md` § Operators — the global directory (`/admin/operators`). */
+export function listOperators(): Promise<OperatorRecord[]> {
+  return request<OperatorRecord[]>(`${BASE}/operators`);
+}
+
+export interface CreateOperatorInput {
+  email: string;
+  name: string;
+  kind?: "person" | "bot";
+  title?: string;
+  org?: string;
+  notes?: string;
+}
+
+export function createOperator(input: CreateOperatorInput): Promise<OperatorRecord> {
+  return request<OperatorRecord>(`${BASE}/operators`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface UpdateOperatorInput {
+  name?: string;
+  active?: boolean;
+  title?: string;
+  org?: string;
+  notes?: string;
+}
+
+export function updateOperator(email: string, input: UpdateOperatorInput): Promise<OperatorRecord> {
+  return request<OperatorRecord>(`${BASE}/operators/${encodeURIComponent(email)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeOperator(email: string): Promise<{ ok: boolean; commit: string | null }> {
+  return request(`${BASE}/operators/${encodeURIComponent(email)}`, { method: "DELETE" });
+}
+
+/** The document's own operator membership (`specs/screens/admin-dashboard.md` § "Operators of this document"). */
+export function getDocumentOperators(slug: string): Promise<OperatorRecord[]> {
+  return request<OperatorRecord[]>(`${BASE}/documents/${encodeURIComponent(slug)}/operators`);
+}
+
+export function addDocumentOperator(
+  slug: string,
+  email: string,
+): Promise<OperatorRecord & { added: boolean }> {
+  return request(`${BASE}/documents/${encodeURIComponent(slug)}/operators`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function removeDocumentOperator(
+  slug: string,
+  email: string,
+): Promise<{ ok: boolean; removed: boolean; commit: string | null }> {
+  return request(
+    `${BASE}/documents/${encodeURIComponent(slug)}/operators/${encodeURIComponent(email)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function listDocuments(): Promise<DocumentSummary[]> {

@@ -6,23 +6,69 @@ export const copy = {
 
   signIn: {
     heading: "Sign in",
-    body: "Sign in with your Google account to open the admin dashboard.",
-    button: "Sign in with Google",
-    notConfigured:
-      "Google sign-in isn't configured for this instance yet. Ask an operator to set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / COOKIE_SECRET, or DEV_ADMIN_EMAIL for local development.",
+    body: "Enter your operator email address and we'll send you a sign-in link.",
+    emailLabel: "Email address",
+    submit: "Send sign-in link",
+    submitting: "Sending…",
+    // `specs/screens/admin-dashboard.md` § Sign-in: "always ... No other
+    // text" — this exact sentence is shown whether or not the address
+    // belongs to an operator, so the page can never be used to enumerate
+    // operators.
+    sent: "If that address belongs to an operator, a sign-in link is on its way.",
+  },
+
+  device: {
+    heading: "Approve this device",
+    body: (code: string) => `A command-line sign-in is waiting for the code ${code}.`,
+    signedInAs: (email: string) => `Signed in as ${email}`,
+    approve: "Approve this device",
+    notMe: "Not me",
+    approved: "You can close this page; the command line will finish signing in.",
+    invalidCode: "This device code is missing, unknown, or has expired.",
   },
 
   nav: {
     documents: "Documents",
+    operators: "Operators",
     signOut: "Sign out",
+  },
+
+  operators: {
+    heading: "Operators",
+    empty: "No operators yet.",
+    add: "Add operator",
+    edit: "Edit",
+    deactivate: "Deactivate",
+    reactivate: "Reactivate",
+    remove: "Remove",
+    cannotSelf: "You cannot deactivate or remove your own operator account here.",
+    confirmDeactivate: (email: string) => `Deactivate ${email}?`,
+    confirmRemove: (email: string) => `Remove ${email}? This cannot be undone.`,
+    nameLabel: "Name",
+    emailLabel: "Email",
+    kindLabel: "Kind",
+    titleLabel: "Title",
+    orgLabel: "Organization",
+    save: "Save",
+    cancel: "Cancel",
+    success: (commit: string | null) => `Saved. Commit: ${commit ?? "(none)"}`,
+  },
+
+  documentOperators: {
+    heading: "Operators of this document",
+    addLabel: "Add an operator",
+    add: "Add",
+    remove: "Remove",
+    confirmRemove: (email: string) => `Remove ${email} from this document?`,
+    lastOperatorHint: "A document always keeps at least one operator.",
+    empty: "No operators on this document yet.",
   },
 
   documentList: {
     heading: "Documents",
     empty: "No documents yet.",
-    newDocumentHint: "New documents are created from the CLI:",
-    newDocumentCommand:
-      'drafter-axi documents create <slug> --title "…" --owner … --sender-name … --reply-to …',
+    newDocumentHint: "New documents are created from the CLI (you become its first operator):",
+    newDocumentCommand: 'drafter-axi docs create <slug> --title "…" --sender-name … --reply-to …',
   },
 
   dashboard: {
