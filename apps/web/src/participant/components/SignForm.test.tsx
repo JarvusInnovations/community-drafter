@@ -137,38 +137,82 @@ describe("SignForm — capacity fields and the attestation gate", () => {
  * skeptic could not tell who would see their name).
  */
 describe("SignForm — who sees your name, and the listing choice", () => {
-  it("names the invited people on a closed document, and the organizations the list is shared with", () => {
+  it("names who a closed statement goes to, whatever the draft's public_access is", () => {
     const bundle = makeBundle({
       document: {
         audience: "closed",
-        list_visible_to: ["St. Brigid Parish Council", "City Arts Council"],
+        addressed_to: ["St. Brigid Parish Council", "City Arts Council"],
       },
     });
     render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
 
     expect(
       screen.getByText(
-        /only the people invited to this document can see\. The team also shares the list with St\. Brigid Parish Council and City Arts Council\./u,
+        /This statement and its signatory list go to St\. Brigid Parish Council and City Arts Council; the people invited to sign can also see the list\./u,
       ),
     ).toBeTruthy();
     expect(screen.getByLabelText(/List my name on the signatory list/u)).toBeTruthy();
   });
 
-  it("says anyone with the link can read the list on a public document", () => {
-    const bundle = makeBundle({ document: { audience: "public", list_visible_to: [] } });
+  it("falls back to the invited people on a record written before the field existed", () => {
+    const bundle = makeBundle({ document: { audience: "closed", addressed_to: [] } });
     render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
 
-    expect(screen.getByText(/which anyone with the link can read\./u)).toBeTruthy();
+    expect(
+      screen.getByText(/This statement and its signatory list go to the people invited to sign\./u),
+    ).toBeTruthy();
+  });
+
+  it("says a public statement will be published for anyone to read", () => {
+    const bundle = makeBundle({ document: { audience: "public", addressed_to: [] } });
+    render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
+
+    expect(
+      screen.getByText(
+        /This statement and its signatory list will be published for anyone to read\./u,
+      ),
+    ).toBeTruthy();
     const listed = screen.getByLabelText(/List my name publicly/u) as HTMLInputElement;
     expect(listed.checked).toBe(true);
   });
 
-  it("offers no listing choice when no list is shown at all", () => {
-    const bundle = makeBundle({ document: { audience: "public", show_signatories: "count" } });
+  it("names the recipients of a public statement too", () => {
+    const bundle = makeBundle({
+      document: { audience: "public", addressed_to: ["the State Board of Education"] },
+    });
     render(<SignForm bundle={bundle} token="test-token" onSigned={noop} />);
 
-    expect(screen.getByText(/Only the number of signatories is shown/u)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /published for anyone to read, addressed to the State Board of Education\./u,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("offers no listing choice when no list is shown at all, and picks the verb by audience", () => {
+    const published = makeBundle({
+      document: { audience: "public", addressed_to: [], show_signatories: "count" },
+    });
+    const { unmount } = render(<SignForm bundle={published} token="test-token" onSigned={noop} />);
+
+    expect(
+      screen.getByText(/Only the number of signatories will be published with this statement/u),
+    ).toBeTruthy();
     expect(screen.queryByLabelText(/List my name/u)).toBeNull();
+    unmount();
+
+    const delivered = makeBundle({
+      document: {
+        audience: "closed",
+        addressed_to: ["City Arts Council"],
+        show_signatories: "none",
+      },
+    });
+    render(<SignForm bundle={delivered} token="test-token" onSigned={noop} />);
+
+    expect(
+      screen.getByText(/No signatory list will be delivered with this statement/u),
+    ).toBeTruthy();
   });
 
   it("sends listed: false when the signer turns the listing off before signing", async () => {

@@ -62,7 +62,6 @@ export function SignForm({
   // shown at all; with `count` or `none` the who-sees sentence has already
   // said so and `listed` stays true.
   const showListingChoice = document.show_signatories === "list";
-  const sharedWith = document.audience === "closed" ? document.list_visible_to : [];
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -209,8 +208,11 @@ export function SignForm({
        */}
       <div className="flex flex-col gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm text-muted-foreground">
         <p>
-          {copy.signForm.whoSees(document.audience, document.show_signatories)}
-          {sharedWith.length > 0 ? ` ${copy.signForm.alsoSharedWith(sharedWith)}` : ""}
+          {copy.signForm.whoSees(
+            document.audience,
+            document.addressed_to,
+            document.show_signatories,
+          )}
         </p>
         {showListingChoice ? (
           <label className="flex items-start gap-2 font-medium text-foreground">

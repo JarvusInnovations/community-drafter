@@ -32,7 +32,7 @@ export function makeBundle(overrides: {
       capacities: ["personal", "official"],
       show_signatories: "list",
       audience: "closed",
-      list_visible_to: [],
+      addressed_to: [],
       reply_to: "team@example.org",
       sender_name: "The Coalition",
       ...overrides.document,

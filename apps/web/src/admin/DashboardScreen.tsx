@@ -166,21 +166,23 @@ export function DashboardScreen(): JSX.Element {
         >
           {document.state} / {document.phase}
         </span>
-        {/*
-         * `specs/screens/admin-dashboard.md` § Dashboard: the audience,
-         * beside the state, because it is what every signer is told about
-         * who will see their name.
-         */}
-        <span className="text-muted-foreground">
-          <span className="font-semibold text-foreground">{copy.dashboard.audienceLabel}:</span>{" "}
-          {document.audience === "public"
-            ? copy.dashboard.audiencePublic
-            : copy.dashboard.audienceClosed}
-          {document.audience === "closed" && (document.list_visible_to?.length ?? 0) > 0
-            ? ` · ${copy.dashboard.listVisibleTo(document.list_visible_to ?? [])}`
-            : ""}
-        </span>
       </div>
+
+      {/*
+       * `specs/screens/admin-dashboard.md` § Dashboard: the audience is its
+       * own line — what every signer is told about who the statement goes
+       * to, stated apart from "Copy public link" below, which is about who
+       * may read the draft.
+       */}
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">{copy.dashboard.audienceLabel}:</span>{" "}
+        {document.audience === "public"
+          ? copy.dashboard.audiencePublic
+          : copy.dashboard.audienceClosed}
+        {(document.addressed_to?.length ?? 0) > 0
+          ? ` · ${copy.dashboard.addressedTo(document.addressed_to ?? [])}`
+          : ""}
+      </p>
 
       <Timeline document={document} />
 
