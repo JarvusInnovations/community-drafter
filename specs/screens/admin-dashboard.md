@@ -62,7 +62,7 @@ Publishing, creating documents, importing invitees and sending are CLI/API only 
 
 ## Navigation
 
-`/admin` ↔ dashboards ↔ sub-pages. Any admin route without a session redirects to `/admin/login` with a return path.
+`/admin` ↔ dashboards ↔ sub-pages. Any admin route without a session redirects to `/admin/login` with a return path. The instance root (`/`) shows one card naming the instance, one sentence saying documents are reached by personal link, and a "Sign in" button to `/admin/login`; nothing else, per `principles.md` § One instance, many documents, no lobby.
 
 ## Principles
 

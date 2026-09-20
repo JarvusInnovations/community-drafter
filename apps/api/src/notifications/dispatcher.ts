@@ -103,6 +103,25 @@ export class NotificationDispatcher {
     this.failures.get(key)?.delete(person);
   }
 
+  /** `GET .../notifications`: every failed send for a document, so the operator can see who and why. */
+  failureList(
+    document: string,
+  ): Array<{ event: string; person: string; error: string; at: string }> {
+    const out: Array<{ event: string; person: string; error: string; at: string }> = [];
+    for (const [key, bucket] of this.failures) {
+      if (!key.startsWith(`${document}:`)) continue;
+      for (const record of bucket.values()) {
+        out.push({
+          event: record.eventKey,
+          person: record.person,
+          error: record.lastError,
+          at: record.at,
+        });
+      }
+    }
+    return out.sort((a, b) => a.at.localeCompare(b.at));
+  }
+
   /** `GET .../notifications`: failed count for a document (across every event key). */
   failedCount(document: string): number {
     let total = 0;
@@ -196,6 +215,10 @@ export class NotificationDispatcher {
           if (target.markNotified) toMark.push(target.person);
         } else {
           failed += 1;
+          this.fastify.log.warn(
+            { document, eventKey, person: target.person, error: result.error },
+            "notifications: delivery failed after retries",
+          );
           this.recordFailure(
             {
               eventKey,

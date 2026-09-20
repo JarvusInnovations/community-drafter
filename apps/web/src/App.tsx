@@ -89,14 +89,27 @@ function LazyFallback(): JSX.Element {
   return <p className="p-4 text-muted-foreground">{copy.loading}</p>;
 }
 
+/**
+ * The instance root (`specs/screens/admin-dashboard.md` § Navigation): one
+ * line naming the instance and where its operators sign in. No lobby, no
+ * document list (`principles.md` § One instance, many documents, no lobby).
+ */
 function HomePage(): JSX.Element {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-foreground">
-      <h1 className="text-2xl font-semibold">Community Drafter</h1>
-      <p className="text-muted-foreground">
-        Workspace bootstrap placeholder — see{" "}
-        <code className="rounded bg-muted px-1.5 py-0.5">specs/README.md</code>.
-      </p>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground">
+      <div className="w-full max-w-[420px] rounded-2xl border border-border bg-card p-6 text-center">
+        <h1 className="text-xl font-bold tracking-tight">Community Drafter</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Documents here are reached through the personal links sent to their participants. If you
+          run documents on this instance, sign in.
+        </p>
+        <a
+          href="/admin/login"
+          className="mt-4 inline-block rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)]"
+        >
+          Sign in
+        </a>
+      </div>
     </main>
   );
 }

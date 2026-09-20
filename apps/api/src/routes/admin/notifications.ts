@@ -39,7 +39,12 @@ const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      return { sent, pending: 0, failed: fastify.notifications.failedCount(document.record.slug) };
+      return {
+        sent,
+        pending: 0,
+        failed: fastify.notifications.failedCount(document.record.slug),
+        failures: fastify.notifications.failureList(document.record.slug),
+      };
     },
   );
 

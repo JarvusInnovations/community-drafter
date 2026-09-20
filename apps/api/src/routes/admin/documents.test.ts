@@ -129,3 +129,63 @@ describe("POST /admin/api/documents/:slug/open", () => {
     await server.close();
   });
 });
+
+describe("POST /admin/api/documents/:slug/open deadline validation", () => {
+  it("422s a deadline without a zone or already in the past, and stores UTC for an offset", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents",
+      headers: adminHeaders(),
+      payload: {
+        slug: "doc-dates",
+        title: "Doc Dates",
+        sender_name: "Team",
+        reply_to: "t@example.org",
+      },
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-dates/versions",
+      headers: adminHeaders(),
+      payload: { body: "# Hello\n\nText.", summary: "Initial draft" },
+    });
+
+    const noZone = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-dates/open",
+      headers: adminHeaders(),
+      payload: { comments_close_at: "2036-09-22T19:00", signing_closes_at: "2036-09-25T19:00Z" },
+    });
+    expect(noZone.statusCode).toBe(422);
+    expect(noZone.json().error).toBe("validation_failed");
+    expect(noZone.json().details.field).toBe("comments_close_at");
+
+    const past = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-dates/open",
+      headers: adminHeaders(),
+      payload: {
+        comments_close_at: "2020-09-02T21:00:00Z",
+        signing_closes_at: "2036-09-25T19:00Z",
+      },
+    });
+    expect(past.statusCode).toBe(422);
+    expect(past.json().message).toContain("future");
+
+    const ok = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-dates/open",
+      headers: adminHeaders(),
+      payload: {
+        comments_close_at: "2036-09-22T19:00:00-04:00",
+        signing_closes_at: "2036-09-25T19:00:00-04:00",
+      },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().comments_close_at).toBe("2036-09-22T23:00:00.000Z");
+
+    await server.close();
+  });
+});

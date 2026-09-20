@@ -716,9 +716,9 @@ function resolveLoginUrl(flagUrl) {
   }
   return url.replace(/\/+$/, "");
 }
-function isConfigured() {
+function isConfigured(options = {}) {
   if (process.env.DRAFTER_URL && process.env.DRAFTER_TOKEN) return true;
-  const stored = readProfile("default");
+  const stored = readProfile(resolveProfileName(options.profile));
   return Boolean(stored.url && stored.token);
 }
 
@@ -1576,7 +1576,7 @@ async function homeCommand(args) {
   const parsed = parseFlags("home", args, HOME_FLAGS);
   const ifConfigured = bool(parsed, "--if-configured");
   const cli = cliInvocation();
-  if (!isConfigured()) {
+  if (!isConfigured({ profile: str(parsed, "--profile") })) {
     if (ifConfigured) return "";
     return joinBlocks(
       renderObject({ documents: "not signed in" }),
@@ -1927,6 +1927,21 @@ async function notificationsCommand(args) {
         summary,
         () => joinBlocks(
           renderObject({ sent: summary.sent, pending: summary.pending, failed: summary.failed }),
+          summary.failures && summary.failures.length > 0 ? renderList("failures", summary.failures, [
+            computed(
+              "event",
+              (f) => f.event
+            ),
+            computed(
+              "person",
+              (f) => f.person
+            ),
+            computed("at", (f) => f.at),
+            computed(
+              "error",
+              (f) => f.error
+            )
+          ]) : "",
           summary.failed > 0 ? renderHelp([`Run \`drafter-axi notifications retry ${slug}\` to re-dispatch`]) : ""
         )
       );
@@ -2881,7 +2896,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "76e0bc5" : "dev";
+var VERSION = true ? "4c2ae35" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

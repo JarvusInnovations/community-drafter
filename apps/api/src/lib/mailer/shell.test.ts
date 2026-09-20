@@ -38,5 +38,8 @@ describe("email shell", () => {
     expect(firstName("  Jane   Q. Doe ")).toBe("Jane");
     expect(firstName("jane@example.org")).toBe("jane@example.org");
     expect(firstName("Cher")).toBe("Cher");
+    expect(firstName("Rev. Tomás Ferreira")).toBe("Rev. Ferreira");
+    expect(firstName("Dr Priya Raman")).toBe("Dr Raman");
+    expect(firstName("Sr. Margaret Doyle")).toBe("Sr. Doyle");
   });
 });

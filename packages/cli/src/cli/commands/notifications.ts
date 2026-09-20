@@ -1,5 +1,5 @@
 import { parseSubcommand, requirePositional, str, type FlagSpec } from "../flags.js";
-import { joinBlocks, renderHelp, renderObject } from "../output.js";
+import { computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
 import type { NotificationsRetryResult, NotificationsSummary } from "../types.js";
 import { clientFrom, render } from "./common.js";
 
@@ -26,6 +26,23 @@ export async function notificationsCommand(args: string[]): Promise<string> {
       return render(parsed, summary, () =>
         joinBlocks(
           renderObject({ sent: summary.sent, pending: summary.pending, failed: summary.failed }),
+          summary.failures && summary.failures.length > 0
+            ? renderList("failures", summary.failures, [
+                computed<NonNullable<NotificationsSummary["failures"]>[number]>(
+                  "event",
+                  (f) => f.event,
+                ),
+                computed<NonNullable<NotificationsSummary["failures"]>[number]>(
+                  "person",
+                  (f) => f.person,
+                ),
+                computed<NonNullable<NotificationsSummary["failures"]>[number]>("at", (f) => f.at),
+                computed<NonNullable<NotificationsSummary["failures"]>[number]>(
+                  "error",
+                  (f) => f.error,
+                ),
+              ])
+            : "",
           summary.failed > 0
             ? renderHelp([`Run \`drafter-axi notifications retry ${slug}\` to re-dispatch`])
             : "",

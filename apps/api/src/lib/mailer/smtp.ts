@@ -1,6 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
-import { MailerError, type Mailer, type OutboundMessage } from "./types.ts";
+import { formatAddress, MailerError, type Mailer, type OutboundMessage } from "./types.ts";
 
 export interface SmtpConfig {
   host: string;
@@ -32,8 +32,8 @@ export class SmtpMailer implements Mailer {
   async send(message: OutboundMessage): Promise<void> {
     try {
       await this.transporter.sendMail({
-        from: `${message.from.name} <${message.from.email}>`,
-        to: `${message.to.name} <${message.to.email}>`,
+        from: formatAddress(message.from),
+        to: formatAddress(message.to),
         replyTo: message.replyTo,
         subject: message.subject,
         text: message.text,

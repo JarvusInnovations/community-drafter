@@ -54,6 +54,27 @@ interface WithdrawBody {
   public: boolean;
 }
 
+/**
+ * `specs/api/admin.md` § open/extend/reopen: deadlines are ISO 8601 with a
+ * zone (an offset or `Z`); anything else is 422 `validation_failed` naming
+ * the field. Stored normalized to UTC so the record never carries a local
+ * time that the schema's `date-time` format would reject as a 500.
+ */
+function parseDeadline(value: unknown, field: string): string {
+  if (typeof value !== "string" || !/(Z|[+-]\d\d:?\d\d)$/u.test(value.trim())) {
+    throw new ApiError(
+      "validation_failed",
+      `${field} must be an ISO 8601 date-time with a time zone, e.g. 2026-10-01T21:00:00Z or 2026-10-01T17:00:00-04:00.`,
+      { field },
+    );
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new ApiError("validation_failed", `${field} is not a valid date-time.`, { field });
+  }
+  return date.toISOString();
+}
+
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/documents", { config: OPERATOR_ROUTE }, async (request) => {
     const principal = request.principal!;
@@ -203,8 +224,15 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
       const slug = entry.record.slug;
-      const { comments_close_at, signing_closes_at } = request.body;
-
+      const comments_close_at = parseDeadline(request.body.comments_close_at, "comments_close_at");
+      const signing_closes_at = parseDeadline(request.body.signing_closes_at, "signing_closes_at");
+      if (new Date(comments_close_at) <= new Date()) {
+        // `behaviors/document-lifecycle.md` § Opening: a document opens into
+        // its comment period, never straight into closed.
+        throw new ApiError("validation_failed", "comments_close_at must be in the future.", {
+          field: "comments_close_at",
+        });
+      }
       if (new Date(comments_close_at) >= new Date(signing_closes_at)) {
         throw new ApiError(
           "validation_failed",
@@ -269,7 +297,14 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
       const slug = entry.record.slug;
-      const { comments_close_at, signing_closes_at } = request.body;
+      const comments_close_at =
+        request.body.comments_close_at === undefined
+          ? undefined
+          : parseDeadline(request.body.comments_close_at, "comments_close_at");
+      const signing_closes_at =
+        request.body.signing_closes_at === undefined
+          ? undefined
+          : parseDeadline(request.body.signing_closes_at, "signing_closes_at");
 
       const patch: Record<string, string> = {};
       if (comments_close_at !== undefined) {
@@ -380,7 +415,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       const entry = fastify.storage.readModel.getDocument(request.params.slug);
       if (!entry) throw notFoundDocument(request.params.slug);
       const slug = entry.record.slug;
-      const { comments_close_at, signing_closes_at } = request.body;
+      const comments_close_at =
+        request.body.comments_close_at === undefined
+          ? undefined
+          : parseDeadline(request.body.comments_close_at, "comments_close_at");
+      const signing_closes_at = parseDeadline(request.body.signing_closes_at, "signing_closes_at");
 
       const now = new Date();
       if (new Date(signing_closes_at) <= now) {
