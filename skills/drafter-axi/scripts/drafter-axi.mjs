@@ -684,8 +684,12 @@ function clearProfileToken(profile) {
   return true;
 }
 var LOGIN_HINT = "Run `drafter-axi login <email> --url <instance>` to sign in";
+function resolveProfileName(flagValue) {
+  const fromEnv = process.env.DRAFTER_PROFILE?.trim();
+  return flagValue ?? (fromEnv && fromEnv.length > 0 ? fromEnv : "default");
+}
 function resolveConfig(options = {}) {
-  const profile = options.profile ?? "default";
+  const profile = resolveProfileName(options.profile);
   const stored = readProfile(profile);
   const url = process.env.DRAFTER_URL ?? stored.url;
   if (!url) {
@@ -1166,7 +1170,7 @@ async function loginCommand(args) {
     "email",
     "drafter-axi login <email> [--url <instance>]"
   ).trim().toLowerCase();
-  const profile = str(parsed, "--profile") ?? "default";
+  const profile = resolveProfileName(str(parsed, "--profile"));
   const url = resolveLoginUrl(str(parsed, "--url"));
   const start = await startDeviceLogin(url, email);
   process.stdout.write(
@@ -1195,7 +1199,7 @@ Check your email for the sign-in link, then approve this device.
 }
 async function logoutCommand(args) {
   const parsed = parseFlags("logout", args, LOGOUT_FLAGS);
-  const profile = str(parsed, "--profile") ?? "default";
+  const profile = resolveProfileName(str(parsed, "--profile"));
   const cleared = clearProfileToken(profile);
   return render(parsed, { signed_out: cleared }, () => renderObject({ signed_out: cleared }));
 }
@@ -2816,7 +2820,7 @@ function renderCommandHelp(name) {
     "",
     doc.summary,
     "",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile."
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile."
   ];
   return `${lines.join("\n")}
 `;
@@ -2833,7 +2837,7 @@ function renderTopLevelHelp() {
   lines.push(
     "",
     "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` selects a config profile.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
     "Run `drafter-axi <command> --help` for usage on any command.",
     "Run `drafter-axi` with no arguments to see every open document's status."
   );
@@ -2841,7 +2845,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "216408b" : "dev";
+var VERSION = true ? "fc4b013" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
