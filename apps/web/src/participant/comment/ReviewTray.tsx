@@ -42,16 +42,32 @@ function SignatureFields({
   const formId = useId();
   const isOfficial = capacity === "official";
 
-  function emit(next: Partial<Record<string, unknown>> = {}): void {
-    onChange({
+  /**
+   * `next` is merged *before* the personal/official shaping, not after: a
+   * handler calls `emit({ capacity: "official" })` in the same tick as
+   * `setCapacity`, when the `capacity` state variable still holds the old
+   * value — reading `isOfficial` here would drop the org and report the
+   * attestation as satisfied (issue #64's disabled-reason gate).
+   */
+  function emit(next: Partial<NonNullable<SubmitInput["signature"]>> = {}): void {
+    const merged = {
       capacity,
       display_name: displayName,
-      descriptor: isOfficial ? undefined : descriptor || undefined,
-      org: isOfficial ? org : undefined,
-      title: isOfficial ? title : undefined,
-      authorized: isOfficial ? authorized : true,
-      listed: true,
+      descriptor,
+      org,
+      title,
+      authorized,
       ...next,
+    };
+    const official = merged.capacity === "official";
+    onChange({
+      capacity: merged.capacity,
+      display_name: merged.display_name,
+      descriptor: official ? undefined : merged.descriptor || undefined,
+      org: official ? merged.org : undefined,
+      title: official ? merged.title : undefined,
+      authorized: official ? merged.authorized === true : true,
+      listed: true,
     });
   }
 

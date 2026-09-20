@@ -37,7 +37,12 @@ describe("ReviewTray — a refused submission is never swallowed", () => {
     renderTray();
 
     fireEvent.click(screen.getByLabelText(/^Sign — add my name/u));
+    // Switching capacity alone must already report the attestation as
+    // unmet — the participant need not touch the Organization field first.
     fireEvent.click(screen.getByLabelText("On behalf of an organization"));
+    expect(
+      screen.getByRole("button", { name: "Sign and send comments" }).hasAttribute("disabled"),
+    ).toBe(true);
     fireEvent.change(screen.getByLabelText("Organization"), {
       target: { value: "St. Brigid Parish Council" },
     });
