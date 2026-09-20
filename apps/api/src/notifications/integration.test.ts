@@ -336,3 +336,49 @@ describe("daily digest", () => {
     await server.close();
   });
 });
+
+/**
+ * Issue #71 — `specs/behaviors/document-lifecycle.md` § Extension: an
+ * extension is "announced to subscribers of phase changes with old and new
+ * times", and `specs/behaviors/notifications.md` § Content rules spells out
+ * the line. End-to-end: extend → event carries the previous values →
+ * dispatcher formats them → the message says what moved.
+ */
+describe("extending a deadline tells subscribers what moved", () => {
+  it("names each deadline that changed with its old and new time", async () => {
+    const { server, cleanup, mailer } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const commentsCloseAt = new Date(Date.now() + 3_600_000).toISOString();
+    const signingClosesAt = new Date(Date.now() + 7_200_000).toISOString();
+    await seedDocument(server, {
+      slug: "doc-extended",
+      comments_close_at: commentsCloseAt,
+      signing_closes_at: signingClosesAt,
+    });
+    await seedParticipant(server, {
+      document: "doc-extended",
+      person: "alice",
+      token: "alicetoken1234567890",
+      notify: { phase_changes: true },
+    });
+
+    const laterComments = new Date(Date.now() + 5_400_000).toISOString();
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-extended/schedule",
+      headers: adminHeaders(),
+      payload: { comments_close_at: laterComments },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const fakeMailer = mailer as import("../lib/mailer/index.ts").FakeMailer;
+    const message = fakeMailer.sent.find((m) => m.subject.includes("schedule updated"));
+    expect(message).toBeDefined();
+    expect(message?.text).toMatch(/Comments close moved from .+ to .+\./u);
+    // The signing deadline did not move, so it gets no line of its own.
+    expect(message?.text).not.toContain("Signatures are due moved");
+
+    await server.close();
+  });
+});
