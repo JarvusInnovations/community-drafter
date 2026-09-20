@@ -114,3 +114,71 @@ export const RAW_HTML_FIXTURE = `# Notice
 
 <a href="#" onclick="evil()">Click</a> this link, or don't.
 `;
+
+/**
+ * A staffing-standards ask, the shape of a real revision round: prose, a
+ * ratios table and a timeline list. v1 → v2 exercises the readability rules
+ * in `specs/behaviors/versioning.md` § Diff — a reworded sentence, a changed
+ * number, one changed table cell, one added list item — and v2 → v3 adds a
+ * column so the table's shape changes.
+ */
+export const STAFFING_V1 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Require a named medication coordinator in every building, available four days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Notes |
+| --- | --- | --- |
+| School nurse | 1:750 | Statewide floor |
+| Health aide | 1:300 | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+`;
+
+/** Relative to v1: the ask is reworded, the nurse ratio moves, one timeline item is added. The table keeps its shape. */
+export const STAFFING_V2 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Name one medication coordinator per building, available five days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Notes |
+| --- | --- | --- |
+| School nurse | 1:700 | Statewide floor |
+| Health aide | 1:300 | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+- The legislature reviews the gap analysis in April.
+`;
+
+/** Relative to v2: the ratios table gains a Funding column — a shape change, nothing else touched. */
+export const STAFFING_V3 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Name one medication coordinator per building, available five days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Funding | Notes |
+| --- | --- | --- | --- |
+| School nurse | 1:700 | State | Statewide floor |
+| Health aide | 1:300 | Local | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+- The legislature reviews the gap analysis in April.
+`;
