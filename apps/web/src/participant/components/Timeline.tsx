@@ -94,8 +94,11 @@ export function Timeline({
   const signingPast = signingCountdown.isPast || document.phase === "closed";
 
   return (
-    <section aria-label={copy.timeline.ariaLabel} className="mt-3">
-      <div className="grid grid-cols-2 gap-2">
+    <section
+      aria-label={copy.timeline.ariaLabel}
+      className="mt-4 rounded-2xl border border-border bg-card p-4"
+    >
+      <div className="grid grid-cols-2 gap-3">
         <Chip
           active={commentState === "active"}
           title={commentsPast ? copy.timeline.commentsClosed : copy.timeline.commentsClose}
@@ -120,9 +123,9 @@ export function Timeline({
         />
       </div>
 
-      <div className="relative mt-3 pb-9">
+      <div className="relative mt-6 pb-9">
         <div
-          className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+          className="flex h-2.5 w-full overflow-hidden rounded-full bg-border"
           role="presentation"
         >
           <Segment state={commentState} share={commentShare} />
@@ -149,10 +152,14 @@ export function Timeline({
         />
 
         <div
-          className="absolute -top-1.5 h-5 w-0.5 -translate-x-1/2 bg-foreground"
+          className="absolute -top-2 h-6 w-[3px] -translate-x-1/2 rounded bg-foreground"
           style={{ left: `${nowShare * 100}%` }}
           aria-hidden="true"
-        />
+        >
+          <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider text-foreground">
+            {copy.timeline.now}
+          </span>
+        </div>
         <span className="sr-only">{copy.timeline.nowSr(document.phase)}</span>
       </div>
     </section>
@@ -176,15 +183,17 @@ function Chip({
     <div
       data-state={state}
       className={
-        "rounded-lg border px-3 py-2 " +
-        (active ? "border-foreground bg-background" : "border-border bg-muted/40")
+        "rounded-xl border px-3 py-2.5 " +
+        (active ? "border-primary bg-primary-soft" : "border-border bg-muted")
       }
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </p>
       <p
         className={
-          "text-base font-semibold leading-tight " +
-          (active ? "text-foreground" : "text-muted-foreground")
+          "text-lg font-bold leading-tight tracking-tight " +
+          (active ? "text-primary-deep" : "text-foreground")
         }
       >
         {relative}
@@ -198,10 +207,10 @@ function Segment({ state, share }: { state: SegmentState; share: number }): JSX.
   const base = "h-full";
   const look =
     state === "done"
-      ? "bg-foreground/70"
+      ? "bg-ok"
       : state === "active"
-        ? "text-foreground"
-        : "bg-transparent";
+        ? "text-primary"
+        : "border border-dashed border-muted-foreground/50 bg-transparent";
   return (
     <div
       data-state={state}
@@ -211,7 +220,7 @@ function Segment({ state, share }: { state: SegmentState; share: number }): JSX.
         ...(state === "active"
           ? {
               backgroundImage:
-                "repeating-linear-gradient(45deg, currentColor 0 6px, transparent 6px 12px)",
+                "repeating-linear-gradient(45deg, currentColor 0 7px, color-mix(in srgb, currentColor 35%, transparent) 7px 14px)",
             }
           : {}),
       }}

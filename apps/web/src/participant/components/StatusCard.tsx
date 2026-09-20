@@ -82,13 +82,13 @@ export function StatusCard({
 
   return (
     <section
-      className="mx-4 mt-4 rounded-lg border border-border p-4"
+      className="rounded-2xl border border-border bg-card p-5"
       aria-label={copy.signForm.heading}
     >
       {draft ? (
         <p className="mb-2 text-sm text-muted-foreground">
           {copy.draftLine(draft.version)} ·{" "}
-          <Link to={`/i/${token}/comment`} className="underline">
+          <Link to={`/i/${token}/comment`} className="font-medium text-primary">
             {copy.continueLink}
           </Link>
         </p>
@@ -183,7 +183,7 @@ export function StatusCard({
                     {copy.signed.remove}
                   </button>
                   {canComment ? (
-                    <Link to={`/i/${token}/comment`} className="underline">
+                    <Link to={`/i/${token}/comment`} className="font-medium text-primary">
                       {copy.signed.addComments}
                     </Link>
                   ) : null}
@@ -227,7 +227,7 @@ export function StatusCard({
           >
             {copy.signForm.declineLink}
           </button>
-          <Link to={`/i/${token}/comment`} className="underline">
+          <Link to={`/i/${token}/comment`} className="font-medium text-primary">
             {copy.signForm.commentLink}
           </Link>
         </div>

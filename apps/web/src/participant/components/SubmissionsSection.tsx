@@ -20,7 +20,7 @@ export function SubmissionsSection({
   }
 
   return (
-    <details className="mx-4 mt-4 rounded border border-border p-3">
+    <details className="mt-5 rounded-2xl border border-border bg-card p-4">
       <summary className="cursor-pointer text-sm font-semibold text-foreground">
         {copy.submissions.heading}
       </summary>

@@ -1,15 +1,26 @@
 @import "tailwindcss";
 
+/* `specs/screens/document.md` § Design: the "Docket" tokens. */
 @theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-border: oklch(0.922 0 0);
+  --color-background: #f4f6f8;
+  --color-card: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #eef1f4;
+  --color-muted-foreground: #5b6472;
+  --color-border: #e3e8ee;
+  --color-primary: #2457f5;
+  --color-primary-soft: #e8eeff;
+  --color-primary-deep: #0f2fa8;
+  --color-ok: #15803d;
+  --color-ok-soft: #e5f6ea;
+  --color-amber: #b45309;
+  --color-amber-soft: #fff4e0;
   --color-destructive: oklch(0.577 0.245 27.325);
   --color-destructive-foreground: oklch(0.985 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
+  --color-accent: #e8eeff;
+  --color-accent-foreground: #0f2fa8;
+  --font-sans:
+    Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /*
@@ -20,15 +31,23 @@
  */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: oklch(0.145 0 0);
-    --color-foreground: oklch(0.985 0 0);
-    --color-muted: oklch(0.269 0 0);
-    --color-muted-foreground: oklch(0.708 0 0);
-    --color-border: oklch(0.269 0 0);
+    --color-background: #0f1216;
+    --color-card: #171b21;
+    --color-foreground: #e9edf2;
+    --color-muted: #1f252d;
+    --color-muted-foreground: #9aa4b1;
+    --color-border: #2a313b;
+    --color-primary: #6b8cff;
+    --color-primary-soft: #182241;
+    --color-primary-deep: #b9c8ff;
+    --color-ok: #5ec78a;
+    --color-ok-soft: #14291c;
+    --color-amber: #e8a54a;
+    --color-amber-soft: #2c2312;
     --color-destructive: oklch(0.704 0.191 22.216);
     --color-destructive-foreground: oklch(0.985 0 0);
-    --color-accent: oklch(0.269 0 0);
-    --color-accent-foreground: oklch(0.985 0 0);
+    --color-accent: #182241;
+    --color-accent-foreground: #b9c8ff;
   }
 }
 
