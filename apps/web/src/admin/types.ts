@@ -12,6 +12,7 @@ export type ShowSignatories = "list" | "count" | "none";
 export type DocumentState = "draft" | "open" | "closed" | "withdrawn";
 export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
 export type ParticipationStatus =
+  | "not_sent"
   | "unopened"
   | "opened"
   | "drafting"

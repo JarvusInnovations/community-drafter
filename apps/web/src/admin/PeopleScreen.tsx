@@ -19,6 +19,7 @@ import { chipClass, inputClass, quietLinkClass, selectClass } from "./styles.ts"
 import { type InvitationRow, type ParticipationStatus, type SubmissionView } from "./types.ts";
 
 const STATUSES = [
+  "not_sent",
   "unopened",
   "opened",
   "drafting",
@@ -46,6 +47,8 @@ function statusPill(status: string): { tone: PillTone; strike?: boolean; label: 
   const normalized: ParticipationStatus | string =
     status === "signed (conditional)" ? "signed_conditional" : status;
   switch (normalized as ParticipationStatus) {
+    case "not_sent":
+      return { tone: "muted", label: "not sent" };
     case "unopened":
       return { tone: "muted", label: "unopened" };
     case "opened":
