@@ -1586,23 +1586,51 @@ async function homeCommand(args) {
       ])
     );
   }
+  const config = resolveConfig({ profile: str(parsed, "--profile") });
+  const client = clientFrom(parsed);
+  let who;
   let documents;
   try {
-    documents = await clientFrom(parsed).get("/documents");
+    [who, documents] = await Promise.all([
+      client.get("/whoami"),
+      client.get("/documents")
+    ]);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const expired = /unauthenticated|operator_inactive|401/iu.test(message);
+    const identity2 = renderObject({
+      signed_in: expired ? "no \u2014 the stored sign-in is expired or revoked" : "unknown",
+      instance: config.url,
+      profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile
+    });
+    if (expired) {
+      return joinBlocks(
+        identity2,
+        renderHelp([`Run \`${cli} login <email> --url ${config.url}\` to sign in again`])
+      );
+    }
     if (ifConfigured) {
-      const message = error instanceof Error ? error.message : String(error);
-      return renderObject({ documents: `could not reach the API: ${message}` });
+      return joinBlocks(
+        identity2,
+        renderObject({ documents: `could not reach the API: ${message}` })
+      );
     }
     throw error;
   }
+  const identity = renderObject({
+    signed_in: `${who.name} <${who.email}>`,
+    kind: who.kind,
+    instance: config.url,
+    profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+    token_expires: who.expires_at
+  });
   if (documents.length === 0) {
     return joinBlocks(
+      identity,
       renderObject({ documents: "0 documents found" }),
       renderHelp([`Run \`${cli} docs create <slug> --title "..." ...\` to start one`])
     );
   }
-  const client = clientFrom(parsed);
   const openDocs = documents.filter((d) => d.state === "open").sort((a, b) => nextDeadline(a).localeCompare(nextDeadline(b))).slice(0, DRILL_DOWN_LIMIT);
   const drillDowns = /* @__PURE__ */ new Map();
   await Promise.all(
@@ -1651,6 +1679,7 @@ async function homeCommand(args) {
     );
   }
   return joinBlocks(
+    identity,
     renderList("documents", rows, [
       computed("slug", (r) => r.slug),
       computed("phase", (r) => r.phase),
@@ -2845,7 +2874,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "fc4b013" : "dev";
+var VERSION = true ? "b37d6bb" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
