@@ -1,6 +1,6 @@
 ---
 status: done
-pr: TBD
+pr: 61
 depends: []
 specs:
   - specs/api/admin-cli.md
