@@ -16,22 +16,22 @@ export const ShowSignatoriesSchema = z.enum(["list", "count", "none"]);
 export type ShowSignatories = z.infer<typeof ShowSignatoriesSchema>;
 
 /**
- * `specs/data-model.md` § Audience. The audience is deliberately **not** a
- * stored field: it is `public_access` read as the two-way partition it
- * already is, so a record can never say two different things about who a
- * document is for and no existing document needs a migration.
+ * `specs/data-model.md` § Audience. Who the **finished** statement is
+ * published or delivered to. Stored on the document and orthogonal to
+ * `public_access`, which is read access to the *working* document while it
+ * is drafted — the two answer different questions and all four
+ * combinations are meaningful.
  */
 export const AudienceSchema = z.enum(["public", "closed"]);
 export type Audience = z.infer<typeof AudienceSchema>;
 
-/** `none` → `closed`; `read` / `participate` → `public`. */
-export function audienceOf(document: { public_access?: PublicAccess }): Audience {
-  return (document.public_access ?? "none") === "none" ? "closed" : "public";
-}
-
-/** The inverse, for a write: `public` → `read`, `closed` → `none`. */
-export function publicAccessForAudience(audience: Audience): PublicAccess {
-  return audience === "public" ? "read" : "none";
+/**
+ * A record written before `audience` existed carries no value for it and
+ * reads as `closed`: nothing is published for anyone to read until someone
+ * says so (`specs/data-model.md` § Audience).
+ */
+export function audienceOf(document: { audience?: Audience }): Audience {
+  return document.audience ?? "closed";
 }
 
 /**
@@ -57,10 +57,14 @@ export const DocumentRecordSchema = z.object({
   capacities: z.array(CapacitySchema).optional(),
   public_access: PublicAccessSchema.optional(),
   show_signatories: ShowSignatoriesSchema.optional(),
-  // `specs/data-model.md` § Audience: the organizations a closed document's
-  // signatory list is shared with besides the invitees — a disclosure the
-  // sign card reads out, not an access control.
-  list_visible_to: z.array(z.string()).optional(),
+  // `specs/data-model.md` § Audience. `audience` is optional here for the
+  // same reason it is optional in the sheet's JSON Schema: a record written
+  // before the field existed still has to parse, and reads as `closed`.
+  // `addressed_to` is required when the audience is `closed`, which the
+  // admin API enforces — it is a rule about a pair of fields on a write,
+  // not a shape a record on disk is held to.
+  audience: AudienceSchema.optional(),
+  addressed_to: z.array(z.string()).optional(),
   // `specs/behaviors/operators.md`: the operator who created the document,
   // always also present in `operators`. Optional here (not `.default()`)
   // because gitsheets "validation is on writes only" — a legacy record
