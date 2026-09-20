@@ -15,6 +15,7 @@ import type {
   DocumentSummary,
   OperatorRecord,
 } from "../types.js";
+import { parseDeadline } from "../deadline.js";
 import { clientFrom, render } from "./common.js";
 
 const DOCS_FLAGS: Record<string, FlagSpec> = {
@@ -47,10 +48,14 @@ create <slug> --title <text> --sender-name <text> --reply-to <email>
        [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
 show <slug>
-open <slug> --comments-close <iso> --signing-closes <iso>
-extend <slug> [--comments-close <iso>] [--signing-closes <iso>]
+open <slug> --comments-close <when> --signing-closes <when>
+extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
-reopen <slug> [--comments-close <iso>] --signing-closes <iso>
+reopen <slug> [--comments-close <when>] --signing-closes <when>
+
+<when> is ISO 8601 with a zone (2026-10-01T21:00:00Z, 2026-10-01T17:00:00-04:00) or a
+zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
+what it resolved to.
 withdraw <slug> --reason <text> [--public]
 operators <slug>
 operators add <slug> <email>
@@ -156,27 +161,30 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>",
+        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>",
+      );
+      const openUsage =
+        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>";
+      const comments = parseDeadline(
+        requireStr(parsed, "--comments-close", openUsage),
+        "--comments-close",
+        openUsage,
+      );
+      const signing = parseDeadline(
+        requireStr(parsed, "--signing-closes", openUsage),
+        "--signing-closes",
+        openUsage,
       );
       const doc = await client.post<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}/open`,
-        {
-          comments_close_at: requireStr(
-            parsed,
-            "--comments-close",
-            "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>",
-          ),
-          signing_closes_at: requireStr(
-            parsed,
-            "--signing-closes",
-            "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>",
-          ),
-        },
+        { comments_close_at: comments.iso, signing_closes_at: signing.iso },
       );
       return render(parsed, doc, () =>
         joinBlocks(
           renderObject(detailObject(doc)),
           renderHelp([
+            comments.note,
+            signing.note,
             `Run \`${cli} people send ${slug}\` if invitees were imported before opening`,
           ]),
         ),
@@ -188,17 +196,32 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]",
+        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]",
       );
+      const extendUsage =
+        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
+      const rawComments = str(parsed, "--comments-close");
+      const rawSigning = str(parsed, "--signing-closes");
+      const comments = rawComments
+        ? parseDeadline(rawComments, "--comments-close", extendUsage)
+        : undefined;
+      const signing = rawSigning
+        ? parseDeadline(rawSigning, "--signing-closes", extendUsage)
+        : undefined;
       const body = compact({
-        comments_close_at: str(parsed, "--comments-close"),
-        signing_closes_at: str(parsed, "--signing-closes"),
+        comments_close_at: comments?.iso,
+        signing_closes_at: signing?.iso,
       });
       const doc = await client.post<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}/schedule`,
         body,
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () =>
+        joinBlocks(
+          renderObject(detailObject(doc)),
+          renderHelp([comments?.note, signing?.note].filter((n): n is string => Boolean(n))),
+        ),
+      );
     }
 
     case "close": {
@@ -214,21 +237,30 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>",
+        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>",
       );
-      const body = compact({
-        comments_close_at: str(parsed, "--comments-close"),
-        signing_closes_at: requireStr(
-          parsed,
-          "--signing-closes",
-          "drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>",
-        ),
-      });
+      const reopenUsage =
+        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
+      const rawComments = str(parsed, "--comments-close");
+      const comments = rawComments
+        ? parseDeadline(rawComments, "--comments-close", reopenUsage)
+        : undefined;
+      const signing = parseDeadline(
+        requireStr(parsed, "--signing-closes", reopenUsage),
+        "--signing-closes",
+        reopenUsage,
+      );
+      const body = compact({ comments_close_at: comments?.iso, signing_closes_at: signing.iso });
       const doc = await client.post<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}/reopen`,
         body,
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(parsed, doc, () =>
+        joinBlocks(
+          renderObject(detailObject(doc)),
+          renderHelp([comments?.note, signing.note].filter((n): n is string => Boolean(n))),
+        ),
+      );
     }
 
     case "withdraw": {

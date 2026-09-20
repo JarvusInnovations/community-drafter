@@ -1243,6 +1243,53 @@ function quote(p) {
   return /\s/.test(p) ? `"${p}"` : p;
 }
 
+// src/cli/deadline.ts
+var ZONED = /(Z|[+-]\d\d:?\d\d)$/u;
+var LOCAL = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/u;
+function localZoneName() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+  } catch {
+    return "local time";
+  }
+}
+function describe(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
+}
+function parseDeadline(value, flag, usage) {
+  const trimmed = value.trim();
+  if (ZONED.test(trimmed)) {
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) {
+      throw new AxiError(`${flag}: "${value}" is not a valid date-time`, "USAGE", [usage]);
+    }
+    return { iso: date.toISOString(), note: `${flag}: ${describe(date)}` };
+  }
+  if (LOCAL.test(trimmed)) {
+    const date = new Date(trimmed.replace(" ", "T"));
+    if (Number.isNaN(date.getTime())) {
+      throw new AxiError(`${flag}: "${value}" is not a valid date-time`, "USAGE", [usage]);
+    }
+    return {
+      iso: date.toISOString(),
+      note: `${flag}: read as ${localZoneName()} \u2192 ${describe(date)} (${date.toISOString()})`
+    };
+  }
+  throw new AxiError(
+    `${flag}: "${value}" is not a date-time. Use 2026-10-01T17:00 (your local time), 2026-10-01T17:00:00-04:00, or 2026-10-01T21:00:00Z.`,
+    "USAGE",
+    [usage]
+  );
+}
+
 // src/cli/commands/docs.ts
 var DOCS_FLAGS = {
   create: {
@@ -1273,10 +1320,14 @@ create <slug> --title <text> --sender-name <text> --reply-to <email>
        [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
 show <slug>
-open <slug> --comments-close <iso> --signing-closes <iso>
-extend <slug> [--comments-close <iso>] [--signing-closes <iso>]
+open <slug> --comments-close <when> --signing-closes <when>
+extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
-reopen <slug> [--comments-close <iso>] --signing-closes <iso>
+reopen <slug> [--comments-close <when>] --signing-closes <when>
+
+<when> is ISO 8601 with a zone (2026-10-01T21:00:00Z, 2026-10-01T17:00:00-04:00) or a
+zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
+what it resolved to.
 withdraw <slug> --reason <text> [--public]
 operators <slug>
 operators add <slug> <email>
@@ -1375,22 +1426,22 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>"
+        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>"
+      );
+      const openUsage = "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>";
+      const comments = parseDeadline(
+        requireStr(parsed, "--comments-close", openUsage),
+        "--comments-close",
+        openUsage
+      );
+      const signing = parseDeadline(
+        requireStr(parsed, "--signing-closes", openUsage),
+        "--signing-closes",
+        openUsage
       );
       const doc = await client.post(
         `/documents/${encodeURIComponent(slug)}/open`,
-        {
-          comments_close_at: requireStr(
-            parsed,
-            "--comments-close",
-            "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>"
-          ),
-          signing_closes_at: requireStr(
-            parsed,
-            "--signing-closes",
-            "drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>"
-          )
-        }
+        { comments_close_at: comments.iso, signing_closes_at: signing.iso }
       );
       return render(
         parsed,
@@ -1398,6 +1449,8 @@ async function docsCommand(args) {
         () => joinBlocks(
           renderObject(detailObject(doc)),
           renderHelp([
+            comments.note,
+            signing.note,
             `Run \`${cli} people send ${slug}\` if invitees were imported before opening`
           ])
         )
@@ -1408,17 +1461,29 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]"
+        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]"
       );
+      const extendUsage = "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
+      const rawComments = str(parsed, "--comments-close");
+      const rawSigning = str(parsed, "--signing-closes");
+      const comments = rawComments ? parseDeadline(rawComments, "--comments-close", extendUsage) : void 0;
+      const signing = rawSigning ? parseDeadline(rawSigning, "--signing-closes", extendUsage) : void 0;
       const body = compact({
-        comments_close_at: str(parsed, "--comments-close"),
-        signing_closes_at: str(parsed, "--signing-closes")
+        comments_close_at: comments?.iso,
+        signing_closes_at: signing?.iso
       });
       const doc = await client.post(
         `/documents/${encodeURIComponent(slug)}/schedule`,
         body
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(
+        parsed,
+        doc,
+        () => joinBlocks(
+          renderObject(detailObject(doc)),
+          renderHelp([comments?.note, signing?.note].filter((n) => Boolean(n)))
+        )
+      );
     }
     case "close": {
       const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs close <slug>");
@@ -1432,21 +1497,29 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>"
+        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>"
       );
-      const body = compact({
-        comments_close_at: str(parsed, "--comments-close"),
-        signing_closes_at: requireStr(
-          parsed,
-          "--signing-closes",
-          "drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>"
-        )
-      });
+      const reopenUsage = "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
+      const rawComments = str(parsed, "--comments-close");
+      const comments = rawComments ? parseDeadline(rawComments, "--comments-close", reopenUsage) : void 0;
+      const signing = parseDeadline(
+        requireStr(parsed, "--signing-closes", reopenUsage),
+        "--signing-closes",
+        reopenUsage
+      );
+      const body = compact({ comments_close_at: comments?.iso, signing_closes_at: signing.iso });
       const doc = await client.post(
         `/documents/${encodeURIComponent(slug)}/reopen`,
         body
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc)));
+      return render(
+        parsed,
+        doc,
+        () => joinBlocks(
+          renderObject(detailObject(doc)),
+          renderHelp([comments?.note, signing.note].filter((n) => Boolean(n)))
+        )
+      );
     }
     case "withdraw": {
       const slug = requirePositional(
@@ -1846,18 +1919,18 @@ function uninstall(args) {
   });
 }
 function status() {
-  const describe = (path) => {
+  const describe2 = (path) => {
     const command = existsSync2(path) ? managedCommand(readSettings(path)) : void 0;
     return command ? { installed: true, runs: command } : { installed: false };
   };
   const globalPath = join2(homedir4(), ".claude", "settings.json");
   const rows = [
-    { scope: "global", file: globalPath, ...describe(globalPath) }
+    { scope: "global", file: globalPath, ...describe2(globalPath) }
   ];
   const root = gitRoot();
   if (root) {
     const projectPath = join2(root, ".claude", "settings.json");
-    rows.push({ scope: "project", file: projectPath, ...describe(projectPath) });
+    rows.push({ scope: "project", file: projectPath, ...describe2(projectPath) });
   } else {
     rows.push({
       scope: "project",
@@ -2896,7 +2969,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "4c2ae35" : "dev";
+var VERSION = true ? "bd2080c" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
