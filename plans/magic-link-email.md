@@ -1,5 +1,6 @@
 ---
-status: planned
+status: done
+pr: 31
 depends: []
 specs:
   - specs/api/auth.md
@@ -24,16 +25,16 @@ Short-code magic links and a human-shaped sign-in email. Out: DMARC/DNS (managed
 4. Tests: link contains no JWT; unknown/expired code fails; code is single-use; device-flow return path still round-trips; template contains the trigger sentence and no token.
 
 ## Validation
-- [ ] The emailed link matches `/auth/callback\?code=[A-Za-z0-9]{24}$` and the message body contains no `eyJ` token fragment.
-- [ ] A code works once; a second use and an unknown code render the failure page.
-- [ ] The device-code email names the user code; the web email says "on the web".
-- [ ] Existing auth and CLI e2e suites pass.
+- [x] The emailed link matches `/auth/callback\?code=[A-Za-z0-9]{24}$` and the message body contains no `eyJ` token fragment.
+- [x] A code works once; a second use and an unknown code render the failure page.
+- [x] The device-code email names the user code; the web email says "on the web".
+- [x] Existing auth and CLI e2e suites pass (api 152, cli 34).
 
 ## Risks / unknowns
 - **Restart mid-link** forgets the code; the failure page tells the person to request a new link.
 
 ## Notes
-(closeout)
+- Verified in `apps/api/src/auth/auth.test.ts` (`operator-magic-link email`, device flow, single-use callback). Live delivery re-checked after deploy against Postmark.
 
 ## Follow-ups
-(closeout)
+- Tracked as: DMARC for the sending domain is managed in another repo by another agent; deliverability to forwarded mailboxes stays limited until it lands.
