@@ -147,6 +147,36 @@ describe("GET /auth/callback", () => {
     await server.close();
   });
 
+  /** `specs/api/auth.md` § `GET /auth/session`: the frame's instance name rides on the session (#37). */
+  it("returns the configured INSTANCE_NAME as instance_name", async () => {
+    const { server, cleanup } = await buildTestServer({ env: { INSTANCE_NAME: "Test Instance" } });
+    cleanups.push(cleanup);
+
+    const session = await server.inject({
+      method: "GET",
+      url: "/auth/session",
+      headers: adminHeaders(),
+    });
+    expect(session.statusCode).toBe(200);
+    expect(session.json().instance_name).toBe("Test Instance");
+
+    await server.close();
+  });
+
+  it("falls back to Community Drafter when INSTANCE_NAME is unset", async () => {
+    const { server, cleanup } = await buildTestServer({ env: { INSTANCE_NAME: undefined } });
+    cleanups.push(cleanup);
+
+    const session = await server.inject({
+      method: "GET",
+      url: "/auth/session",
+      headers: adminHeaders(),
+    });
+    expect(session.json().instance_name).toBe("Community Drafter");
+
+    await server.close();
+  });
+
   it("a used token cannot be replayed", async () => {
     const mailer = new FakeMailer();
     const { server, cleanup } = await buildTestServer({ mailer });

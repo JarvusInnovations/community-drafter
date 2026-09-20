@@ -142,6 +142,11 @@ export interface ActivityEntry {
   judgement?: string;
   reason?: string;
   actor: string;
+  /**
+   * `specs/behaviors/operators.md` § Superadmins: set when the actor is
+   * not one of the document's operators and holds the superadmin flag.
+   */
+  actor_superadmin?: boolean;
 }
 
 export interface NotificationsHealth {
@@ -156,6 +161,8 @@ export interface SessionInfo {
   kind?: "person" | "bot";
   superadmin?: boolean;
   expires_at: string;
+  /** `specs/api/auth.md`: the configured `INSTANCE_NAME`, shown in the admin frame. */
+  instance_name?: string;
 }
 
 /** `specs/api/admin.md` § Operators — the global operator directory. */

@@ -261,6 +261,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       superadmin: principal.superadmin,
       expires_at: new Date(principal.exp * 1000).toISOString(),
       transport: principal.transport,
+      // `specs/api/auth.md`: the admin frame shows the instance name on
+      // every page and already resolves the session there, so the name
+      // rides along rather than costing a second round trip.
+      instance_name: instanceName(),
     };
   });
 

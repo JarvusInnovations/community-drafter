@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError, deleteSignature, patchSignature, postDecline } from "../api.ts";
@@ -16,15 +16,25 @@ import { SignForm } from "./SignForm.tsx";
  * variants) / `declined` / `closed`, always shown above the document text
  * (`## Principles` § Local: "the first sentence a returning participant
  * reads is what they have done and what they can do next").
+ *
+ * `readOnly` is admin view-as (`specs/screens/admin-dashboard.md` § "View
+ * as"): the same card, whole, with every control disabled — the operator
+ * is checking the screen a participant will actually be sent, so a
+ * summary sentence in its place would hide the one thing view-as exists
+ * to show. Links become disabled buttons so the disabled state is real
+ * for the keyboard and for assistive technology, not just visual, and no
+ * handler in this mode reaches the network.
  */
 export function StatusCard({
   bundle,
   token,
   refetch,
+  readOnly = false,
 }: {
   bundle: Bundle;
   token: string;
   refetch: () => Promise<void>;
+  readOnly?: boolean;
 }): JSX.Element {
   const state = computeCardState(bundle);
   const draft = currentDraftSubmission(bundle);
@@ -88,9 +98,9 @@ export function StatusCard({
       {draft ? (
         <p className="mb-2 text-sm text-muted-foreground">
           {copy.draftLine(draft.version)} ·{" "}
-          <Link to={`/i/${token}/comment`} className="font-medium text-primary hover:underline">
+          <InertLink readOnly={readOnly} to={`/i/${token}/comment`} className="font-medium">
             {copy.continueLink}
-          </Link>
+          </InertLink>
         </p>
       ) : null}
 
@@ -102,7 +112,7 @@ export function StatusCard({
                 {copy.signForm.removedOn(formatAbsolute(signature.revoked_at))}
               </p>
             ) : null}
-            <SignForm bundle={bundle} token={token} onSigned={refetch} />
+            <SignForm bundle={bundle} token={token} onSigned={refetch} readOnly={readOnly} />
           </>
         ) : (
           <p className="text-foreground">{copy.closedCard.ownNotSigned}</p>
@@ -113,13 +123,14 @@ export function StatusCard({
         <div className="flex flex-col gap-2">
           <p className="text-foreground">{copy.declined.heading}</p>
           {resigning ? (
-            <SignForm bundle={bundle} token={token} onSigned={refetch} />
+            <SignForm bundle={bundle} token={token} onSigned={refetch} readOnly={readOnly} />
           ) : canAct ? (
             <div>
               <span className="text-muted-foreground">{copy.declined.changedMind} </span>
               <button
                 type="button"
-                className="font-semibold text-primary hover:underline"
+                disabled={readOnly}
+                className="font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
                 onClick={() => setResigning(true)}
               >
                 {copy.declined.signAs(bundle.prefill.name ?? "")}
@@ -170,33 +181,36 @@ export function StatusCard({
                     <button
                       type="button"
                       onClick={() => void handleConfirmSignature()}
-                      disabled={busy}
-                      className="font-semibold text-primary hover:underline"
+                      disabled={busy || readOnly}
+                      className="font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     >
                       {copy.signed.confirmButton}
                     </button>
                   ) : null}
                   <button
                     type="button"
-                    className="font-medium text-primary hover:underline"
+                    disabled={readOnly}
+                    className="font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     onClick={() => setEditing(true)}
                   >
                     {copy.signed.changeListing}
                   </button>
                   <button
                     type="button"
-                    className="font-medium text-primary hover:underline"
+                    disabled={readOnly}
+                    className="font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     onClick={() => setRemoveOpen(true)}
                   >
                     {copy.signed.remove}
                   </button>
                   {canComment ? (
-                    <Link
+                    <InertLink
+                      readOnly={readOnly}
                       to={`/i/${token}/comment`}
-                      className="font-medium text-primary hover:underline"
+                      className="font-medium"
                     >
                       {copy.signed.addComments}
-                    </Link>
+                    </InertLink>
                   ) : null}
                 </div>
               ) : null}
@@ -233,14 +247,15 @@ export function StatusCard({
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <button
             type="button"
-            className="text-left font-medium text-primary hover:underline"
+            disabled={readOnly}
+            className="text-left font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
             onClick={() => setDeclineOpen(true)}
           >
             {copy.signForm.declineLink}
           </button>
-          <Link to={`/i/${token}/comment`} className="font-medium text-primary hover:underline">
+          <InertLink readOnly={readOnly} to={`/i/${token}/comment`} className="font-medium">
             {copy.signForm.commentLink}
-          </Link>
+          </InertLink>
         </div>
       ) : null}
 
@@ -269,5 +284,36 @@ export function StatusCard({
         onCancel={() => setDeclineOpen(false)}
       />
     </section>
+  );
+}
+
+/**
+ * A navigation link that becomes a genuinely disabled button under
+ * view-as, so "every action control is disabled"
+ * (`specs/screens/admin-dashboard.md`) holds for the keyboard and for a
+ * screen reader, not only visually.
+ */
+function InertLink({
+  readOnly,
+  to,
+  className,
+  children,
+}: {
+  readOnly: boolean;
+  to: string;
+  className: string;
+  children: ReactNode;
+}): JSX.Element {
+  if (readOnly) {
+    return (
+      <button type="button" disabled className={`${className} text-primary opacity-60`}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link to={to} className={`${className} text-primary hover:underline`}>
+      {children}
+    </Link>
   );
 }

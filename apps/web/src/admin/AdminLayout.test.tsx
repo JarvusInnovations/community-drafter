@@ -82,4 +82,48 @@ describe("AdminLayout — session guard", () => {
     });
     expect(screen.getByText("ops@example.org")).toBeTruthy();
   });
+
+  /**
+   * `specs/screens/admin-dashboard.md` § Design "Frame": the top bar shows
+   * the configured instance name, read from the session — never a
+   * build-time literal (#37).
+   */
+  it("shows the session's instance_name in the top bar, falling back to the literal", async () => {
+    globalThis.fetch = ((url: string) => {
+      if (url === "/auth/session") {
+        return Promise.resolve(
+          jsonResponse(200, {
+            email: "ops@example.org",
+            expires_at: "2026-01-01T00:00:00Z",
+            instance_name: "Test Instance",
+          }),
+        );
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    renderAt("/admin");
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Test Instance" })).toBeTruthy();
+    });
+    expect(screen.queryByText("Community Drafter")).toBeNull();
+
+    cleanup();
+
+    globalThis.fetch = ((url: string) => {
+      if (url === "/auth/session") {
+        return Promise.resolve(
+          jsonResponse(200, { email: "ops@example.org", expires_at: "2026-01-01T00:00:00Z" }),
+        );
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as unknown as typeof fetch;
+
+    renderAt("/admin");
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Community Drafter" })).toBeTruthy();
+    });
+  });
 });

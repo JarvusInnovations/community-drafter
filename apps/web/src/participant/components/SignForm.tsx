@@ -1,5 +1,6 @@
 import { type FormEvent, useId, useState } from "react";
 
+import { cn } from "../../lib/utils.ts";
 import { ApiError, postSignature } from "../api.ts";
 import { copy } from "../copy.ts";
 import { formatAbsolute } from "../format.ts";
@@ -11,15 +12,28 @@ import { type Bundle, type Capacity } from "../types.ts";
  * only one is offered), prefilled fields, the official-capacity
  * attestation checkbox with its exact required text, and the mandatory
  * reassurance line under the sign button.
+ *
+ * `readOnly` is admin view-as (`specs/screens/admin-dashboard.md` § "View
+ * as"): the operator is checking the exact card a participant will be
+ * sent — capacity choice, prefill, the attestation's wording — so the card
+ * renders whole with every control disabled rather than being replaced by
+ * a summary sentence. Nothing here issues a request in that mode.
  */
+const FIELD =
+  "rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground disabled:opacity-60";
+const CAPACITY_OPTION =
+  "rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm has-disabled:opacity-70";
+
 export function SignForm({
   bundle,
   token,
   onSigned,
+  readOnly = false,
 }: {
   bundle: Bundle;
   token: string;
   onSigned: () => void | Promise<void>;
+  readOnly?: boolean;
 }): JSX.Element {
   const document = bundle.document;
   const prefill = bundle.prefill;
@@ -41,6 +55,7 @@ export function SignForm({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (readOnly) return;
     setError(null);
 
     if (isOfficial && !authorized) {
@@ -76,22 +91,24 @@ export function SignForm({
         <fieldset className="flex flex-col gap-1">
           <legend className="sr-only">{copy.signForm.capacityLegend}</legend>
           <div className="grid grid-cols-2 rounded-xl bg-muted p-1">
-            <label className="cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm">
+            <label className={cn(CAPACITY_OPTION, readOnly ? "cursor-default" : "cursor-pointer")}>
               <input
                 type="radio"
                 name={`${formId}-capacity`}
                 className="sr-only"
                 checked={capacity === "personal"}
+                disabled={readOnly}
                 onChange={() => setCapacity("personal")}
               />
               {copy.signForm.capacityPersonal}
             </label>
-            <label className="cursor-pointer rounded-lg px-3 py-2 text-center text-sm font-semibold text-muted-foreground has-checked:bg-card has-checked:text-foreground has-checked:shadow-sm">
+            <label className={cn(CAPACITY_OPTION, readOnly ? "cursor-default" : "cursor-pointer")}>
               <input
                 type="radio"
                 name={`${formId}-capacity`}
                 className="sr-only"
                 checked={capacity === "official"}
+                disabled={readOnly}
                 onChange={() => setCapacity("official")}
               />
               {copy.signForm.capacityOfficial}
@@ -106,8 +123,9 @@ export function SignForm({
           type="text"
           required
           value={displayName}
+          disabled={readOnly}
           onChange={(event) => setDisplayName(event.target.value)}
-          className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
+          className={FIELD}
         />
       </label>
 
@@ -119,8 +137,9 @@ export function SignForm({
               type="text"
               required
               value={org}
+              disabled={readOnly}
               onChange={(event) => setOrg(event.target.value)}
-              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
+              className={FIELD}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
@@ -128,14 +147,16 @@ export function SignForm({
             <input
               type="text"
               value={title}
+              disabled={readOnly}
               onChange={(event) => setTitle(event.target.value)}
-              className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
+              className={FIELD}
             />
           </label>
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
               checked={authorized}
+              disabled={readOnly}
               onChange={(event) => setAuthorized(event.target.checked)}
               className="mt-0.5"
             />
@@ -148,9 +169,10 @@ export function SignForm({
           <input
             type="text"
             value={descriptor}
+            disabled={readOnly}
             onChange={(event) => setDescriptor(event.target.value)}
             placeholder={copy.signForm.descriptorHint}
-            className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
+            className={FIELD}
           />
         </label>
       )}
@@ -163,7 +185,7 @@ export function SignForm({
 
       <button
         type="submit"
-        disabled={submitting || displayName.trim().length === 0}
+        disabled={readOnly || submitting || displayName.trim().length === 0}
         className="rounded-xl bg-primary px-4 py-3.5 text-base font-bold text-white shadow-[0_8px_18px_rgba(36,87,245,0.28)] disabled:opacity-60"
       >
         {submitting ? copy.signForm.signing : copy.signForm.signButton(displayName)}
