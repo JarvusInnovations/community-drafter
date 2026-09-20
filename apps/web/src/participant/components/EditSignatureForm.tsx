@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 
 import { ApiError, patchSignature } from "../api.ts";
 import { copy } from "../copy.ts";
 import { type SignatureView } from "../types.ts";
 
-/** `specs/screens/document.md` § Actions: "Change how you're listed" — edits display fields on the existing signature. */
+/**
+ * `specs/screens/document.md` § Actions: "Change how you're listed" — edits
+ * display fields on the existing signature.
+ *
+ * The panel is a real `<form>` whose Save is a `type="submit"` button, and
+ * the save happens on submit and nowhere else: a click and a press of Enter
+ * take the same path, and no field's blur can consume the press that was
+ * meant for Save (issue #62 — the first click did nothing at all, with no
+ * error and no saving state).
+ */
 export function EditSignatureForm({
   signature,
   token,
@@ -25,7 +34,9 @@ export function EditSignatureForm({
   const [error, setError] = useState<string | null>(null);
   const isOfficial = signature.capacity === "official";
 
-  async function handleSave() {
+  async function handleSave(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -45,7 +56,11 @@ export function EditSignatureForm({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border p-3">
+    <form
+      onSubmit={(event) => void handleSave(event)}
+      aria-busy={saving}
+      className="mt-3 flex flex-col gap-3 rounded-xl border border-border p-3"
+    >
       <label className="flex flex-col gap-1 text-sm font-semibold text-muted-foreground">
         {copy.signForm.nameLabel}
         <input
@@ -102,10 +117,12 @@ export function EditSignatureForm({
           {error}
         </p>
       ) : null}
+      <p role="status" className="sr-only">
+        {saving ? copy.signed.saving : ""}
+      </p>
       <div className="mt-1 flex gap-2">
         <button
-          type="button"
-          onClick={() => void handleSave()}
+          type="submit"
           disabled={saving}
           className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
@@ -120,6 +137,6 @@ export function EditSignatureForm({
           {copy.signed.cancel}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
