@@ -4,6 +4,7 @@ import type { ParticipationEntry } from "../storage/read-model.ts";
 
 /** `specs/data-model.md` § `participations`: "Derived participant status for the dashboard". */
 export type ParticipationStatus =
+  | "not_sent"
   | "unopened"
   | "opened"
   | "drafting"
@@ -35,5 +36,8 @@ export function participationStatus(
     return "drafting";
   }
   if (entry.record.first_opened_at) return "opened";
+  // `specs/data-model.md`: staged but not yet sent is its own state, so a
+  // list can be reviewed before the first send.
+  if (!entry.record.sent_at) return "not_sent";
   return "unopened";
 }

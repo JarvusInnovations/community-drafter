@@ -24,6 +24,8 @@ export type ErrorCode =
   | "no_change"
   | "no_version"
   | "already_exists"
+  | "already_sent"
+  | "has_activity"
   | "last_operator"
   | "refresh_busy"
   | "refresh_diverged"
@@ -63,6 +65,9 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   // documents-create route uses for its own slug conflict — a pre-existing
   // inconsistency this plan doesn't relitigate, see the plan's Notes).
   already_exists: 409,
+  // `specs/api/admin.md` § People and invitations: `DELETE .../invitations/:person`.
+  already_sent: 409,
+  has_activity: 409,
   validation_failed: 422,
   rate_limited: 429,
   internal_error: 500,
