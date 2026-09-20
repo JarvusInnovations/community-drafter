@@ -24,6 +24,10 @@ export function CommentModeScreen(): JSX.Element {
   const [displayedVersionNumber, setDisplayedVersionNumber] = useState<number | null>(null);
   const [displayedVersion, setDisplayedVersion] = useState<VersionDetail | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  // § Design "Review tray": on phones the sheet starts collapsed to its
+  // handle and header so the document stays readable; it opens on tap,
+  // when a comment is added, or when a highlight is tapped.
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const phaseCommenting = bundle.document.phase === "commenting";
   const effectiveVersion = displayedVersionNumber ?? bundle.version.number;
@@ -142,7 +146,7 @@ export function CommentModeScreen(): JSX.Element {
   const isCurrentVersion = effectiveVersion === bundle.version.number;
 
   return (
-    <main className="mx-auto max-w-[1120px] px-5 pb-[60vh] lg:pb-10">
+    <main className={`mx-auto max-w-[1120px] px-5 lg:pb-10 ${sheetOpen ? "pb-[70vh]" : "pb-28"}`}>
       {/*
        * `specs/screens/comment-mode.md` § Design "Frame": beneath the
        * sticky top bar (`InstanceBar`, rendered by `ParticipantLayout`) a
@@ -182,8 +186,14 @@ export function CommentModeScreen(): JSX.Element {
             html={html}
             version={effectiveVersion}
             highlightTargets={highlightTargets}
-            onAddComment={(anchor, body) => tray.addInline(anchor, body)}
-            onHighlightClick={setFocusedId}
+            onAddComment={(anchor, body) => {
+              tray.addInline(anchor, body);
+              setSheetOpen(true);
+            }}
+            onHighlightClick={(id) => {
+              setFocusedId(id);
+              setSheetOpen(true);
+            }}
           />
         </section>
 
@@ -208,6 +218,8 @@ export function CommentModeScreen(): JSX.Element {
             pendingCount={tray.pendingCount}
             focusedId={focusedId}
             earlierSubmissions={bundle.submissions}
+            sheetOpen={sheetOpen}
+            onToggleSheet={() => setSheetOpen((value) => !value)}
             onEditComment={tray.editComment}
             onCommitComment={tray.commitComment}
             onRemoveComment={(id) => void tray.removeComment(id)}

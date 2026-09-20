@@ -221,6 +221,9 @@ export interface ReviewTrayProps {
   onEditGeneral: (body: string) => void;
   onSubmit: (input: SubmitInput) => Promise<void>;
   submitting: boolean;
+  /** Phone bottom sheet: whether the body is shown (always shown at `lg`). */
+  sheetOpen: boolean;
+  onToggleSheet: () => void;
 }
 
 /**
@@ -245,6 +248,8 @@ export function ReviewTray({
   onEditGeneral,
   onSubmit,
   submitting,
+  sheetOpen,
+  onToggleSheet,
 }: ReviewTrayProps): JSX.Element {
   const [judgement, setJudgement] = useState<SubmissionJudgement | null>(null);
   const [signature, setSignature] = useState<NonNullable<SubmitInput["signature"]> | null>(null);
@@ -293,17 +298,30 @@ export function ReviewTray({
       <span className="h-1.5 w-10 rounded-full bg-border" />
     </div>
   );
+  // On phones the header is the sheet's toggle; at `lg` it is a plain heading.
+  const toggle = (
+    <button
+      type="button"
+      className="ml-auto flex-none text-sm font-medium text-primary lg:hidden"
+      aria-expanded={sheetOpen}
+      onClick={onToggleSheet}
+    >
+      {sheetOpen ? copy.commentMode.trayCollapse : copy.commentMode.trayExpand}
+    </button>
+  );
+  const bodyClass = `${sheetOpen ? "flex" : "hidden"} max-h-[55vh] flex-col overflow-y-auto px-4 py-4 lg:flex lg:max-h-none lg:px-5`;
 
   if (!phaseCommenting) {
     return (
       <div className="flex max-h-[70vh] flex-col lg:max-h-none">
         {dragHandle}
-        <div className="flex-none border-b border-border px-4 py-3 lg:px-5">
+        <div className="flex flex-none items-center gap-3 border-b border-border px-4 py-3 lg:px-5">
           <h2 className="text-sm font-bold text-foreground">
             {copy.commentMode.trayHeading(version)}
           </h2>
+          {toggle}
         </div>
-        <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto px-4 py-4 lg:max-h-none lg:px-5">
+        <div className={`${bodyClass} gap-3`}>
           <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">
             {copy.commentMode.phaseClosed.message(
               formatAbsolute(bundle.document.comments_close_at),
@@ -325,14 +343,19 @@ export function ReviewTray({
   return (
     <div className="flex max-h-[70vh] flex-col lg:max-h-none">
       {dragHandle}
-      <div className="flex-none border-b border-border px-4 py-3 lg:px-5">
-        <h2 className="text-sm font-bold text-foreground">
-          {copy.commentMode.trayHeading(version)}
-        </h2>
-        <p className="text-xs text-muted-foreground">{copy.commentMode.traySummary(totalCount)}</p>
+      <div className="flex flex-none items-center gap-3 border-b border-border px-4 py-3 lg:px-5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-foreground">
+            {copy.commentMode.trayHeading(version)}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {copy.commentMode.traySummary(totalCount)}
+          </p>
+        </div>
+        {toggle}
       </div>
 
-      <div className="flex max-h-[55vh] flex-col gap-4 overflow-y-auto px-4 py-4 lg:max-h-none lg:px-5">
+      <div className={`${bodyClass} gap-4`}>
         {inlineComments.length === 0 && !general ? (
           <p className="text-sm text-muted-foreground">{copy.commentMode.trayEmpty}</p>
         ) : null}

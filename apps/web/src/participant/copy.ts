@@ -280,6 +280,8 @@ export const copy = {
     trayHeading: (version: number) => `Your submission on v${version}`,
     traySummary: (n: number) => `${n} comment${n === 1 ? "" : "s"} saved, not yet sent`,
     trayEmpty: "Nothing saved yet — select text in the document or write a general note.",
+    trayExpand: "Open",
+    trayCollapse: "Hide",
     quoteExpand: "Show more",
     quoteCollapse: "Show less",
     judgement: {
