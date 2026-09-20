@@ -19,7 +19,7 @@ export function IdentityLine({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mt-2 text-sm">
+    <div className="mt-2 text-[0.95rem]">
       <span className="text-muted-foreground">
         {copy.identity.prefix} <strong className="font-semibold text-foreground">{name}</strong>
       </span>
@@ -28,14 +28,14 @@ export function IdentityLine({
           {" · "}
           <button
             type="button"
-            className="text-foreground underline underline-offset-2"
+            className="font-medium text-primary hover:underline"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
           >
             {copy.identity.notYou}
           </button>
           {open ? (
-            <p className="mt-1 rounded border border-border bg-muted p-2 text-muted-foreground">
+            <p className="mt-2 rounded-xl border border-border bg-muted p-3 text-sm text-muted-foreground">
               {copy.identity.notYouBody}
             </p>
           ) : null}

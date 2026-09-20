@@ -78,13 +78,18 @@ export function CompareScreen(): JSX.Element {
   const versionNumbers = bundle.versions.map((v) => v.number).toSorted((a, b) => a - b);
 
   return (
-    <main className="px-4 py-4 pb-8">
+    <main className="mx-auto max-w-[760px] px-5 py-6 pb-10">
       <p className="mb-2">
-        <Link to={`/i/${token}/history`} className="text-sm underline">
+        <Link
+          to={`/i/${token}/history`}
+          className="text-sm font-medium text-primary hover:underline"
+        >
           {copy.history.title}
         </Link>
       </p>
-      <h1 className="text-xl font-semibold text-foreground">{copy.compare.title(from, to)}</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+        {copy.compare.title(from, to)}
+      </h1>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-1">
@@ -92,7 +97,7 @@ export function CompareScreen(): JSX.Element {
           <select
             value={from}
             onChange={(event) => updateParams({ from: event.target.value })}
-            className="rounded border border-border p-1"
+            className="rounded-lg border border-border bg-card px-2 py-1"
           >
             {versionNumbers.map((n) => (
               <option key={n} value={n}>
@@ -106,7 +111,7 @@ export function CompareScreen(): JSX.Element {
           <select
             value={to}
             onChange={(event) => updateParams({ to: event.target.value })}
-            className="rounded border border-border p-1"
+            className="rounded-lg border border-border bg-card px-2 py-1"
           >
             {versionNumbers.map((n) => (
               <option key={n} value={n}>
@@ -139,7 +144,7 @@ export function CompareScreen(): JSX.Element {
           {blocks.length === 0 ? (
             <p className="mt-4 text-muted-foreground">{copy.compare.noChanges}</p>
           ) : (
-            <div className="doc-body mt-4">
+            <div className="doc-body mt-4 rounded-2xl border border-border bg-card p-5">
               {blocks
                 .filter((block) => !(hideUnchanged && block.status === "same"))
                 .map((block) => (

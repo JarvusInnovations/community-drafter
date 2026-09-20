@@ -88,7 +88,7 @@ export function StatusCard({
       {draft ? (
         <p className="mb-2 text-sm text-muted-foreground">
           {copy.draftLine(draft.version)} ·{" "}
-          <Link to={`/i/${token}/comment`} className="font-medium text-primary">
+          <Link to={`/i/${token}/comment`} className="font-medium text-primary hover:underline">
             {copy.continueLink}
           </Link>
         </p>
@@ -119,7 +119,7 @@ export function StatusCard({
               <span className="text-muted-foreground">{copy.declined.changedMind} </span>
               <button
                 type="button"
-                className="font-semibold underline"
+                className="font-semibold text-primary hover:underline"
                 onClick={() => setResigning(true)}
               >
                 {copy.declined.signAs(bundle.prefill.name ?? "")}
@@ -171,19 +171,30 @@ export function StatusCard({
                       type="button"
                       onClick={() => void handleConfirmSignature()}
                       disabled={busy}
-                      className="font-semibold underline"
+                      className="font-semibold text-primary hover:underline"
                     >
                       {copy.signed.confirmButton}
                     </button>
                   ) : null}
-                  <button type="button" className="underline" onClick={() => setEditing(true)}>
+                  <button
+                    type="button"
+                    className="font-medium text-primary hover:underline"
+                    onClick={() => setEditing(true)}
+                  >
                     {copy.signed.changeListing}
                   </button>
-                  <button type="button" className="underline" onClick={() => setRemoveOpen(true)}>
+                  <button
+                    type="button"
+                    className="font-medium text-primary hover:underline"
+                    onClick={() => setRemoveOpen(true)}
+                  >
                     {copy.signed.remove}
                   </button>
                   {canComment ? (
-                    <Link to={`/i/${token}/comment`} className="font-medium text-primary">
+                    <Link
+                      to={`/i/${token}/comment`}
+                      className="font-medium text-primary hover:underline"
+                    >
                       {copy.signed.addComments}
                     </Link>
                   ) : null}
@@ -219,15 +230,15 @@ export function StatusCard({
       ) : null}
 
       {state === "not_signed" && canAct ? (
-        <div className="mt-2 flex flex-col gap-1 text-sm">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <button
             type="button"
-            className="text-left underline"
+            className="text-left font-medium text-primary hover:underline"
             onClick={() => setDeclineOpen(true)}
           >
             {copy.signForm.declineLink}
           </button>
-          <Link to={`/i/${token}/comment`} className="font-medium text-primary">
+          <Link to={`/i/${token}/comment`} className="font-medium text-primary hover:underline">
             {copy.signForm.commentLink}
           </Link>
         </div>

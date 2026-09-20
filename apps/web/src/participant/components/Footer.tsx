@@ -3,10 +3,12 @@ import { Link } from "react-router";
 import { copy } from "../copy.ts";
 
 /**
- * `specs/screens/document.md` § Display Rules 8. `readOnly` (admin
- * "view as") drops the "manage preferences" link — that screen writes
- * preference changes for the real participant, which a read-only render
- * must never offer a path into.
+ * `specs/screens/document.md` § Display Rules 8 and § Design "Footer": one
+ * quiet line with the questions and preferences links, then the
+ * private-link line; no rule above it. `readOnly` (admin "view as") drops
+ * the "manage preferences" link — that screen writes preference changes for
+ * the real participant, which a read-only render must never offer a path
+ * into.
  */
 export function Footer({
   token,
@@ -19,18 +21,42 @@ export function Footer({
   senderName?: string;
   readOnly?: boolean;
 }): JSX.Element {
+  const links: JSX.Element[] = [];
+  if (replyTo) {
+    links.push(
+      <a
+        key="questions"
+        href={`mailto:${replyTo}`}
+        className="font-medium text-primary hover:underline"
+      >
+        {copy.footer.questions}
+      </a>,
+    );
+  }
+  if (!readOnly) {
+    links.push(
+      <Link
+        key="prefs"
+        to={`/i/${token}/prefs`}
+        className="font-medium text-primary hover:underline"
+      >
+        {copy.footer.managePrefs}
+      </Link>,
+    );
+  }
+
   return (
-    <footer className="mt-6 mb-8 flex flex-col gap-1 border-t border-border pt-4 text-sm text-muted-foreground">
-      {replyTo ? (
-        <a href={`mailto:${replyTo}`} className="font-medium text-primary">
-          {copy.footer.questions}
-        </a>
+    <footer className="mt-9 mb-4 text-sm leading-relaxed text-muted-foreground">
+      {links.length > 0 ? (
+        <p>
+          {links.map((link, index) => (
+            <span key={link.key}>
+              {index > 0 ? " · " : null}
+              {link}
+            </span>
+          ))}
+        </p>
       ) : null}
-      {readOnly ? null : (
-        <Link to={`/i/${token}/prefs`} className="font-medium text-primary">
-          {copy.footer.managePrefs}
-        </Link>
-      )}
       <p>{copy.footer.privateLink(senderName ?? "")}</p>
     </footer>
   );

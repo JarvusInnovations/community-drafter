@@ -43,7 +43,7 @@ export function ReadOnlyStatusCard({ bundle }: { bundle: Bundle }): JSX.Element 
 
   return (
     <section
-      className="mx-4 mt-4 rounded-lg border border-border p-4"
+      className="rounded-2xl border border-border bg-card p-5"
       aria-label={copy.signForm.heading}
     >
       <p className="text-foreground">{text}</p>

@@ -36,7 +36,7 @@ export function VersionLabel({
           {readOnly ? (
             copy.olderVersionBanner.readCurrent(currentNumber)
           ) : (
-            <Link to={`/i/${token}`} className="font-semibold underline">
+            <Link to={`/i/${token}`} className="font-semibold text-primary hover:underline">
               {copy.olderVersionBanner.readCurrent(currentNumber)}
             </Link>
           )}
@@ -64,7 +64,7 @@ export function VersionLabel({
                 </Link>
               </>
             ) : null}
-            <Link to={`/i/${token}/history`} className="font-medium text-primary">
+            <Link to={`/i/${token}/history`} className="font-medium text-primary hover:underline">
               {copy.versionLabel.allVersions}
             </Link>
           </>

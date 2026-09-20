@@ -13,9 +13,11 @@ export function PrefsPlaceholder(): JSX.Element {
   const { token } = useParticipantBundle();
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
-      <h1 className="text-lg font-semibold text-foreground">{copy.prefsPlaceholder.heading}</h1>
+      <h1 className="text-xl font-bold tracking-tight text-foreground">
+        {copy.prefsPlaceholder.heading}
+      </h1>
       <p className="text-muted-foreground">{copy.prefsPlaceholder.body}</p>
-      <Link to={`/i/${token}`} className="underline">
+      <Link to={`/i/${token}`} className="font-medium text-primary hover:underline">
         {copy.prefsPlaceholder.back}
       </Link>
     </main>
