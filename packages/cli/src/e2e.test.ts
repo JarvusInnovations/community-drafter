@@ -313,6 +313,20 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(home.output.indexOf("signed_in")).toBeLessThan(home.output.indexOf("documents"));
   });
 
+  it("a leading --profile or --json with no command still opens the home view", async () => {
+    const harness = await bootServer();
+    cleanups.push(harness.cleanup);
+    withAdminEnv(harness);
+
+    const withProfile = await run(["--profile", "dinobot"]);
+    expect(withProfile.exitCode).toBe(0);
+    expect(withProfile.output).toMatch(/signed_in: /u);
+    expect(withProfile.output).not.toContain("Flags must come after the command");
+
+    const asJson = await run(["--json"]);
+    expect(asJson.exitCode).toBe(0);
+  });
+
   it("people list never prints a token or email unless --contacts", async () => {
     const harness = await bootServer();
     cleanups.push(harness.cleanup);

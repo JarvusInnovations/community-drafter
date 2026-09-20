@@ -95,15 +95,38 @@ export interface MainOptions {
   stdout?: { write: (chunk: string) => unknown };
 }
 
+/**
+ * `drafter-axi --profile dinobot` (or `--json`) with no command means the
+ * home view for that profile. The SDK rejects flags ahead of a command, so
+ * a leading run of global flags is peeled off here and handed to `home`.
+ */
+function leadingGlobalFlags(argv: string[]): string[] | null {
+  if (argv.length === 0) return null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--json") continue;
+    if (arg === "--profile") {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith("--")) return null;
+      i += 1;
+      continue;
+    }
+    return null;
+  }
+  return argv;
+}
+
 export async function main(options: MainOptions = {}): Promise<void> {
+  const rawArgv = options.argv ?? process.argv.slice(2);
+  const homeArgs = leadingGlobalFlags(rawArgv);
   await runAxiCli<undefined>({
     description: DESCRIPTION,
     version: VERSION,
-    ...(options.argv ? { argv: options.argv } : {}),
+    argv: homeArgs ? [] : rawArgv,
     ...(options.stdout ? { stdout: options.stdout } : {}),
     topLevelHelp: renderTopLevelHelp(),
     getCommandHelp: (command) => COMMAND_HELP[command] ?? renderCommandHelp(command),
-    home: async () => homeCommand([]),
+    home: async () => homeCommand(homeArgs ?? []),
     commands: COMMANDS,
     formatError,
     // Hooks are managed explicitly via the `hook` command. The SDK's
