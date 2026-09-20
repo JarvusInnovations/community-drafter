@@ -21,6 +21,7 @@ import {
   type TokenPurpose,
   type VerifiedOperatorToken,
 } from "./tokens.ts";
+import { MagicCodeStore } from "./magic-code-store.ts";
 import { UsedJtiStore } from "./used-jti-store.ts";
 
 export interface OperatorIdentity {
@@ -37,6 +38,8 @@ export interface AuthDecoration {
   devEmail: string | null;
   deviceCodes: DeviceCodeStore;
   usedMagicJti: UsedJtiStore;
+  /** Short emailed codes → signed magic tokens (`api/auth.md`). */
+  magicCodes: MagicCodeStore;
   /** `specs/api/auth.md`: 5 per address and 5 per source IP per 15 minutes, on `/auth/login` and `/auth/device`. */
   loginRateLimiters: { perEmail: FixedWindowLimiter; perIp: FixedWindowLimiter };
   mint(
@@ -134,6 +137,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     devEmail,
     deviceCodes: new DeviceCodeStore(),
     usedMagicJti: new UsedJtiStore(),
+    magicCodes: new MagicCodeStore(),
     loginRateLimiters: {
       // `specs/api/auth.md`: "5 per address and 5 per source IP per 15 minutes".
       perEmail: new FixedWindowLimiter(5, 15 * 60_000),

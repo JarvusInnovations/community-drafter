@@ -25,10 +25,11 @@ function setCookieHeader(response: { headers: { "set-cookie"?: string | string[]
   return value.split(";")[0] as string;
 }
 
-function extractMagicToken(text: string): string {
-  const match = /token=([^\s"&]+)/.exec(text);
-  if (!match?.[1]) throw new Error(`no magic token found in: ${text}`);
-  return decodeURIComponent(match[1]);
+/** The emailed link carries a 24-char code, never the token (`specs/api/auth.md`). */
+function extractMagicCode(text: string): string {
+  const match = /callback\?code=([A-Za-z0-9]{24})(?![A-Za-z0-9])/u.exec(text);
+  if (!match?.[1]) throw new Error(`no magic code found in: ${text}`);
+  return match[1];
 }
 
 describe("POST /auth/login", () => {
@@ -121,11 +122,11 @@ describe("GET /auth/callback", () => {
       url: "/auth/login",
       payload: { email: TEST_ACTOR.email, return: "/admin/d/x" },
     });
-    const token = extractMagicToken(mailer.sent[0]!.text);
+    const token = extractMagicCode(mailer.sent[0]!.text);
 
     const callback = await server.inject({
       method: "GET",
-      url: `/auth/callback?token=${encodeURIComponent(token)}`,
+      url: `/auth/callback?code=${token}`,
     });
     expect(callback.statusCode).toBe(302);
     expect(callback.headers.location).toBe("/admin/d/x");
@@ -156,12 +157,12 @@ describe("GET /auth/callback", () => {
       url: "/auth/login",
       payload: { email: TEST_ACTOR.email },
     });
-    const token = extractMagicToken(mailer.sent[0]!.text);
+    const token = extractMagicCode(mailer.sent[0]!.text);
 
-    const first = await server.inject({ method: "GET", url: `/auth/callback?token=${token}` });
+    const first = await server.inject({ method: "GET", url: `/auth/callback?code=${token}` });
     expect(first.statusCode).toBe(302);
 
-    const second = await server.inject({ method: "GET", url: `/auth/callback?token=${token}` });
+    const second = await server.inject({ method: "GET", url: `/auth/callback?code=${token}` });
     expect(second.statusCode).toBe(400);
     expect(second.body).toContain("isn't valid any more");
 
@@ -172,7 +173,7 @@ describe("GET /auth/callback", () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
 
-    const response = await server.inject({ method: "GET", url: "/auth/callback?token=garbage" });
+    const response = await server.inject({ method: "GET", url: "/auth/callback?code=garbage" });
     expect(response.statusCode).toBe(400);
     expect(response.body).toContain("isn't valid any more");
 
@@ -444,9 +445,15 @@ describe("device-code flow", () => {
     expect(interval).toBe(3);
     // The device return path travels inside the signed magic token's
     // `return` claim, not in the visible email text.
-    const magicToken = extractMagicToken(mailer.sent[0]!.text);
-    const verified = await verifyOperatorToken(magicToken, TEST_AUTH_SECRET, "magic");
+    const magicCode = extractMagicCode(mailer.sent[0]!.text);
+    const magicToken = server.auth.magicCodes.peek(magicCode);
+    expect(magicToken).not.toBeNull();
+    const verified = await verifyOperatorToken(magicToken!, TEST_AUTH_SECRET, "magic");
     expect(verified?.returnPath).toBe(`/auth/device?code=${user_code}`);
+    // The device email names the user code and never the token itself.
+    expect(mailer.sent[0]!.text).toContain(user_code);
+    expect(mailer.sent[0]!.text).not.toContain("eyJ");
+    expect(mailer.sent[0]!.html).not.toContain("eyJ");
 
     const pending = await server.inject({
       method: "POST",
@@ -536,5 +543,26 @@ describe("rate limiter unit", () => {
     expect(limiter.hit("a")).toBe(false);
     limiter.reset();
     expect(limiter.hit("a")).toBe(true);
+  });
+});
+
+describe("operator-magic-link email", () => {
+  it("greets by name, says it was requested on the web, carries a short-code link and no token", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await server.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: TEST_ACTOR.email, return: "/admin" },
+    });
+    const sent = mailer.sent[0]!;
+    expect(sent.subject).toBe("Sign in to Community Drafter");
+    expect(sent.text).toContain("on the web");
+    expect(sent.text).toMatch(/\/auth\/callback\?code=[A-Za-z0-9]{24}\b/u);
+    expect(sent.text).not.toContain("eyJ");
+    expect(sent.html).toContain("Sign in to Community Drafter");
+    expect(sent.text).toContain("If you didn't request this");
+    await server.close();
   });
 });
