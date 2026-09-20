@@ -10,7 +10,7 @@
  */
 import { type ApiError } from "./api.ts";
 import { formatAbsolute } from "./format.ts";
-import { type Phase } from "./types.ts";
+import { type DiffSummaryItem, type Phase } from "./types.ts";
 
 export const copy = {
   instanceBar: (name: string) => name,
@@ -244,13 +244,19 @@ export const copy = {
 
   compare: {
     title: (from: number, to: number) => `What changed from version ${from} to version ${to}`,
-    summary(changed: number, added: number, removed: number): string {
-      const parts = [
-        `${changed} paragraph${changed === 1 ? "" : "s"} changed`,
-        `${added} added`,
-        `${removed} removed`,
-      ];
-      return parts.join(", ");
+    /**
+     * `specs/behaviors/versioning.md` § Diff: the summary names the kinds
+     * involved ("2 paragraphs changed, 1 table changed") rather than
+     * reporting bare totals, and reads "No changes" when the two versions
+     * render identically.
+     */
+    summary(items: DiffSummaryItem[]): string {
+      if (items.length === 0) {
+        return "No changes";
+      }
+      return items
+        .map((item) => `${item.count} ${item.kind}${item.count === 1 ? "" : "s"} ${item.change}`)
+        .join(", ");
     },
     legend: "Struck-through, colored text was removed; underlined, colored text was added.",
     sameVersion: "This is the only version so far, so there is nothing to compare yet.",

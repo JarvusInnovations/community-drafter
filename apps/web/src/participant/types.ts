@@ -174,10 +174,17 @@ export interface CompareBlock {
   html: string;
 }
 
+/** One clause of the compare summary line, `specs/api/participant.md` § compare. */
+export interface DiffSummaryItem {
+  kind: "paragraph" | "heading" | "list item" | "table";
+  change: "changed" | "added" | "removed";
+  count: number;
+}
+
 export interface CompareResult {
   from: number;
   to: number;
-  summary: { changed: number; added: number; removed: number };
+  summary: { changed: number; added: number; removed: number; items: DiffSummaryItem[] };
   blocks: CompareBlock[];
 }
 
