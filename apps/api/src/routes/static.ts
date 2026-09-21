@@ -159,7 +159,7 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
       const path = request.url.split("?")[0] ?? request.url;
       setFrameHeaders(reply, path);
 
-      const preview = resolvePreview(fastify, resolveBaseUrl(fastify, request), path);
+      const preview = resolvePreview(fastify, request, resolveBaseUrl(request), path);
       const html = injectPreviewTags(readShell(join(rootPath, found)), renderPreviewTags(preview));
       return reply.type("text/html; charset=utf-8").send(html);
     });

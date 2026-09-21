@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { PUBLIC_ROUTE } from "../../gateway/gateway.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
+import { siteForDocument, siteIdentity } from "../../sites/site.ts";
 import { loadPublicDocument } from "./context.ts";
 
 interface BundleParams {
@@ -39,6 +40,9 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
       );
 
       return {
+        // `specs/screens/public-and-embed.md` § Site identity: the top bar
+        // names the document's site, and the accent token follows its own.
+        site: siteIdentity(siteForDocument(fastify, document.record)),
         document: {
           slug: document.record.slug,
           title: document.record.title,

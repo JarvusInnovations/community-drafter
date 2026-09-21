@@ -19,8 +19,6 @@ import { findPublicDocument } from "./public-document.ts";
 export const GENERIC_DESCRIPTION =
   "Community drafting and signing of collective statements: one link per person, a real deadline, numbered versions, and a truthful list of who signed.";
 
-const DEFAULT_INSTANCE_NAME = "Community Drafter";
-
 /** The generic instance card, served from the built web app's dist root. */
 const CARD_PATH = "/og.png";
 
@@ -102,18 +100,22 @@ export function firstSentence(body: string): string | undefined {
   return undefined;
 }
 
-/** The instance's own name, for `og:site_name` and every generic title. */
-export function instanceName(fastify: FastifyInstance): string {
-  return fastify.config.INSTANCE_NAME?.trim() || DEFAULT_INSTANCE_NAME;
+/**
+ * The **resolved site's** own name, for `og:site_name` and every generic
+ * title (`specs/behaviors/sites.md` § Identity on a surface — no surface
+ * carries the platform's name on another site).
+ */
+export function siteName(request: FastifyRequest): string {
+  return request.site.name.trim();
 }
 
 /**
- * `PUBLIC_URL` decides every absolute URL in production. The request's own
- * scheme and host is a development fallback only — Open Graph has no
- * relative URLs, and a dev server has no configured address.
+ * The resolved site's origin decides every absolute URL in production. The
+ * request's own scheme and host is a development fallback only — Open Graph
+ * has no relative URLs, and a dev server has no configured address.
  */
-export function resolveBaseUrl(fastify: FastifyInstance, request: FastifyRequest): string {
-  const configured = fastify.config.PUBLIC_URL?.trim();
+export function resolveBaseUrl(request: FastifyRequest): string {
+  const configured = request.site.baseUrl.trim();
   if (configured) return configured.replace(/\/+$/u, "");
 
   const host = request.headers.host ?? "localhost";
@@ -133,11 +135,11 @@ export function publicSlugFromPath(path: string): string | undefined {
 }
 
 function genericPreview(
-  fastify: FastifyInstance,
+  request: FastifyRequest,
   baseUrl: string,
   { noindex }: { noindex: boolean },
 ): SharePreview {
-  const name = instanceName(fastify);
+  const name = siteName(request);
   return {
     title: name,
     description: GENERIC_DESCRIPTION,
@@ -159,6 +161,7 @@ function genericPreview(
  */
 export function resolvePreview(
   fastify: FastifyInstance,
+  request: FastifyRequest,
   baseUrl: string,
   path: string,
 ): SharePreview {
@@ -166,7 +169,7 @@ export function resolvePreview(
   // admin pages declare `noindex` — the one that carries a credential in
   // its URL must never end up in a crawler's corpus.
   const noindex = /^\/(i|admin|auth)(\/|$)/u.test(path);
-  const generic = genericPreview(fastify, baseUrl, { noindex });
+  const generic = genericPreview(request, baseUrl, { noindex });
 
   const slug = publicSlugFromPath(path);
   if (!slug) return generic;
