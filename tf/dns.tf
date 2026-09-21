@@ -70,3 +70,12 @@ resource "google_dns_record_set" "signatories_app_site_verification" {
   ttl          = 300
   rrdatas      = ["\"google-site-verification=zEAZPNI0KjeYt81Ux_E4tIQSMGFOYMnrYOdNWPwPtIo\""]
 }
+
+# Same for signatories.org.
+resource "google_dns_record_set" "signatories_org_site_verification" {
+  name         = google_dns_managed_zone.signatories_org.dns_name
+  managed_zone = google_dns_managed_zone.signatories_org.name
+  type         = "TXT"
+  ttl          = 300
+  rrdatas      = ["\"google-site-verification=F2ZwTZ9xmDeJS_g6X9AaWyWb63Qdf2D727kYu50iuVw\""]
+}
