@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: [6, 21, 78, 8]
+pr: 90
 specs:
   - specs/behaviors/versioning.md
   - specs/screens/admin-dashboard.md
@@ -81,17 +82,24 @@ service account of its own for the plan job (deferred, see Follow-ups).
 
 ## Validation
 
-- [ ] A commit that changes `documents/<slug>.md` with no trailers at all is counted as a
+- [x] A commit that changes `documents/<slug>.md` with no trailers at all is counted as a
       version, with its subject as the summary; a trailerless settings-only commit is not.
-- [ ] Extending a deadline records old and new times on the commit, and
-      `GET /admin/api/documents/:slug/activity` returns them as `deadlines`.
-- [ ] `DELETE /admin/api/documents/:slug/operators/:email` with
+      `read-model.test.ts` writes both straight through `store.transact` and asserts the
+      version list, the publisher (the git author) and the activity feed.
+- [x] Extending a deadline records old and new times on the commit, and
+      `GET /admin/api/documents/:slug/activity` returns them as `deadlines`
+      (`documents.test.ts`), with the trailer's own round-trip covered in
+      `packages/shared/src/records/trailers.test.ts`.
+- [x] `DELETE /admin/api/documents/:slug/operators/:email` with
       `content-type: application/json` and no body returns 400 `invalid_request`, not
-      `internal_error`; a genuine 500 still reports `internal_error`.
-- [ ] `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test` pass for
-      every package the change touches.
-- [ ] The two `tf/` workflows parse (`actionlint`) and are scoped to `paths: [tf/**]`;
-      neither runs `apply`.
+      `internal_error` (`app.test.ts`, which also covers a malformed JSON body). The 5xx
+      branch is unchanged and still logs; no test drives it.
+- [x] `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test` pass for
+      every package the change touches — api 203, web 101, shared 35, cli 44, no failures.
+- [x] The two `tf/` workflows parse (`actionlint` 1.7.12, clean over the whole workflow
+      directory) and are scoped to `paths: [tf/**]`; neither runs `apply`. `tofu fmt
+      -check -recursive`, `init -backend=false` and `validate` were also run locally
+      against `tf/` and pass.
 
 ## Risks / unknowns
 
@@ -109,8 +117,39 @@ service account of its own for the plan job (deferred, see Follow-ups).
 
 ## Notes
 
-(At closeout.)
+- **A trailerless commit is recognized only by its path, so the log pass had to carry
+  paths.** `--name-only` rides the existing single `git log` spawn rather than costing a
+  second one; the format ends with its own separator (`\x1d`) because git appends the path
+  block outside the format, and the trailer block can in principle contain the field
+  separator already in use.
+- **Admitting path-touching commits does not make settings commits versions.** The body
+  comparison that was already there does that work; the change only widens which commits
+  get compared. A commit that touched the record without changing the body is still an
+  activity entry and not a version.
+- **The `Deadlines` trailer, not the commit diff.** The activity endpoint could have
+  recomputed old and new times by diffing the commit, but that is a second reading of the
+  same fact and needs a `git show` per entry in a feed that renders 50. The trailer is
+  where `specs/data-model.md` puts structured facts, and the route already reads trailers.
+- **`DeadlineChange` moved to `packages/shared`** next to the trailer it is written as, and
+  `events/bus.ts` re-exports it, so the event and the commit cannot drift apart.
+- **The extend subject changed shape**, from `extend: <slug> comments_close_at,
+  signing_closes_at` to `extend: <slug> comments to <ts>, signing to <ts>` — which is what
+  `specs/data-model.md`'s example subject always said it was. The dialog's success banner
+  echoes the subject, so an operator sees the times twice over, in the banner and in the
+  feed.
+- **The plan job runs under the deploy service account**, because that is the only
+  principal the WIF provider trusts. `plan` cannot write, and `-lock=false` keeps it from
+  taking the lock a deploy needs, but a reader-only principal would express the intent
+  structurally rather than by convention (Follow-ups).
+- **415 is mapped but not exercised.** An admin route inherits a `text/plain` parser from a
+  sibling plugin, so the obvious 415 case parses instead of failing; the mapping stands for
+  a request that does reach Fastify's media-type check.
 
 ## Follow-ups
 
-(At closeout.)
+- Issue [#92](https://github.com/JarvusInnovations/community-drafter/issues/92) — give the
+  `tofu plan` gate its own reader principal (a viewer-role service account and a WIF
+  binding for it) instead of borrowing the deploy account.
+- **Tracked as:** the two `tf/` workflows cannot be exercised before they merge — the first
+  PR that touches `tf/` after this one is the real first run. Watch that run rather than
+  assuming the gate is live.
