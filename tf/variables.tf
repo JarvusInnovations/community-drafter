@@ -46,6 +46,12 @@ variable "domain_mapping" {
   default     = "drafter.jarv.us"
 }
 
+variable "site_hostnames" {
+  description = "Customer site hostnames, each already verified to the Google identity that runs this apply; every entry gets its own Cloud Run domain mapping (specs/behaviors/sites.md § Onboarding a hostname; docs/operations.md step 7). An unverified hostname fails the apply, so verification comes first."
+  type        = list(string)
+  default     = []
+}
+
 variable "instance_name" {
   description = "Display name for this instance (specs/architecture.md § Deployment → Configuration: INSTANCE_NAME)"
   type        = string
