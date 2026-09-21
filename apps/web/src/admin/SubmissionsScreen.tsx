@@ -9,6 +9,17 @@ import { useAdminDocument } from "./DocumentContext.tsx";
 import { chipClass, inputClass, quietLinkClass, selectClass } from "./styles.ts";
 import { type SubmissionView } from "./types.ts";
 
+/**
+ * `specs/behaviors/review-and-judgement.md` § Submission: the four
+ * judgements a submission can carry. Offered as the filter's options so the
+ * team picks one instead of guessing at its spelling.
+ */
+const JUDGEMENTS = ["sign", "sign_conditional", "comment", "decline"] as const;
+
+/** A filter's label sits above its control, in the toolbar's small muted caps. */
+const filterLabelClass =
+  "flex min-w-0 flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+
 interface AnchorLike {
   heading_path?: string[];
   quote?: string;
@@ -253,36 +264,66 @@ export function SubmissionsScreen(): JSX.Element {
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <select
-          value={disposition}
-          onChange={(e) => updateParam("disposition", e.target.value)}
-          className={selectClass}
-          aria-label={copy.submissions.filters.disposition}
-        >
-          <option value="">{copy.submissions.filters.disposition}</option>
-          <option value="pending">pending</option>
-          <option value="answered">answered</option>
-          <option value="unanswered">unanswered</option>
-        </select>
-        <input
-          value={version}
-          onChange={(e) => updateParam("version", e.target.value)}
-          placeholder={copy.submissions.filters.version}
-          className={`${inputClass} w-24`}
-        />
-        <input
-          value={judgement}
-          onChange={(e) => updateParam("judgement", e.target.value)}
-          placeholder={copy.submissions.filters.judgement}
-          className={`${inputClass} w-32`}
-        />
-        <input
-          value={person}
-          onChange={(e) => updateParam("person", e.target.value)}
-          placeholder={copy.submissions.filters.person}
-          className={`${inputClass} w-32`}
-        />
+      {/*
+        `specs/screens/admin-dashboard.md` § Submissions: "every filter
+        carries a visible label or is a control whose purpose is
+        self-evident — a row of bare text boxes beside one real dropdown
+        leaves the team guessing what each accepts. Version and judgement
+        offer the values this document actually has." (#60)
+      */}
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className={filterLabelClass}>
+          {copy.submissions.filters.disposition}
+          <select
+            value={disposition}
+            onChange={(e) => updateParam("disposition", e.target.value)}
+            className={selectClass}
+          >
+            <option value="">{copy.submissions.filters.any}</option>
+            <option value="pending">pending</option>
+            <option value="answered">answered</option>
+            <option value="unanswered">unanswered</option>
+          </select>
+        </label>
+        <label className={filterLabelClass}>
+          {copy.submissions.filters.version}
+          <select
+            value={version}
+            onChange={(e) => updateParam("version", e.target.value)}
+            className={selectClass}
+          >
+            <option value="">{copy.submissions.filters.any}</option>
+            {document.versions.map((v) => (
+              <option key={v.number} value={String(v.number)}>
+                v{v.number}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={filterLabelClass}>
+          {copy.submissions.filters.judgement}
+          <select
+            value={judgement}
+            onChange={(e) => updateParam("judgement", e.target.value)}
+            className={selectClass}
+          >
+            <option value="">{copy.submissions.filters.any}</option>
+            {JUDGEMENTS.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={filterLabelClass}>
+          {copy.submissions.filters.person}
+          <input
+            value={person}
+            onChange={(e) => updateParam("person", e.target.value)}
+            placeholder={copy.submissions.filters.personHint}
+            className={`${inputClass} w-40`}
+          />
+        </label>
       </div>
 
       {activeFilters.length > 0 ? (

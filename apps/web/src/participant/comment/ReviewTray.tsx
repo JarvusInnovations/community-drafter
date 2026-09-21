@@ -86,6 +86,7 @@ function SignatureFields({
           <label className="flex items-center gap-2">
             <input
               type="radio"
+              id={`${formId}-capacity-personal`}
               name={`${formId}-capacity`}
               checked={capacity === "personal"}
               onChange={() => {
@@ -98,6 +99,7 @@ function SignatureFields({
           <label className="flex items-center gap-2">
             <input
               type="radio"
+              id={`${formId}-capacity-official`}
               name={`${formId}-capacity`}
               checked={capacity === "official"}
               onChange={() => {
@@ -114,6 +116,9 @@ function SignatureFields({
         {copy.signForm.nameLabel}
         <input
           type="text"
+          id={`${formId}-display-name`}
+          name="display_name"
+          autoComplete="name"
           value={displayName}
           onChange={(event) => {
             setDisplayName(event.target.value);
@@ -129,6 +134,9 @@ function SignatureFields({
             {copy.signForm.orgLabel}
             <input
               type="text"
+              id={`${formId}-org`}
+              name="org"
+              autoComplete="organization"
               value={org}
               onChange={(event) => {
                 setOrg(event.target.value);
@@ -141,6 +149,9 @@ function SignatureFields({
             {copy.signForm.titleLabel}
             <input
               type="text"
+              id={`${formId}-title`}
+              name="title"
+              autoComplete="organization-title"
               required
               value={title}
               placeholder={copy.signForm.titleHint}
@@ -154,6 +165,8 @@ function SignatureFields({
           <label className="flex items-start gap-2">
             <input
               type="checkbox"
+              id={`${formId}-authorized`}
+              name="authorized"
               checked={authorized}
               onChange={(event) => {
                 setAuthorized(event.target.checked);
@@ -169,6 +182,8 @@ function SignatureFields({
           {copy.signForm.descriptorLabel}
           <input
             type="text"
+            id={`${formId}-descriptor`}
+            name="descriptor"
             value={descriptor}
             onChange={(event) => {
               setDescriptor(event.target.value);

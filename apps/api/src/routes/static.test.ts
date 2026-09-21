@@ -95,6 +95,53 @@ describe("static SPA serving", () => {
     await server.close();
   });
 
+  it("serves the SPA shell with a 404 for an unrouted HTML GET, and JSON otherwise", async () => {
+    process.env.NODE_ENV = "test";
+    const { dataDir, cleanup: cleanupData } = await createTestDataRepo();
+    cleanups.push(cleanupData);
+    const { root, cleanup: cleanupDist } = buildFixtureDist();
+    cleanups.push(cleanupDist);
+
+    const server = Fastify();
+    await server.register(app, {
+      storage: { dataDir, trackerIntervalMs: 3_600_000 },
+      disablePhaseObserver: true,
+      static: { root },
+    });
+    await server.ready();
+
+    // `specs/api/conventions.md`: deny-by-default governs routes, not
+    // addresses a person typed. `/login` used to reach the gateway's
+    // default-deny and come back as a JSON 403 (#60).
+    const page = await server.inject({
+      method: "GET",
+      url: "/login",
+      headers: { accept: "text/html,application/xhtml+xml" },
+    });
+    expect(page.statusCode).toBe(404);
+    expect(page.headers["content-type"]).toContain("text/html");
+    expect(page.body).toContain("<!doctype html>");
+
+    const json = await server.inject({
+      method: "GET",
+      url: "/sign-in",
+      headers: { accept: "application/json" },
+    });
+    expect(json.statusCode).toBe(404);
+    expect(json.json().error).toBe("not_found");
+
+    // A write to an unrouted path is never handed a page to parse.
+    const post = await server.inject({
+      method: "POST",
+      url: "/login",
+      headers: { accept: "text/html" },
+    });
+    expect(post.statusCode).toBe(404);
+    expect(post.json().error).toBe("not_found");
+
+    await server.close();
+  });
+
   it("404s for an unknown asset path instead of falling back to index.html", async () => {
     process.env.NODE_ENV = "test";
     const { dataDir, cleanup: cleanupData } = await createTestDataRepo();

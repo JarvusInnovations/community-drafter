@@ -217,6 +217,16 @@ function resolveParticipant(request: FastifyRequest, fastify: FastifyInstance): 
  */
 const gatewayPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", async (request) => {
+    // `specs/api/conventions.md`: deny-by-default governs *routes*, not
+    // addresses a person typed. Nothing matched here, so there is no route
+    // to have declared a capability and nothing to protect — the request
+    // goes on to the not-found handler, which answers 404 (the app's own
+    // "isn't available" page for an HTML GET). Denying instead turned every
+    // mistyped URL under the instance into a raw JSON 403 (#60).
+    if (request.routeOptions.url === undefined) {
+      return;
+    }
+
     const capability = request.routeOptions.config.capability as Capability | undefined;
 
     if (capability === undefined) {

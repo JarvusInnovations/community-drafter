@@ -4,7 +4,9 @@ import { NavLink, Outlet, useParams } from "react-router";
 import { ApiError, getDocument } from "./api.ts";
 import { copy } from "./copy.ts";
 import { DocumentContext, type DocumentContextValue } from "./DocumentContext.tsx";
+import { useAdminSession } from "./SessionContext.tsx";
 import { type DocumentDetail } from "./types.ts";
+import { useDocumentTitle } from "../lib/useDocumentTitle.ts";
 
 type LoadState =
   | { status: "loading" }
@@ -39,6 +41,12 @@ export function DocumentLayout(): JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const { session } = useAdminSession();
+  useDocumentTitle(
+    state.status === "ready" ? state.document.title : undefined,
+    session.instance_name || copy.instanceName,
+  );
 
   const contextValue: DocumentContextValue | undefined = useMemo(
     () => (state.status === "ready" ? { document: state.document, refetch: load } : undefined),

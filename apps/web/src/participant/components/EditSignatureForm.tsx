@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
 import { ApiError, patchSignature } from "../api.ts";
 import { copy } from "../copy.ts";
@@ -78,6 +78,8 @@ export function EditSignatureForm({
     }
   }
 
+  const formId = useId();
+
   return (
     <form
       onSubmit={(event) => void handleSave(event)}
@@ -88,6 +90,9 @@ export function EditSignatureForm({
         {copy.signForm.nameLabel}
         <input
           type="text"
+          id={`${formId}-display-name`}
+          name="display_name"
+          autoComplete="name"
           autoFocus
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
@@ -100,6 +105,9 @@ export function EditSignatureForm({
             {copy.signForm.orgLabel}
             <input
               type="text"
+              id={`${formId}-org`}
+              name="org"
+              autoComplete="organization"
               value={org}
               onChange={(event) => setOrg(event.target.value)}
               className="rounded-xl border border-border bg-card px-3 py-2.5 font-normal text-foreground"
@@ -109,6 +117,9 @@ export function EditSignatureForm({
             {copy.signForm.titleLabel}
             <input
               type="text"
+              id={`${formId}-title`}
+              name="title"
+              autoComplete="organization-title"
               required
               value={title}
               placeholder={copy.signForm.titleHint}
@@ -122,6 +133,8 @@ export function EditSignatureForm({
               <label className="flex items-start gap-2">
                 <input
                   type="checkbox"
+                  id={`${formId}-reattested`}
+                  name="reattested"
                   checked={reattested}
                   onChange={(event) => setReattested(event.target.checked)}
                   className="mt-0.5"
@@ -136,6 +149,8 @@ export function EditSignatureForm({
           {copy.signForm.descriptorLabel}
           <input
             type="text"
+            id={`${formId}-descriptor`}
+            name="descriptor"
             value={descriptor}
             onChange={(event) => setDescriptor(event.target.value)}
             placeholder={copy.signForm.descriptorHint}
@@ -150,6 +165,8 @@ export function EditSignatureForm({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            id={`${formId}-listed`}
+            name="listed"
             checked={listed}
             onChange={(event) => setListed(event.target.checked)}
           />

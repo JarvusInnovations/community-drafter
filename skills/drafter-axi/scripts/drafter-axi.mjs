@@ -2238,7 +2238,7 @@ async function operatorsCommand(args) {
 }
 
 // src/cli/commands/people.ts
-import { writeFileSync as writeFileSync4 } from "node:fs";
+import { chmodSync as chmodSync2, writeFileSync as writeFileSync4 } from "node:fs";
 var PEOPLE_FLAGS = {
   import: { positionals: 2, value: ["--suggested-capacity"], boolean: ["--dry-run"] },
   list: { positionals: 1, value: ["--status", "--source", "-q"], boolean: ["--contacts"] },
@@ -2447,7 +2447,8 @@ async function peopleCommand(args) {
       );
       const out = str(parsed, "--out");
       if (out) {
-        writeFileSync4(out, csvText, "utf8");
+        writeFileSync4(out, csvText, { encoding: "utf8", mode: 384 });
+        chmodSync2(out, 384);
         const rowCount = Math.max(0, parseCsv(csvText).length - 1);
         return render(parsed, { out, rows: rowCount }, () => renderObject({ out, rows: rowCount }));
       }
@@ -2992,7 +2993,10 @@ async function versionsCommand(args) {
             number: result.number,
             summary: result.summary,
             commit: result.commit,
-            signing_closes_at: result.signing_closes_at
+            // `specs/api/admin-cli.md`: printed only when the publish moved
+            // it — a `signing_closes_at: null` line reads as a deadline
+            // that was cleared (#60).
+            ...result.signing_closes_at ? { signing_closes_at: result.signing_closes_at } : {}
           }),
           renderObject({ notified: result.notified }),
           renderHelp([`Run \`drafter-axi docs show ${slug}\` to see the updated dashboard`])
@@ -3272,7 +3276,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "e5a877c" : "dev";
+var VERSION = true ? "329ab0e" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

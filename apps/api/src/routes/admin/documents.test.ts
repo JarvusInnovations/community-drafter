@@ -47,6 +47,34 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
   });
 
   /**
+   * `specs/api/admin.md` § schedule (#60): a document that has never been
+   * opened has no deadline to extend, and reporting that as
+   * "comments_close_at must move later" tells the team about a stored
+   * field instead of about their document.
+   */
+  it("returns no_deadline_set when there is no deadline to extend", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, { slug: "doc-never-opened", state: "draft" });
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-never-opened/schedule",
+      headers: adminHeaders(),
+      payload: { comments_close_at: new Date(Date.now() + 86_400_000).toISOString() },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe("no_deadline_set");
+    expect(response.json().message).toContain("comment deadline");
+    expect(response.json().message).toContain("docs open");
+    expect(response.json().details.field).toBe("comments_close_at");
+
+    await server.close();
+  });
+
+  /**
    * Issue #71 — `specs/behaviors/document-lifecycle.md` § Extension: the
    * change is "announced ... with old and new times", so the event the
    * notification dispatcher consumes has to carry the previous values.

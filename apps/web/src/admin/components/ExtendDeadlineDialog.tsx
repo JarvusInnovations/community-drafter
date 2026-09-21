@@ -5,6 +5,7 @@ import { copy } from "../copy.ts";
 import { inputClass, labelClass, primaryButtonClass, quietButtonClass } from "../styles.ts";
 import { type DocumentDetail } from "../types.ts";
 import { DialogShell } from "./DialogShell.tsx";
+import { formatAbsolute } from "../../participant/format.ts";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -68,12 +69,12 @@ export function ExtendDeadlineDialog({
       const parts: string[] = [];
       if (updated.comments_close_at && updated.comments_close_at !== oldComments) {
         parts.push(
-          `comments: ${oldComments ? new Date(oldComments).toLocaleString() : "—"} → ${new Date(updated.comments_close_at).toLocaleString()}`,
+          `comments: ${oldComments ? formatAbsolute(oldComments) : "—"} → ${formatAbsolute(updated.comments_close_at)}`,
         );
       }
       if (updated.signing_closes_at && updated.signing_closes_at !== oldSigning) {
         parts.push(
-          `signing: ${oldSigning ? new Date(oldSigning).toLocaleString() : "—"} → ${new Date(updated.signing_closes_at).toLocaleString()}`,
+          `signing: ${oldSigning ? formatAbsolute(oldSigning) : "—"} → ${formatAbsolute(updated.signing_closes_at)}`,
         );
       }
       setSuccess(

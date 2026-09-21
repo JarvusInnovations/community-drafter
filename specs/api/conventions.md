@@ -13,7 +13,9 @@
 | `/auth/*` | magic-link request and callback, device-code flow, session, refresh, logout | none / cookie / bearer (see `api/auth.md`) |
 | `/_health` | liveness | none |
 
-The gateway is deny-by-default: every route declares `participant`, `operator`, `webhook`, or `public`; undeclared routes fail closed. Bearer and cookie are never mixed on one request; a present `Authorization` header is decisive. Operator routes that name a document also require the caller to be one of its operators; otherwise 404.
+The gateway is deny-by-default: every route declares `participant`, `operator`, `webhook`, or `public`; undeclared routes fail closed.
+
+Deny-by-default is about *routes*, not about *addresses a person typed*. A `GET` for a path that matches nothing at all — `/login`, `/sign-in`, a mistyped personal link — is a 404, and when the request accepts HTML it is answered with the app's own "this isn't available" page rather than a JSON error body. A visitor who guessed at a URL is shown a page; only a client that asked for JSON is given JSON. Bearer and cookie are never mixed on one request; a present `Authorization` header is decisive. Operator routes that name a document also require the caller to be one of its operators; otherwise 404.
 
 ## Content
 
@@ -34,7 +36,7 @@ Success bodies are the resource or a domain-shaped object; no generic envelope. 
 | 403 | `forbidden`, `csrf_required` |
 | 404 | `not_found` (also used for unknown/revoked/expired tokens and non-public documents) |
 | 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `already_exists`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
-| 422 | `validation_failed` with field errors; a record the store rejects (schema `ValidationError`) is reported the same way, with `details.issues` |
+| 422 | `validation_failed` with field errors; `no_deadline_set`; a record the store rejects (schema `ValidationError`) is reported the same way, with `details.issues` |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |
 | 429 | `rate_limited` |

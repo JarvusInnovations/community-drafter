@@ -10,7 +10,7 @@ import {
   revokeLink,
   revokeSignature,
 } from "./api.ts";
-import { Card } from "./components/Card.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { Pill, type PillTone } from "./components/Pill.tsx";
 import { ReasonDialog } from "./components/ReasonDialog.tsx";
 import { copy } from "./copy.ts";
@@ -22,6 +22,7 @@ import {
   type ParticipationStatus,
   type SubmissionView,
 } from "./types.ts";
+import { formatAbsolute } from "../participant/format.ts";
 
 const STATUSES = [
   "not_sent",
@@ -281,7 +282,7 @@ export function PeopleScreen(): JSX.Element {
       ) : null}
 
       {rows ? (
-        <Card className="mt-4 overflow-x-auto p-0">
+        <TableScroller className="mt-4">
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -309,10 +310,10 @@ export function PeopleScreen(): JSX.Element {
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{row.source}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">
-                        {row.opened_at ? new Date(row.opened_at).toLocaleString() : "—"}
+                        {row.opened_at ? formatAbsolute(row.opened_at) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
-                        {row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : "—"}
+                        {row.last_seen_at ? formatAbsolute(row.last_seen_at) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{row.opens}</td>
                       <td className="px-4 py-2.5 text-foreground">
@@ -396,7 +397,7 @@ export function PeopleScreen(): JSX.Element {
               })}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       ) : null}
 
       <ReasonDialog

@@ -164,6 +164,29 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
       return reply.type("text/html; charset=utf-8").send(html);
     });
   }
+
+  /**
+   * `specs/api/conventions.md`: a `GET` for a path that matches nothing at
+   * all — `/login`, `/sign-in`, a mistyped personal link — is a 404, and a
+   * request that accepts HTML is answered with the app's own "this isn't
+   * available" page rather than a JSON error body (#60: the gateway's
+   * default-deny used to turn these into a raw JSON 403). A client that
+   * asked for JSON, and every non-`GET`, still gets the JSON 404, so an
+   * API caller is never handed a page to parse.
+   *
+   * No `config.capability` here: `setNotFoundHandler` takes no route
+   * config, and it needs none — the gateway hook lets an unmatched request
+   * through precisely because there is no route to have declared one.
+   */
+  fastify.setNotFoundHandler((request, reply) => {
+    const accept = request.headers.accept ?? "";
+    const wantsHtml = request.method === "GET" && accept.includes("text/html");
+    const found = wantsHtml ? safeFile("index.html") : null;
+    if (!found) return notFound(reply);
+    setFrameHeaders(reply, request.url.split("?")[0] ?? request.url);
+    reply.code(404);
+    return reply.sendFile(found);
+  });
 };
 
 export default staticRoutes;

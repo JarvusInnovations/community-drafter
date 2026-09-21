@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -333,6 +333,21 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(links.exitCode).toBe(0);
     expect(links.output).toContain("ada");
     expect(links.output).toContain("/i/");
+
+    // `specs/api/admin-cli.md`: `--out` writes a credential file, so it
+    // lands `0600` like the profile does — it was written at the process
+    // umask (664) through the simulated run (#60).
+    const linksOut = join(tempHome, "links.csv");
+    const linksToFile = await run(["people", "links", slug, "--out", linksOut]);
+    expect(linksToFile.exitCode).toBe(0);
+    expect(statSync(linksOut).mode & 0o777).toBe(0o600);
+
+    // An existing, more permissive file is tightened rather than left as is.
+    writeFileSync(linksOut, "stale", { mode: 0o664 });
+    chmodSync(linksOut, 0o664);
+    const rewritten = await run(["people", "links", slug, "--out", linksOut]);
+    expect(rewritten.exitCode).toBe(0);
+    expect(statSync(linksOut).mode & 0o777).toBe(0o600);
 
     // Verify the data repo actually recorded one commit per admin action,
     // with the trailers the API's commit layer writes.

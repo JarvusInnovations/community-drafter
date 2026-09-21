@@ -37,12 +37,12 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 | `docs update <slug> [--audience public\|closed] [--addressed-to "…"]… [--site <slug>]` | change the audience, who the statement is addressed to, and the site, and nothing else (`PATCH /documents/:slug`). `--site` moves the document to another site the caller belongs to: the slug, tokens and history do not change, the hostname its participants are sent to does, and the CLI prints the new canonical host so the operator sees what the next message will say. Passing `--addressed-to` replaces the list; `--audience closed` on a document that would be left with no recipients is refused, naming the flag |
 | `docs close | reopen | withdraw <slug> …` | lifecycle |
 | `versions list <slug>` / `versions show <slug> <n> [--body]` | read |
-| `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts |
+| `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts, and `signing_closes_at` only when the publish moved it (a `null` line reads as a deadline that was cleared) |
 | `versions compare <slug> <from> <to> [--unchanged]` | text redline for a terminal |
 | `people import <slug> [file.ndjson \| -] [--suggested-capacity official] [--dry-run]` | import invitees; accepts a gitsheets people sheet's NDJSON export directly; `--dry-run` shows what each row would do without writing |
 | `people remove <slug> <person>` | remove a staged invitation that was never sent |
 | `people list <slug> [--status not_sent\|signed\|…] [--source crm] [-q name]` | statuses (staged invitations read `not_sent`), no tokens |
-| `people links <slug> [--person a,b] [--out links.csv]` | export personal links (recorded) |
+| `people links <slug> [--person a,b] [--out links.csv]` | export personal links (recorded); `--out` writes the file `0600`, as `login` does for the profile — the rows are credentials |
 | `people send <slug> [--only-unsent] [--person a,b] [--dry-run]` | send invitations; prints how many were delivered, how many failed and who with what error; `--dry-run` lists who would receive one and who is skipped and why |
 | `people remind <slug> --target unopened\|opened-not-acted [--min-age <hours>] [--dry-run]` | reminders; skips anyone this document messaged within `--min-age` hours (default 48, `0` to send regardless) and prints what it actually sent, how many were skipped as recently messaged and how many by preference |
 | `people revoke-link | reissue-link <slug> <person>` | link management |

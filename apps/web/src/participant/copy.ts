@@ -49,8 +49,16 @@ export const copy = {
     prefix: "You're here as",
     notYou: "Not you?",
     notYouHeading: "Not you?",
-    notYouBody:
-      "This is a private link made for one person. If you're not the person named above, please don't sign or comment — ask whoever sent you this link to send you your own copy instead.",
+    /**
+     * `specs/screens/document.md` § Display Rules 2: names the sender and
+     * the address to ask. A person who has been mistaken for someone else
+     * needs somebody to write to, not "whoever sent you this link" (#60).
+     */
+    notYouBody: (senderName?: string, replyTo?: string): string => {
+      const who = senderName ?? "the team that sent it";
+      const ask = replyTo ? `${who} (${replyTo})` : who;
+      return `This is a private link made for one person. If you're not the person named above, please don't sign or comment — ask ${ask} to send you your own copy instead.`;
+    },
   },
 
   phase: {

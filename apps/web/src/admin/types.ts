@@ -168,10 +168,23 @@ export interface DeadlineShift {
   to: string;
 }
 
+export interface NotificationFailure {
+  event: string;
+  person?: string;
+  at?: string;
+  error?: string;
+}
+
 export interface NotificationsHealth {
   sent: Record<string, number>;
   pending: number;
   failed: number;
+  /**
+   * `specs/screens/admin-dashboard.md` § Notification health — the
+   * dispatcher's in-memory failure list, shown alongside the count so the
+   * panel says what failed and not only how much (#60).
+   */
+  failures?: NotificationFailure[];
 }
 
 export interface SessionInfo {

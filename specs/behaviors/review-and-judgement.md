@@ -59,7 +59,7 @@ Rules:
 
 ## Feedback export (for the LLM round)
 
-The admin export for a document produces, in one file: the current version's text; every **submission** with at least one comment not yet dispositioned, whole (author display name, capacity/org, version, judgement, reason, and each comment's anchor (quote, heading path, block), body and any existing disposition), submitted ones first and draft ones in a separate labeled section; a tally of judgements per version; and the current signatory count. Comments are never exported detached from their submission. The export is the input to the team's or agent's revision work; the publish action is the output path. Dispositions may target unsubmitted comments too; the author sees the disposition if they later submit or on their own page.
+The admin export for a document produces, in one file: the current version's text; every **submission** with at least one comment not yet dispositioned, whole (author display name, capacity/org, version, judgement, reason, and each comment's anchor (quote, heading path, block), body and any existing disposition), submitted ones first and draft ones in a separate labeled section; a tally of judgements per version; and the current signatory count. Comments are never exported detached from their submission. Every section of the export states its own emptiness — a heading with nothing under it reads as a truncated file, not as "none yet". The export is the input to the team's or agent's revision work; the publish action is the output path. Dispositions may target unsubmitted comments too; the author sees the disposition if they later submit or on their own page.
 
 ## Principles
 

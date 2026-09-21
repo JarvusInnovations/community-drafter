@@ -9,6 +9,8 @@ import { cn } from "../../lib/utils.ts";
  * surface (document list, dashboard sections, table wrappers, submission
  * cards) reuses this one primitive rather than re-declaring the class list.
  */
+export const cardClass = "rounded-2xl border border-border bg-card p-5";
+
 export function Card({
   children,
   className,
@@ -19,7 +21,5 @@ export function Card({
   /** The submissions list needs its cards to be `<li>` elements (see `SubmissionsScreen.tsx`). */
   as?: "div" | "li" | "section";
 }): JSX.Element {
-  return (
-    <Tag className={cn("rounded-2xl border border-border bg-card p-5", className)}>{children}</Tag>
-  );
+  return <Tag className={cn(cardClass, className)}>{children}</Tag>;
 }

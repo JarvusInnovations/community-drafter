@@ -10,6 +10,8 @@ import {
 } from "./api.ts";
 import { copy } from "./copy.ts";
 import { Card } from "./components/Card.tsx";
+import { Pill } from "./components/Pill.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { DocumentOperatorsPanel } from "./components/DocumentOperatorsPanel.tsx";
 import { ExtendDeadlineDialog } from "./components/ExtendDeadlineDialog.tsx";
 import { FunnelBar, StatTile } from "./components/Funnel.tsx";
@@ -17,6 +19,7 @@ import { useAdminDocument } from "./DocumentContext.tsx";
 import { quietButtonClass } from "./styles.ts";
 import { type ActivityEntry, type InvitationRow, type NotificationsHealth } from "./types.ts";
 import { Timeline } from "../participant/components/Timeline.tsx";
+import { formatAbsolute } from "../participant/format.ts";
 
 function downloadText(filename: string, text: string, mime: string): void {
   const blob = new Blob([text], { type: mime });
@@ -36,7 +39,15 @@ interface Funnel {
   organizations: number;
   individuals: number;
   conditional: number;
-  revoked: number;
+  /**
+   * `specs/screens/admin-dashboard.md` § Funnel: revoked signatures and
+   * revoked links are two counts, never one. A person whose link was
+   * revoked and reissued has withdrawn nothing, and a single "revoked"
+   * figure standing beside the signature tiles is read as a withdrawn
+   * signature (#60).
+   */
+  revokedSignatures: number;
+  revokedLinks: number;
   /**
    * `specs/screens/admin-dashboard.md` § Funnel: live signatures still
    * attached to a version older than the current one
@@ -54,7 +65,8 @@ function computeFunnel(rows: InvitationRow[], currentVersion: number): Funnel {
     organizations: 0,
     individuals: 0,
     conditional: 0,
-    revoked: 0,
+    revokedSignatures: 0,
+    revokedLinks: 0,
     behind: 0,
   };
   for (const row of rows) {
@@ -77,8 +89,11 @@ function computeFunnel(rows: InvitationRow[], currentVersion: number): Funnel {
     if (row.status === "signed_conditional") {
       funnel.conditional += 1;
     }
-    if (row.status === "revoked" || row.link_revoked) {
-      funnel.revoked += 1;
+    if (row.signature?.revoked) {
+      funnel.revokedSignatures += 1;
+    }
+    if (row.link_revoked) {
+      funnel.revokedLinks += 1;
     }
     const signedOn = row.signature?.signed_on_version;
     if (
@@ -156,6 +171,7 @@ export function DashboardScreen(): JSX.Element {
     0,
   );
   const funnel = invitations ? computeFunnel(invitations, currentVersion) : null;
+  const hasDeadline = Boolean(document.comments_close_at || document.signing_closes_at);
 
   return (
     <main className="mx-auto max-w-[1120px] px-5 py-6">
@@ -187,9 +203,17 @@ export function DashboardScreen(): JSX.Element {
       <Timeline document={document} />
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => setExtendOpen(true)} className={quietButtonClass}>
-          {copy.dashboard.extendDeadline}
-        </button>
+        {/*
+          `specs/screens/admin-dashboard.md` § Dashboard: "Extend deadline…"
+          only when there is a deadline to extend. A document that has never
+          been opened has none, and the dialog could only answer with a
+          refusal naming a stored field (#60).
+        */}
+        {hasDeadline ? (
+          <button type="button" onClick={() => setExtendOpen(true)} className={quietButtonClass}>
+            {copy.dashboard.extendDeadline}
+          </button>
+        ) : null}
         {document.public_access && document.public_access !== "none" ? (
           <button
             type="button"
@@ -211,6 +235,15 @@ export function DashboardScreen(): JSX.Element {
         </button>
       </div>
 
+      {hasDeadline ? null : (
+        <p className="mt-3 rounded-xl border-l-[3px] border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+          {copy.dashboard.notOpenedYet}{" "}
+          <code className="rounded bg-card px-1.5 py-0.5">
+            {copy.dashboard.openCommand(document.slug)}
+          </code>
+        </p>
+      )}
+
       {banner ? (
         <p
           role="status"
@@ -226,7 +259,7 @@ export function DashboardScreen(): JSX.Element {
       ) : null}
 
       <ExtendDeadlineDialog
-        open={extendOpen}
+        open={extendOpen && hasDeadline}
         document={document}
         onClose={() => setExtendOpen(false)}
         onExtended={() => void refetch()}
@@ -251,7 +284,7 @@ export function DashboardScreen(): JSX.Element {
             />
             <div
               className={`mt-4 grid grid-cols-2 gap-3 ${
-                currentVersion > 1 ? "sm:grid-cols-5" : "sm:grid-cols-4"
+                currentVersion > 1 ? "sm:grid-cols-6" : "sm:grid-cols-5"
               }`}
             >
               <StatTile label={copy.dashboard.organizations} value={funnel.organizations} />
@@ -261,7 +294,16 @@ export function DashboardScreen(): JSX.Element {
                 value={funnel.conditional}
                 tone="muted"
               />
-              <StatTile label={copy.dashboard.revoked} value={funnel.revoked} tone="muted" />
+              <StatTile
+                label={copy.dashboard.revokedSignatures}
+                value={funnel.revokedSignatures}
+                tone="muted"
+              />
+              <StatTile
+                label={copy.dashboard.revokedLinks}
+                value={funnel.revokedLinks}
+                tone="muted"
+              />
               {/*
                * Shown from the moment a second version exists, zero
                * included: the operator needs to read the number, not infer
@@ -287,7 +329,7 @@ export function DashboardScreen(): JSX.Element {
             {copy.dashboard.publishCommand(document.slug)}
           </code>
         </p>
-        <Card className="mt-3 overflow-x-auto p-0">
+        <TableScroller className="mt-3">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -301,9 +343,16 @@ export function DashboardScreen(): JSX.Element {
             <tbody>
               {document.versions.map((v) => (
                 <tr key={v.number} className="border-b border-border last:border-0">
-                  <td className="px-4 py-2.5 font-semibold text-foreground">{v.number}</td>
+                  <td className="px-4 py-2.5 font-semibold text-foreground">
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {v.number}
+                      {v.number === currentVersion ? (
+                        <Pill tone="ok">{copy.versions.current}</Pill>
+                      ) : null}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-muted-foreground">
-                    {new Date(v.published_at).toLocaleString()}
+                    {formatAbsolute(v.published_at)}
                   </td>
                   <td className="px-4 py-2.5 text-foreground">{v.summary}</td>
                   <td className="px-4 py-2.5 text-foreground">{v.dispositions}</td>
@@ -312,7 +361,7 @@ export function DashboardScreen(): JSX.Element {
               ))}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       </section>
 
       <section className="mt-6">
@@ -327,10 +376,8 @@ export function DashboardScreen(): JSX.Element {
             <ul className="flex flex-col text-sm">
               {activity.map((entry) => (
                 <li key={entry.commit} className="border-b border-border px-4 py-2.5 last:border-0">
-                  <span className="text-muted-foreground">
-                    {new Date(entry.date).toLocaleString()}
-                  </span>{" "}
-                  — {entry.subject}
+                  <span className="text-muted-foreground">{formatAbsolute(entry.date)}</span> —{" "}
+                  {entry.subject}
                   {entry.actor ? (
                     <span className="text-muted-foreground">
                       {" "}
@@ -376,6 +423,27 @@ export function DashboardScreen(): JSX.Element {
               {copy.dashboard.pendingLabel}: {notifications.pending} · {copy.dashboard.failedLabel}:{" "}
               {notifications.failed}
             </p>
+            {/*
+              `specs/screens/admin-dashboard.md` § Notification health: a
+              non-zero failure count is shown with the failures themselves,
+              because the count alone tells the team something is wrong and
+              nothing about what (#60).
+            */}
+            {notifications.failures && notifications.failures.length > 0 ? (
+              <ul className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
+                {notifications.failures.map((failure) => (
+                  <li key={`${failure.event}:${failure.person}:${failure.at}`}>
+                    <span className="font-semibold text-foreground">{failure.event}</span>
+                    {failure.person ? ` · ${failure.person}` : ""}
+                    {failure.at ? ` · ${formatAbsolute(failure.at)}` : ""}
+                    {failure.error ? (
+                      <span className="text-destructive"> — {failure.error}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="mt-2 text-xs text-muted-foreground">{copy.dashboard.sinceRestart}</p>
           </Card>
         ) : (
           <p className="mt-2 text-muted-foreground">{copy.loading}</p>

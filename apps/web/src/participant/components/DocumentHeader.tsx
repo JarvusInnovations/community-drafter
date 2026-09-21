@@ -24,7 +24,12 @@ export function DocumentHeader({
       <Title className="text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl">
         {document.title}
       </Title>
-      <IdentityLine name={person.name} readOnly={readOnly} />
+      <IdentityLine
+        name={person.name}
+        senderName={document.sender_name}
+        replyTo={document.reply_to}
+        readOnly={readOnly}
+      />
       <Timeline document={document} />
     </header>
   );

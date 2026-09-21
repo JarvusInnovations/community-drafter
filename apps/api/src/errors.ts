@@ -19,6 +19,7 @@ export type ErrorCode =
   | "phase_closed"
   | "version_stale"
   | "deadline_not_later"
+  | "no_deadline_set"
   | "stale_edit"
   | "unsaved_items"
   | "no_change"
@@ -47,6 +48,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   phase_closed: 409,
   version_stale: 409,
   deadline_not_later: 409,
+  no_deadline_set: 422,
   stale_edit: 409,
   unsaved_items: 409,
   no_change: 409,
