@@ -20,7 +20,7 @@ specs:
 
 The thing the whole service exists to produce: the finished statement, with its signatories, as a PDF.
 
-**In:** the new `specs/screens/deliverable.md` whole — the print document (title block, statement, signatory list, running footer, DRAFT watermark), the server-side renderer (headless Chromium via `puppeteer-core` against a system browser), the in-memory render cache, the three routes and their gates (operator, personal link, public with the `audience` rule and a per-IP rate limit), `chromium` in the `Dockerfile`, `drafter-axi docs export --pdf`, and the three places a human presses a button: the admin dashboard, the participant footer, the public footer.
+**In:** the new `specs/screens/deliverable.md` whole — the print document (title block, statement, signatory list, running footer, DRAFT watermark), the server-side renderer (headless Chromium via `puppeteer-core` against a system browser), the in-memory render cache, the three routes and their gates (operator, personal link, public with the `audience` rule and a per-IP rate limit), `chromium` in the `Dockerfile`, `signatories-axi docs export --pdf`, and the three places a human presses a button: the admin dashboard, the participant footer, the public footer.
 
 **Out:** a PDF of anything other than the current version (no per-version export, no diff PDF, no comment appendix); any stored or attached PDF (nothing is written to the data repo, nothing is mailed); a signatory-list-only export; and a hosted print preview route in the SPA. Out too: the post-close revocation footnote (`specs/behaviors/signatures.md` § Revocation), which no surface implements yet and which the deliverable will inherit for free from `computeSignatories` the day one does.
 
@@ -55,7 +55,7 @@ The thing the whole service exists to produce: the finished statement, with its 
 - [ ] Nothing from the `people` sheet appears in the rendered HTML — asserted against a seeded participant whose person record carries an email and a phone the signature does not.
 - [ ] The public route is rate-limited to 10/min per source address and answers 429 `rate_limited` past that.
 - [ ] Golden render: the produced bytes are a PDF of at least one page whose extracted text contains the document title and a signatory's name (`pdf-parse`).
-- [ ] `drafter-axi docs export <slug> --pdf` writes a file, prints the path, the version and the draft-or-clean word, and never puts PDF bytes on stdout; the committed bundle and SKILL.md are rebuilt and the drift gate passes.
+- [ ] `signatories-axi docs export <slug> --pdf` writes a file, prints the path, the version and the draft-or-clean word, and never puts PDF bytes on stdout; the committed bundle and SKILL.md are rebuilt and the drift gate passes.
 - [ ] Gates in every touched package: `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test`; `apps/web` also `bun run build` and `bun run check:bundle-size` (120 KB).
 - [ ] The image builds with Chromium in it, the size delta against the current image is recorded, and a render inside the container proves Chromium launches there.
 - [ ] Peak memory for one render is measured against Cloud Run's 1 GiB, and `tf/cloudrun.tf` is raised in this PR if it does not fit.

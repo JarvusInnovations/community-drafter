@@ -1127,6 +1127,11 @@ var SignatoriesClient = class {
       const text = await response.text();
       throw new ApiCallError("internal_error", text || `HTTP ${response.status}`);
     }
+    if (options.binary) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const filename = filenameFromDisposition(response.headers.get("content-disposition"));
+      return { bytes, filename };
+    }
     if (response.status === 204) return void 0;
     if (contentType.includes("text/csv") || contentType.includes("text/markdown")) {
       return await response.text();
@@ -1138,6 +1143,9 @@ var SignatoriesClient = class {
   }
   get(path, query) {
     return this.request("GET", path, { query });
+  }
+  getBinary(path, query) {
+    return this.request("GET", path, { query, binary: true });
   }
   post(path, body) {
     return this.request("POST", path, { body });
@@ -1153,6 +1161,12 @@ var SignatoriesClient = class {
     return this.request("DELETE", path);
   }
 };
+function filenameFromDisposition(header) {
+  if (!header) return void 0;
+  const match = /filename\*?=(?:"([^"]+)"|([^;]+))/u.exec(header);
+  const value = match?.[1] ?? match?.[2];
+  return value?.trim() || void 0;
+}
 
 // src/cli/commands/common.ts
 function clientFrom(parsed) {
@@ -1247,6 +1261,9 @@ async function whoamiCommand(args) {
   return render(parsed, info, () => renderObject(info));
 }
 
+// src/cli/commands/docs.ts
+import { writeFileSync as writeFileSync2 } from "node:fs";
+
 // src/cli/deadline.ts
 var ZONED = /(Z|[+-]\d\d:?\d\d)$/u;
 var LOCAL = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/u;
@@ -1326,9 +1343,10 @@ var DOCS_FLAGS = {
   close: { positionals: 1 },
   reopen: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
-  operators: { positionals: 3 }
+  operators: { positionals: 3 },
+  export: { positionals: 1, value: ["--out", "--paper"], boolean: ["--pdf", "--draft"] }
 };
-var DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
+var DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|export|operators> ...
 
 create <slug> --title <text> --audience public|closed
        [--site <slug>] [--sender-name <text>] [--reply-to <email>]
@@ -1368,6 +1386,20 @@ reopen <slug> [--comments-close <when>] --signing-closes <when>
 zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
 what it resolved to.
 withdraw <slug> --reason <text> [--public]
+export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
+       The deliverable: the current version's text with a title block naming
+       who it is addressed to, then the signatory list as it stands. --pdf
+       names the format and is the only one today, so it may be omitted.
+
+       Without --out the file is <slug>-v<n>.pdf in the working directory, or
+       <slug>-v<n>-draft.pdf while the copy is still a draft. A copy is a
+       draft \u2014 watermarked DRAFT, with the version number \u2014 until the
+       document has a final version AND signing has closed. --draft forces
+       the watermark back on; there is deliberately no flag the other way.
+
+       The signatory list is computed at the moment of the render and is
+       never frozen, so a name revoked after closing is simply not in the
+       next copy. For the counts themselves, run \`signatures list <slug>\`.
 operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
@@ -1654,6 +1686,46 @@ async function docsCommand(args) {
       );
       return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
+    case "export": {
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi docs export <slug> --pdf [--out <file>]"
+      );
+      const paper = str(parsed, "--paper");
+      if (paper !== void 0 && paper !== "letter" && paper !== "a4") {
+        throw new AxiError("--paper must be letter or a4", "USAGE", [
+          `Run \`${cli} docs export ${slug} --pdf --paper letter\``
+        ]);
+      }
+      const download = await client.getBinary(
+        `/documents/${encodeURIComponent(slug)}/statement.pdf`,
+        { paper, draft: bool(parsed, "--draft") ? "1" : void 0 }
+      );
+      const serverName = download.filename ?? `${slug}.pdf`;
+      const out = str(parsed, "--out") ?? serverName;
+      writeFileSync2(out, download.bytes);
+      const draftCopy = serverName.endsWith("-draft.pdf");
+      const version = /-v(\d+)(?:-draft)?\.pdf$/u.exec(serverName)?.[1];
+      const result = {
+        out,
+        version: version === void 0 ? void 0 : Number(version),
+        copy: draftCopy ? "draft" : "clean",
+        paper: paper ?? "letter",
+        bytes: download.bytes.byteLength
+      };
+      return render(
+        parsed,
+        result,
+        () => joinBlocks(
+          renderObject(compact(result)),
+          renderHelp([
+            draftCopy ? `This copy is watermarked DRAFT; it goes clean once ${slug} has a final version and signing has closed` : `Run \`${cli} signatures list ${slug}\` to read the names on this copy`
+          ])
+        )
+      );
+    }
     case "operators": {
       const first = parsed.positional[0];
       if (first === "add" || first === "remove") {
@@ -1700,7 +1772,7 @@ async function docsCommand(args) {
 }
 
 // src/cli/commands/feedback.ts
-import { writeFileSync as writeFileSync2 } from "node:fs";
+import { writeFileSync as writeFileSync3 } from "node:fs";
 var FEEDBACK_FLAGS = {
   export: { positionals: 1, value: ["--format", "--out"] }
 };
@@ -1730,7 +1802,7 @@ async function feedbackCommand(args) {
           }
         );
         if (out) {
-          writeFileSync2(out, markdown, "utf8");
+          writeFileSync3(out, markdown, "utf8");
           return renderObject({ out, format });
         }
         return markdown;
@@ -1740,7 +1812,7 @@ async function feedbackCommand(args) {
       );
       const content = JSON.stringify(bundle, null, 2);
       if (out) {
-        writeFileSync2(out, content, "utf8");
+        writeFileSync3(out, content, "utf8");
         return renderObject({
           out,
           format,
@@ -1925,7 +1997,7 @@ function nextDeadline(doc) {
 
 // src/cli/commands/hook.ts
 import { execSync } from "node:child_process";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync4 } from "node:fs";
 import { homedir as homedir4 } from "node:os";
 import { dirname, join as join2, resolve } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -2004,7 +2076,7 @@ function readSettings(path) {
 }
 function writeSettings(path, settings) {
   mkdirSync2(dirname(path), { recursive: true });
-  writeFileSync3(path, `${JSON.stringify(settings, null, 2)}
+  writeFileSync4(path, `${JSON.stringify(settings, null, 2)}
 `, "utf8");
 }
 function isManaged(command) {
@@ -2330,7 +2402,7 @@ async function operatorsCommand(args) {
 }
 
 // src/cli/commands/people.ts
-import { chmodSync as chmodSync2, writeFileSync as writeFileSync4 } from "node:fs";
+import { chmodSync as chmodSync2, writeFileSync as writeFileSync5 } from "node:fs";
 var PEOPLE_FLAGS = {
   import: { positionals: 2, value: ["--suggested-capacity"], boolean: ["--dry-run"] },
   list: { positionals: 1, value: ["--status", "--source", "-q"], boolean: ["--contacts"] },
@@ -2539,7 +2611,7 @@ async function peopleCommand(args) {
       );
       const out = str(parsed, "--out");
       if (out) {
-        writeFileSync4(out, csvText, { encoding: "utf8", mode: 384 });
+        writeFileSync5(out, csvText, { encoding: "utf8", mode: 384 });
         chmodSync2(out, 384);
         const rowCount = Math.max(0, parseCsv(csvText).length - 1);
         return render(parsed, { out, rows: rowCount }, () => renderObject({ out, rows: rowCount }));
@@ -3474,6 +3546,10 @@ var COMMAND_GROUPS = [
         usage: 'docs withdraw <slug> --reason "<text>" [--public]',
         summary: "Withdraw the document."
       },
+      {
+        usage: "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]",
+        summary: "Write the deliverable \u2014 the current version's text, a title block naming who it is addressed to, and the signatory list as it stands \u2014 to a PDF file, and print the path, the version, the paper and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. The list is computed at the moment of the render and never frozen."
+      },
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
         usage: "docs operators add <slug> <email>",
@@ -3642,7 +3718,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "a7ce356" : "dev";
+var VERSION = true ? "c020c33" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

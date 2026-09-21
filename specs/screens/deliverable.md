@@ -78,7 +78,7 @@ None. It is a file. The three surfaces that offer it are:
 | Admin dashboard (`screens/admin-dashboard.md`) | "Download PDF" beside the other exports |
 | Participant document screen (`screens/document.md`) | "Download the statement (PDF)" in the footer |
 | Public read view (`screens/public-and-embed.md`) | the same footer link, when the public door is open |
-| Admin CLI (`api/admin-cli.md`) | `drafter-axi docs export <slug> --pdf [--out <file>]` |
+| Admin CLI (`api/admin-cli.md`) | `signatories-axi docs export <slug> --pdf [--out <file>]` |
 
 ## Navigation
 
