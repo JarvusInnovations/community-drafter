@@ -2404,7 +2404,7 @@ async function operatorsCommand(args) {
 // src/cli/commands/people.ts
 import { chmodSync as chmodSync2, writeFileSync as writeFileSync5 } from "node:fs";
 var PEOPLE_FLAGS = {
-  import: { positionals: 2, value: ["--suggested-capacity"], boolean: ["--dry-run"] },
+  import: { positionals: 2, value: ["--suggested-capacity"], boolean: ["--dry-run", "--update"] },
   list: { positionals: 1, value: ["--status", "--source", "-q"], boolean: ["--contacts"] },
   links: { positionals: 1, value: ["--person", "--out"] },
   send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
@@ -2416,9 +2416,15 @@ var PEOPLE_FLAGS = {
 };
 var PEOPLE_HELP = `usage: signatories-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
 
-import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
+import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--update] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
        a gitsheets people sheet's NDJSON export works directly.
+
+       People are matched by email within THIS document's site, so the same
+       address invited on another site is a different person and is never
+       touched. Each row's name/org/role/descriptor also become this document's
+       own prefill, so importing here never changes what another document's
+       sign card offers.
 
        Row fields, by these exact names:
          email              required  merge key; matches an existing person
@@ -2435,9 +2441,16 @@ import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-
        nothing. Run --dry-run first: it shows what every row would do (new
        person, existing person and which fields would change, or already
        invited) without writing anything.
+
+       An existing person keeps every field they already have; only their
+       blanks are filled. Pass --update to let the file replace them and
+       refresh an already-invited person's prefill. Either way --dry-run
+       reports would_change (what this mode changes) and kept (the set fields
+       it leaves alone \u2014 what --update would act on).
 list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]
        Never prints tokens; emails only with --contacts. Staged invitations that
-       have not been sent yet show status not_sent.
+       have not been sent yet show status not_sent. name and org are what this
+       document's sign card prefills, not the raw contact record.
 remove <slug> <person>
        Take back a staged invitation that was never sent. Once sent or acted on,
        the record stays (use revoke-link instead).
@@ -2548,9 +2561,11 @@ async function peopleCommand(args) {
         }
       }
       const dryRun = bool(parsed, "--dry-run");
+      const update = bool(parsed, "--update");
       const ndjson = rows.map((row) => JSON.stringify(row)).join("\n");
+      const query = [dryRun ? "dry_run=1" : "", update ? "update=1" : ""].filter(Boolean).join("&");
       const result = await client.postText(
-        `/documents/${encodeURIComponent(slug)}/invitations/import${dryRun ? "?dry_run=1" : ""}`,
+        `/documents/${encodeURIComponent(slug)}/invitations/import${query ? `?${query}` : ""}`,
         ndjson,
         "application/x-ndjson"
       );
@@ -2564,10 +2579,18 @@ async function peopleCommand(args) {
             computed("person", (r) => r.person),
             computed("name", (r) => r.name),
             computed("action", (r) => r.action),
-            computed("changes", (r) => r.changes.join(","))
+            computed("would_change", (r) => r.would_change.join(",")),
+            computed("kept", (r) => r.kept.join(","))
           ]) : "",
           renderHelp(
-            dryRun ? [`Nothing was written. Run again without --dry-run to import`] : [`Run \`signatories-axi people list ${slug}\` to see the imported invitees`]
+            [
+              dryRun ? `Nothing was written. Run again without --dry-run to import` : `Run \`signatories-axi people list ${slug}\` to see the imported invitees`,
+              // The one thing a reader cannot infer from the counts: the rows
+              // in `kept` are the ones a second run with --update would change.
+              ...!update && planRows?.some((r) => r.kept.length > 0) ? [
+                `Fields in kept were left alone because the person already has a value \u2014 pass --update to replace them`
+              ] : []
+            ].filter(Boolean)
           )
         )
       );
@@ -2586,6 +2609,7 @@ async function peopleCommand(args) {
       const schema = [
         computed("person", (r) => r.person),
         computed("name", (r) => r.name),
+        computed("org", (r) => r.org ?? ""),
         ...contacts ? [computed("email", (r) => r.email)] : [],
         computed("status", (r) => r.status),
         computed("opens", (r) => r.opens),
@@ -3580,12 +3604,12 @@ var COMMAND_GROUPS = [
     group: "People",
     commands: [
       {
-        usage: "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]",
-        summary: "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags, and --dry-run shows what each row would do first. Run `people import --help` for the full field list."
+        usage: "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--update] [--dry-run]",
+        summary: "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags. People are matched by email within this document's site, each row's values become this document's own sign-card prefill, and an existing person keeps the fields they already have unless --update is passed. --dry-run shows what each row would change and what it would keep first. Run `people import --help` for the full field list."
       },
       {
         usage: "people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]",
-        summary: "Participation statuses \u2014 never tokens; emails only with --contacts."
+        summary: "Participation statuses \u2014 never tokens; emails only with --contacts. name and org are what this document prefills, not the raw contact record."
       },
       {
         usage: "people links <slug> [--person a,b] [--out <file.csv>]",
@@ -3718,7 +3742,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "c020c33" : "dev";
+var VERSION = true ? "4afca03" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

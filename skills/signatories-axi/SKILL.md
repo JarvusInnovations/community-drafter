@@ -47,7 +47,11 @@ Six steps take a document from nothing to signatures. Run them from this skill's
    and again without `--dry-run` to write it. `scripts/signatories-axi people send <slug>` mails each
    person their own link and prints how many went out; anyone the mail provider rejected is named
    with the reason and stays `not_sent`, so fix the address and run `people send` again.
-   Run `people import --help` for the full field list.
+   Run `people import --help` for the full field list. People are matched by email within
+   this document's site, and what each row says about a person becomes *this* document's
+   prefill — importing a list here never changes what another document's sign card offers.
+   An existing person keeps the fields they already have; pass `--update` to let the file
+   replace them.
 6. **Revise.** `scripts/signatories-axi feedback export <slug> --format md` gives you every pending
    comment. Answer them by publishing again with a dispositions file, where each comment gets one
    of four outcomes — `accepted`, `partial`, `declined`, `noted`:
@@ -207,8 +211,8 @@ every-session use instead.
 
 ### People
 
-- `scripts/signatories-axi people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]` — Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags, and --dry-run shows what each row would do first. Run `people import --help` for the full field list.
-- `scripts/signatories-axi people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]` — Participation statuses — never tokens; emails only with --contacts.
+- `scripts/signatories-axi people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--update] [--dry-run]` — Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags. People are matched by email within this document's site, each row's values become this document's own sign-card prefill, and an existing person keeps the fields they already have unless --update is passed. --dry-run shows what each row would change and what it would keep first. Run `people import --help` for the full field list.
+- `scripts/signatories-axi people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]` — Participation statuses — never tokens; emails only with --contacts. name and org are what this document prefills, not the raw contact record.
 - `scripts/signatories-axi people links <slug> [--person a,b] [--out <file.csv>]` — Export personal sign-in links (recorded).
 - `scripts/signatories-axi people remove <slug> <person>` — Take back a staged invitation that was never sent.
 - `scripts/signatories-axi people send <slug> [--only-unsent] [--person a,b] [--dry-run]` — Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why.
