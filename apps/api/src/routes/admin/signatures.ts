@@ -39,7 +39,10 @@ const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
         .filter((entry) => entry.record.signature !== undefined)
         .filter((entry) => includeRevoked || entry.record.signature?.revoked !== true)
         .map((entry) => {
-          const person = fastify.storage.readModel.getPerson(entry.record.person);
+          const person = fastify.storage.readModel.getPersonOn(
+            document.record.slug,
+            entry.record.person,
+          );
           return {
             person: entry.record.person,
             name: person?.name ?? "",

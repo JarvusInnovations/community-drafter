@@ -53,6 +53,10 @@ export const ACTIONS = [
   "site-remove",
   "site-operator-add",
   "site-operator-remove",
+  // `specs/data-model.md` § Migrating the pre-site layout: a boot-time,
+  // idempotent rewrite the service performs on itself, always attributed to
+  // `system`. No operator can ask for one.
+  "migrate",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];

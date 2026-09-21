@@ -493,3 +493,24 @@ curl -s "$SERVICE_URL/_health" | jq .
 built. `storage.pushDaemon.running: true` (once a remote origin is
 configured, which it always is in the deployed container) means the push
 daemon started cleanly.
+
+### The one-time people-to-sites migration
+
+The first boot of the build that moved `people` under its site
+(`specs/data-model.md` § Migrating the pre-site layout) rewrites every
+record from `people/<id>.toml` to `people/default/<id>.toml` with
+`site = 'default'`, in one commit. Watch for it once:
+
+- The log line `storage: migrated N people record(s) to site 'default'`,
+  with `N` equal to the number of files that were directly under `people/`.
+- One commit in the data repo with `Action: migrate` and `Actor: system`,
+  whose diff is only renames-plus-one-added-field. The push daemon pushes
+  it like any other commit.
+- `/_health`'s `storage.people` afterwards equal to `N`. The read model is
+  built before the migration runs, so the `storage: read model built` line
+  at boot reports `people: 0` on this one boot — that is expected, and the
+  health endpoint is the count to trust.
+
+Every later boot finds nothing to move and commits nothing. If the log line
+appears on a second boot, something is writing records back to the old
+path and that is a bug, not a retry.

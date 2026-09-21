@@ -27,6 +27,8 @@ const DOCUMENT: DocumentDetail = {
 const ROW: InvitationRow = {
   person: "jane-doe",
   name: "Jane Doe",
+  org: "",
+  prefill: { name: "Jane Doe" },
   email: "jane@example.org",
   status: "opened",
   source: "admin",

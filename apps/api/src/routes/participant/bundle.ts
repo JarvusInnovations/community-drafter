@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { buildPrefsView } from "../../lib/prefs.ts";
+import { resolvePrefill } from "../../lib/prefill.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
 import { buildSubmissionView } from "../../lib/submission-view.ts";
@@ -35,7 +36,12 @@ export function buildParticipantBundle(
   const latest = document.versions[document.versions.length - 1];
   const rendered = fastify.rendering.render(version.commit, version.body);
 
-  const person = fastify.storage.readModel.getPerson(participation.record.person);
+  // `specs/behaviors/sites.md` § People are per site: the person belongs to
+  // the **document's** site, so that is what resolves them.
+  const person = fastify.storage.readModel.getPersonOn(
+    document.record.slug,
+    participation.record.person,
+  );
   const submissions = fastify.storage.readModel
     .listSubmissionsForDocument(document.record.slug)
     .filter((entry) => entry.record.person === participation.record.person);
@@ -95,11 +101,11 @@ export function buildParticipantBundle(
       : null,
     submissions: submissions.map((entry) => buildSubmissionView(fastify, entry)),
     signatories,
+    // `specs/screens/document.md` § Display Rules 3: every prefilled field
+    // resolves for **this** document — the participation's own `prefill`
+    // value, else the person's site-level default, else nothing.
     prefill: {
-      name: person?.name,
-      org: person?.org,
-      role: person?.role,
-      descriptor: person?.descriptor,
+      ...resolvePrefill(person, participation.record),
       suggested_capacity: participation.record.suggested_capacity,
     },
     notify: buildPrefsView(participation),

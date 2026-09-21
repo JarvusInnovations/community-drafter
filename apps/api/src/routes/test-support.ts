@@ -224,6 +224,13 @@ export interface SeedParticipantOptions {
   token: string;
   email?: string;
   name?: string;
+  /** The person's site; defaults to the document's own (`default` unless set). */
+  site?: string;
+  org?: string;
+  role?: string;
+  descriptor?: string;
+  /** The participation's per-document sign-card overrides. */
+  prefill?: { name?: string; org?: string; title?: string; descriptor?: string };
   notify?: {
     channel?: string;
     every_revision?: boolean;
@@ -247,9 +254,13 @@ export async function seedParticipant(
     },
     async (tx) => {
       await tx.people.upsert({
+        site: opts.site ?? server.storage.readModel.siteSlugForDocument(opts.document),
         id: opts.person,
         name: opts.name ?? opts.person,
         email: opts.email ?? `${opts.person}@example.org`,
+        org: opts.org,
+        role: opts.role,
+        descriptor: opts.descriptor,
         source: "admin",
       });
       await tx.participations.upsert({
@@ -257,6 +268,7 @@ export async function seedParticipant(
         person: opts.person,
         token: opts.token,
         source: "admin",
+        prefill: opts.prefill,
         notify: opts.notify,
       });
     },

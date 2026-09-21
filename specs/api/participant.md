@@ -26,7 +26,7 @@ Response:
                                disposition: null | { outcome, note, version } }] }],
   signatories: { organizations: n, individuals: n, unlisted: n,
                  list: [{ display_name, capacity, descriptor, org, title }] } | { organizations, individuals, unlisted } | null,
-  prefill: { name, org, role, descriptor, suggested_capacity },
+  prefill: { name, org, role, descriptor, suggested_capacity },   // resolved per field: the participation's `prefill` (whose `title` supplies `role`), else the person's site-level default, else absent
   notify:   { channel, every_revision, daily_digest, phase_changes, my_comments_addressed, reminders, forced: [..] }
 }
 ```

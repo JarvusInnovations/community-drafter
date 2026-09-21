@@ -165,6 +165,7 @@ describe("ReadModel — version derivation", () => {
       },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane",
           email: "jane@x.org",
@@ -286,6 +287,7 @@ describe("ReadModel — participations, positions, token index", () => {
       { actor, subject: "invite: jane-doe on doc-b", document: "doc-b", person: "jane-doe" },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",
@@ -463,6 +465,7 @@ describe("ReadModel — golden fixture", () => {
         { actor, subject: `invite: ${person} on ${document}`, document, person },
         async (tx) => {
           await tx.people.upsert({
+            site: "default",
             id: person,
             name: `Person ${i}`,
             email: `${person}@example.org`,

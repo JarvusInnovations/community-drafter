@@ -16,6 +16,7 @@ import {
   ensureBootstrapSuperadmin,
   migrateLegacyDocuments,
 } from "./operators-bootstrap.ts";
+import { migratePeopleToSites } from "./people-site-migration.ts";
 import { openDataRepo } from "./repo.ts";
 import { ReadModel } from "./read-model.ts";
 import type { DataStore } from "./schemas.ts";
@@ -109,6 +110,16 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
     readModel,
     commit: boundCommit,
     bootstrapOperatorEmail: fastify.config.BOOTSTRAP_OPERATOR_EMAIL,
+    log: (message) => fastify.log.info(message),
+  });
+  // `specs/data-model.md` § Migrating the pre-site layout. Runs after the
+  // sheet configs have been synced (`openDataRepo`, above), because the new
+  // path template is what makes the old records unreadable in the first
+  // place; idempotent, so every later boot finds nothing and commits nothing.
+  await migratePeopleToSites({
+    readModel,
+    commit: boundCommit,
+    dataDir: resolvedDataDir,
     log: (message) => fastify.log.info(message),
   });
 

@@ -33,6 +33,29 @@ enum = ['crm', 'admin', 'public']
 type = 'string'
 enum = ['personal', 'official']
 
+# --- prefill: what THIS document prefills on the sign card for this
+# person, overriding the person's site-level defaults field by field
+# (specs/data-model.md → `participations`). Written by an import from the
+# row it imported; never written from a signature. Absent — as on every
+# record written before the field existed — means the person's defaults
+# alone. Named for what it prefills, so `prefill.title` is the default for
+# `signature.title` and overrides the person's `role`. ---
+[gitsheet.schema.properties.prefill]
+type = 'object'
+additionalProperties = false
+
+[gitsheet.schema.properties.prefill.properties.name]
+type = 'string'
+
+[gitsheet.schema.properties.prefill.properties.org]
+type = 'string'
+
+[gitsheet.schema.properties.prefill.properties.title]
+type = 'string'
+
+[gitsheet.schema.properties.prefill.properties.descriptor]
+type = 'string'
+
 [gitsheet.schema.properties.link_revoked]
 type = 'boolean'
 default = false

@@ -22,6 +22,8 @@ function signedRow(person: string, signedOnVersion: number, revoked = false): In
   return {
     person,
     name: person,
+    org: "",
+    prefill: { name: person },
     email: `${person}@example.org`,
     status: revoked ? "revoked" : "signed",
     source: "admin",

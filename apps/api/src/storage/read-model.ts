@@ -1,3 +1,4 @@
+import { DEFAULT_SITE_SLUG } from "@signatories/shared";
 import type {
   Action,
   DocumentRecord,
@@ -161,6 +162,15 @@ function participationKey(document: string, person: string): string {
   return `${document}/${person}`;
 }
 
+/**
+ * `specs/data-model.md` → `people`: the record's own path. A person id is
+ * unique within a site and not across the instance, so the site is part of
+ * every key the read model stores them under.
+ */
+function personKey(site: string, id: string): string {
+  return `${site}/${id}`;
+}
+
 function submissionKey(document: string, id: string): string {
   return `${document}/${id}`;
 }
@@ -272,7 +282,7 @@ export class ReadModel {
   async refreshPeople(): Promise<void> {
     const people = await this.store.people.queryAll();
     this.people.clear();
-    for (const person of people) this.people.set(person.id, person);
+    for (const person of people) this.people.set(personKey(person.site, person.id), person);
   }
 
   async refreshOperators(): Promise<void> {
@@ -355,6 +365,12 @@ export class ReadModel {
     // reload every document the read model knows about instead.
     if (action === "operator-remove") {
       for (const slug of this.documents.keys()) await this.reloadDocument(slug);
+    }
+
+    // `specs/data-model.md` § Migrating the pre-site layout: one commit
+    // rewrites every pre-site record, with no per-record trailer to key off.
+    if (action === "migrate") {
+      await this.refreshPeople();
     }
 
     if (action === "invite") {
@@ -647,8 +663,34 @@ export class ReadModel {
       .flatMap(expandActivity);
   }
 
-  getPerson(id: string): PersonRecord | undefined {
-    return this.people.get(id);
+  /**
+   * `specs/behaviors/sites.md` § People are per site: a person is identified
+   * by their site **and** their id — the same slug may name a different
+   * person on another site — so there is deliberately no lookup by id alone.
+   */
+  getPerson(site: string, id: string): PersonRecord | undefined {
+    return this.people.get(personKey(site, id));
+  }
+
+  /**
+   * The person a participation names, resolved through the **document's**
+   * site rather than the caller's standing ("the scope follows the
+   * document"). Every call site already holds a document slug, so this is
+   * the form they use; an unknown document resolves against the default
+   * site, which is what a document with no `site` field means anyway.
+   */
+  getPersonOn(documentSlug: string, personId: string): PersonRecord | undefined {
+    return this.getPerson(this.siteSlugForDocument(documentSlug), personId);
+  }
+
+  /** The slug of the site a document belongs to; `default` when it names none. */
+  siteSlugForDocument(documentSlug: string): string {
+    return this.documents.get(documentSlug)?.record.site ?? DEFAULT_SITE_SLUG;
+  }
+
+  /** Every person on one site — the only listing scope there is. */
+  listPeopleForSite(site: string): PersonRecord[] {
+    return [...this.people.values()].filter((person) => person.site === site);
   }
 
   /** Case-insensitive — every operator lookup keys off the lowercase email. */

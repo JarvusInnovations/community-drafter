@@ -1,15 +1,31 @@
 # specs/data-model.md → `people`. Never rendered on any participant or
-# public surface (see CLAUDE.md Boundaries).
+# public surface beyond the resolved sign-card prefill (CLAUDE.md
+# Boundaries). One record per person **per site**: `site` is the first path
+# component, so two sites may hold the same email as two independent
+# records and neither can read the other (specs/behaviors/sites.md
+# § People are per site).
+#
+# The template has no fallback on purpose: a `${{ site || "default" }}`
+# component renders as un-renderable when the field is absent, so `site` is
+# required on every record and records written before it existed are
+# rewritten by the boot migration (specs/data-model.md § Migrating the
+# pre-site layout), not merely moved.
 
 [gitsheet]
 root = 'people'
-path = '${{ id }}'
+path = '${{ site }}/${{ id }}'
 
 [gitsheet.schema]
 type = 'object'
-required = ['id', 'name', 'email', 'source']
+required = ['site', 'id', 'name', 'email', 'source']
 additionalProperties = false
 
+# The derived default site's slug is `default`, which no site record may take.
+[gitsheet.schema.properties.site]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+# Unique within the site, not across the instance.
 [gitsheet.schema.properties.id]
 type = 'string'
 pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
@@ -25,6 +41,9 @@ format = 'email'
 [gitsheet.schema.properties.phone]
 type = 'string'
 
+# The site-level defaults for the sign card. What a *particular* document
+# prefills is `prefill` on that document's participation, which overrides
+# these field by field.
 [gitsheet.schema.properties.org]
 type = 'string'
 

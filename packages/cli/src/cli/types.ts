@@ -132,12 +132,26 @@ export interface CompareResult {
 }
 
 export interface ImportResult {
+  /** Whether `--update` was in force — what the row was allowed to overwrite. */
+  update: boolean;
+  /** The site the rows were merged into; an email is unique within it, not across the instance. */
+  site: string;
   people_created: number;
   people_updated: number;
+  people_overwritten: number;
   invitations_created: number;
   skipped_existing: number;
   dry_run?: boolean;
-  rows?: Array<{ email: string; name: string; person: string; action: string; changes: string[] }>;
+  rows?: Array<{
+    email: string;
+    name: string;
+    person: string;
+    action: string;
+    /** What this row would really change in this mode; prefill fields as `prefill.<field>`. */
+    would_change: string[];
+    /** Set person fields the row differs from and would leave alone — what `--update` would act on. */
+    kept: string[];
+  }>;
   commit?: string | null;
 }
 
@@ -168,7 +182,11 @@ export interface PrefsView {
 
 export interface InvitationRow {
   person: string;
+  /** This document's resolved sign-card name — the participation's prefill, else the person's default. */
   name: string;
+  /** This document's resolved sign-card organization, resolved the same way. */
+  org: string;
+  prefill: { name?: string; org?: string; role?: string; descriptor?: string };
   email: string;
   status: string;
   source?: string;

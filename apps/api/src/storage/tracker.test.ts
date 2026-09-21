@@ -33,6 +33,7 @@ describe("OpenTracker", () => {
       { actor: { kind: "system" }, subject: "invite: jane-doe on doc" },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane",
           email: "jane@x.org",
@@ -89,7 +90,13 @@ describe("OpenTracker", () => {
       "invite",
       { actor: { kind: "system" }, subject: "invite: p1 on doc" },
       async (tx) => {
-        await tx.people.upsert({ id: "p1", name: "P1", email: "p1@x.org", source: "admin" });
+        await tx.people.upsert({
+          site: "default",
+          id: "p1",
+          name: "P1",
+          email: "p1@x.org",
+          source: "admin",
+        });
         await tx.participations.upsert({
           document: "doc",
           person: "p1",
@@ -139,6 +146,7 @@ describe("OpenTracker: opens as events", () => {
           ["sam-soe", "doc-b", "c"],
         ] as const) {
           await tx.people.upsert({
+            site: "default",
             id: person,
             name: person,
             email: `${person}@x.org`,

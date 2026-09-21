@@ -22,14 +22,19 @@ const OPTIONAL_KEYS = [
   "reminders",
 ] as const;
 
-function emailFor(fastify: FastifyInstance, person: string): string | undefined {
-  return fastify.storage.readModel.getPerson(person)?.email;
+function emailFor(fastify: FastifyInstance, document: string, person: string): string | undefined {
+  // `specs/behaviors/sites.md` § People are per site: the person is resolved
+  // through the document's site, never by id alone.
+  return fastify.storage.readModel.getPersonOn(document, person)?.email;
 }
 
 const prefsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/prefs", { config: PARTICIPANT_ROUTE }, async (request) => {
-    const { participation } = loadParticipantContext(fastify, request);
-    return buildPrefsView(participation, emailFor(fastify, participation.record.person));
+    const { document, participation } = loadParticipantContext(fastify, request);
+    return buildPrefsView(
+      participation,
+      emailFor(fastify, document.record.slug, participation.record.person),
+    );
   });
 
   fastify.put<{ Body: PrefsPutBody }>("/prefs", { config: PARTICIPANT_ROUTE }, async (request) => {
@@ -70,7 +75,7 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
     );
 
     const updated = fastify.storage.readModel.getParticipation(slug, person);
-    return { ...buildPrefsView(updated!, emailFor(fastify, person)), ignored };
+    return { ...buildPrefsView(updated!, emailFor(fastify, slug, person)), ignored };
   });
 
   fastify.post("/prefs/stop-optional", { config: PARTICIPANT_ROUTE }, async (request) => {
@@ -103,7 +108,7 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
     );
 
     const updated = fastify.storage.readModel.getParticipation(slug, person);
-    return buildPrefsView(updated!, emailFor(fastify, person));
+    return buildPrefsView(updated!, emailFor(fastify, slug, person));
   });
 };
 

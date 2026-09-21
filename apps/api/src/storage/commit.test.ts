@@ -39,6 +39,7 @@ describe("commit()", () => {
       },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",
@@ -131,7 +132,13 @@ describe("commit()", () => {
       "invite",
       { actor: { kind: "system" }, subject: "invite: 1 person on doc" },
       async (tx) => {
-        await tx.people.upsert({ id: "p1", name: "P1", email: "p1@x.org", source: "crm" });
+        await tx.people.upsert({
+          site: "default",
+          id: "p1",
+          name: "P1",
+          email: "p1@x.org",
+          source: "crm",
+        });
       },
     );
     expect(systemResult.trailers.Actor).toBe("system");
