@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  Source for the marketing site's raster icons
+  (`specs/screens/marketing-site.md` § Share preview and icons): the app's
+  own mark on the white card colour, sized by the viewport. Regenerate with:
+
+    chrome-devtools-axi resize 512 512
+    chrome-devtools-axi open file://<repo>/scripts/og-cards/icon.html
+    chrome-devtools-axi screenshot <repo>/site/icon-512.png
+
+  then from `site/`:
+    convert icon-512.png -resize 192x192 icon-192.png
+    convert icon-512.png -resize 180x180 apple-touch-icon.png
+    convert icon-512.png -define icon:auto-resize=48,32,16 favicon.ico
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; background: #ffffff; }
+  body { display: grid; place-items: center; }
+  img { width: 62%; height: 62%; object-fit: contain; }
+</style>
+</head>
+<body><img src="../../site/favicon.svg" alt=""></body>
+</html>
