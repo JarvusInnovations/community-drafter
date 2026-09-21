@@ -1,0 +1,71 @@
+---
+status: done
+depends: []
+issues: [83]
+pr: 93
+specs:
+  - specs/screens/marketing-site.md
+  - specs/screens/public-and-embed.md
+  - specs/screens/version-history.md
+  - specs/behaviors/access-and-identity.md
+---
+
+# Plan: share-previews
+
+## Scope
+
+Chris's decision of 2026-09-20: links to this product get forwarded — pasted into Slack, iMessage, WhatsApp, a board email — and today neither the marketing site nor a public document link carries any social metadata, so every one of those previews is a bare URL or a scrape of the first text the crawler finds. Two surfaces get a share preview:
+
+1. **The marketing site** (`site/`, GitHub Pages): Open Graph and Twitter card meta, a 1200×630 card image generated from the site's own tokens and fonts and served as a static file from `site/`, and a favicon set. No external services and no third-party requests — the spec's existing rule.
+2. **Public document links** (`/d/:slug`, served by `apps/api` from the built `apps/web`): the HTML the server returns carries OG/Twitter meta naming the document, a one-line description, `og:type=article`, a canonical URL, and a generic instance card image. A private or unknown slug, a personal link, and every admin page get the generic instance tags and nothing that confirms a document exists.
+
+Also in: **#83**, the compare view's missing list-item bullet, as a CSS fix (it is the same "a forwarded link should look right" pass, and it is two rules).
+
+Out: per-document rendered card images (a generic instance card is enough — a per-document image means an image renderer in the request path and a cache, and the title is already in the preview text); `oEmbed`; structured data / JSON-LD; anything that changes diff semantics for #83.
+
+## Implements
+
+- `specs/screens/marketing-site.md` § Display Rules gains a *Share preview and icons* rule: the page carries a description, a canonical URL, and Open Graph/Twitter card metadata naming the platform (never a tenant), with a 1200×630 card image and a favicon set served from `site/` itself, so the no-third-party-requests rule holds for the preview too.
+- `specs/screens/public-and-embed.md` gains a § Share preview: what a public document page's HTML declares (title, one-line description from the current version's `summary`, else the first sentence of its body, else a generic line; `og:type=article`; canonical `<instance>/d/<slug>`; a generic instance card image), and the privacy rule for everything else — an unknown slug, `public_access = none`, `state = draft`, any `/i/:token/…` page and any `/admin` page get the generic instance tags only, plus `noindex` on the pages that are nobody's to index.
+- `specs/screens/public-and-embed.md` § Principles, Local: **A share preview never confirms a private document exists.** The most specific spec that owns share previews owns the rule; it is the same reasoning as the one shared `PUBLIC_NOT_FOUND` body, applied to the metadata a scraper reads without a human ever clicking.
+- `specs/screens/version-history.md` § Display Rules "Compare": a list item reads as a list item whatever its status — #83.
+- `specs/behaviors/access-and-identity.md` § Public links: the no-preview rule for personal links, one line pointing at the share-preview spec, beside the no-framing rule it mirrors.
+
+## Approach
+
+1. **Specs first**, in one `docs(specs)` commit.
+2. **Card images and icons.** Write the card as an HTML file rendered at exactly 1200×630 in `chrome-devtools-axi` (`resize 1200 630` → `screenshot`), using `site/style.css`'s tokens and the site's own Inter file. Two cards: the marketing one (`site/og.png`) and a generic instance one (`apps/web/public/og.png`, shipped in the web build). Keep the card sources committed next to what they render so either can be regenerated. Favicon set for the site: the app's mark as `favicon.svg`, plus `favicon.ico`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and `site.webmanifest`.
+3. **`site/index.html` head**: canonical, OG, Twitter, icon links. The existing `<meta name="description">` stays as the description the OG tags mirror.
+4. **API.** A new `apps/api/src/lib/share-preview.ts`: `resolvePreview(fastify, request, path)` → the tag set for that path, `renderPreviewTags()` → the HTML, `injectPreviewTags()` → the tags spliced into the SPA shell's `<head>` with its `<title>` replaced. `routes/static.ts`'s SPA-shell handler reads `index.html` (mtime-cached), injects, and sends HTML instead of `sendFile`. Only a path matching `/d/:slug` resolves a document, and only through the same gate `routes/public/context.ts` uses; everything else takes the generic branch by construction, so there is no path by which a personal link grows a document-specific tag. `og.png` joins `PUBLIC_ROOT_FILES` so the built web app serves it.
+5. **#83.** `.diff-block` gets one uniform left gutter (a transparent 2 px left border plus the padding) that added/removed only recolor, so every block lines up whatever its status; a bare `li` inside a diff block gets the list indent `.doc-body ul/ol` give their items, which is where the outside-positioned marker renders.
+6. **Tests.** `routes/static.test.ts`: a public slug's HTML carries `og:title` with the document title and `og:type=article`; a private slug, an unknown slug, a `/i/:token` page and `/admin` carry the generic tags, no document title, and the same bytes as each other.
+
+## Validation
+
+- [x] `GET /d/<public-slug>` returns HTML whose `og:title` is the document title, whose `og:description` is the current version's summary, whose `og:url` is `<PUBLIC_URL>/d/<slug>`, and whose `og:type` is `article`. Asserted in `routes/static.test.ts` and curled against a throwaway data repo.
+- [x] `GET /d/<private-slug>`, `GET /d/<unknown-slug>`, `GET /i/<token>` and `GET /admin` return the generic instance tags — identical to each other but for the `noindex` the personal-link and admin pages add — with the document's title appearing nowhere. Asserted in `routes/static.test.ts` (the private and unknown heads compared tag by tag) and confirmed by `diff` over the curled heads.
+- [x] The marketing site's card renders at 1200×630 from the site's own tokens and fonts, is served from `site/`, and the page makes no third-party request. Card on PR #93; the page served over HTTP makes 10 requests, all same-origin.
+- [x] A whole added or removed list item in the compare view shows its marker and lines up with its unchanged neighbours (#83). Before/after screenshots on PR #93, taken against a throwaway data repo.
+- [x] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test` (api 202, web 101, shared 33, cli 44 — 0 fail, nothing rerun); `apps/web` `build` clean and `check:bundle-size` 106.04 KB gzip of a 120 KB budget.
+- [x] #83 closed by the PR (`Closes #83` in PR #93's body).
+
+## Risks / unknowns
+
+- **Injecting into `index.html` costs the `sendFile` fast path.** The shell is a few KB and the instance is one container; cache the file by mtime and it is a string splice per request. Watch that the injection still leaves the Vite-built `<script type="module">` untouched.
+- **`PUBLIC_URL` is optional in dev.** Absolute URLs are mandatory in OG, so fall back to the request's own scheme and host. Production always sets `PUBLIC_URL`, which takes precedence, so the fallback never decides a live preview.
+- **A crawler that renders JS** would see the SPA's own title after hydration; every real scraper reads the served HTML, which is what this changes.
+- **Ordered-list items in the compare view** still show a disc, because each block is injected alone outside any `<ol>`. Out of scope here (it needs the block's `ordered` flag threaded through the diff result); the bullet-versus-no-bullet regression #83 names is what this fixes.
+
+## Notes
+
+- **The privacy rule is enforced by shape, not by a check.** `lib/public-document.ts` now holds the one gate every public surface asks — unknown slug, `public_access = none` and `state = draft` all return `null` without distinguishing themselves — and both `routes/public/context.ts` (which throws the shared `PUBLIC_NOT_FOUND`) and the preview resolver go through it. Document-specific tags are then reachable only from a path matching `/d/<slug>`, so a personal-link or admin path cannot grow one even if someone later adds a branch: it has no way to name a document.
+- **The SPA shell is read and spliced rather than `sendFile`d**, cached by mtime inside the plugin closure. The frame headers the route already set are unaffected, and the Vite-built script and stylesheet links survive the rewrite (asserted in the test, whose fixture `index.html` now has a realistic `<head>`).
+- **`PUBLIC_URL` decides every absolute URL; the request's own scheme and host is a development fallback only.** Open Graph has no relative URLs and a dev server has no configured address, so the fallback exists — but production always sets `PUBLIC_URL`, which takes precedence, so a `Host` header never decides a live preview.
+- **The card sources live in `scripts/og-cards/`, not beside what they render** as the Approach said. `site/` is the published GitHub Pages tree, and a card's source HTML published as a stray page there is noise; each source carries the `chrome-devtools-axi` command that regenerates it and where the output goes.
+- **The site's icons are the app's own mark.** Rendering the SVG through Inkscape dropped its blurred overlays (`mask-type` unsupported) and flattened it to one purple; the PNGs are Chrome screenshots of the real thing, downscaled with ImageMagick, so the site's icon and the app's favicon are the same image.
+- **The description falls back to the first sentence of the text, not the first line.** `firstSentence()` skips headings, block quotes, list markers, tables, rules and fenced code before taking a sentence, because a statement almost always opens with its own title as an `h1` and a description repeating the title tells a reader nothing.
+
+## Follow-ups
+
+- **Deferred to a future plan — ordered-list numbering in the compare view.** A whole added or removed `<li>` shows a disc even when its list is ordered, because each block is injected alone outside any `<ol>` and the `ordered` flag the render pipeline already puts on the block never reaches `BlockDiff`. Threading it through is a diff-result change, which this plan's scope excluded; the bullet-versus-no-bullet regression #83 named is fixed.
+- **Issue-worthy but not filed — a per-instance card.** The generic card says "Community Drafter" because the image is static and `INSTANCE_NAME` is config. An instance that wanted its own wording would need either a rendered card or a configurable image path; nobody has asked, and the document's title and summary already carry the specific information in the preview's text.

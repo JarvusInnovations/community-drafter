@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,6 +6,12 @@ import fastifyStatic from "@fastify/static";
 import type { FastifyPluginAsync } from "fastify";
 
 import { PUBLIC_ROUTE } from "../gateway/gateway.ts";
+import {
+  injectPreviewTags,
+  renderPreviewTags,
+  resolveBaseUrl,
+  resolvePreview,
+} from "../lib/share-preview.ts";
 
 /**
  * `specs/architecture.md` § API server: "Serves the built web app
@@ -30,8 +36,12 @@ import { PUBLIC_ROUTE } from "../gateway/gateway.ts";
  */
 const WEB_DIST = new URL("../../../web/dist", import.meta.url);
 
-/** Files Vite copies from `apps/web/public/` to the dist root (not `dist/assets/`). */
-const PUBLIC_ROOT_FILES = ["favicon.svg", "icons.svg"];
+/**
+ * Files Vite copies from `apps/web/public/` to the dist root (not
+ * `dist/assets/`). `og.png` is the generic instance card every share
+ * preview points at (`specs/screens/public-and-embed.md` § Share Preview).
+ */
+const PUBLIC_ROOT_FILES = ["favicon.svg", "icons.svg", "og.png"];
 
 /**
  * Route families whose paths are client-side routes inside the one SPA
@@ -124,12 +134,34 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
     });
   }
 
+  /**
+   * The shell is read rather than streamed because
+   * `specs/screens/public-and-embed.md` § Share Preview needs its head
+   * rewritten per request. It is a few KB and the instance is one container
+   * (`specs/architecture.md`), so it is cached until the file's mtime moves
+   * — which keeps `bun --watch` and a rebuilt `dist` honest in development
+   * without re-reading on every request in production.
+   */
+  let cachedShell: { mtimeMs: number; html: string } | null = null;
+  function readShell(path: string): string {
+    const { mtimeMs } = statSync(path);
+    if (cachedShell?.mtimeMs !== mtimeMs) {
+      cachedShell = { mtimeMs, html: readFileSync(path, "utf8") };
+    }
+    return cachedShell.html;
+  }
+
   for (const prefix of [...SPA_SHELL_PREFIXES, "/"]) {
     fastify.get(prefix, { config: PUBLIC_ROUTE }, (request, reply) => {
       const found = safeFile("index.html");
       if (!found) return notFound(reply);
-      setFrameHeaders(reply, request.url.split("?")[0] ?? request.url);
-      return reply.sendFile(found);
+
+      const path = request.url.split("?")[0] ?? request.url;
+      setFrameHeaders(reply, path);
+
+      const preview = resolvePreview(fastify, resolveBaseUrl(fastify, request), path);
+      const html = injectPreviewTags(readShell(join(rootPath, found)), renderPreviewTags(preview));
+      return reply.type("text/html; charset=utf-8").send(html);
     });
   }
 };

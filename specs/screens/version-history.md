@@ -21,6 +21,7 @@ All versions derived from the document record's body-changing commits (number, d
 - Header: "What changed from version 2 to version 3", the summary of the `to` version, the change summary line ("2 paragraphs changed, 1 table changed"; "No changes" when the two versions render identically), and two selectors to change `from` and `to`. When `from` and `to` are the same version (including a document with a single version), the page says there is nothing to compare yet instead of requesting a diff.
 - Body: the redline per `behaviors/versioning.md`: deletions struck, insertions highlighted; whole added/removed blocks marked in the margin. A deletion and the insertion replacing it are always separated, so a reworded phrase still reads as words. A table reads as a table: cells redlined in place when the table kept its shape, otherwise the old table above the new one, each labelled. A toggle "Hide unchanged paragraphs" defaults on when the document exceeds 30 blocks, off otherwise.
 - A legend explains the two styles in one line. Color is never the only signal (strike-through and underline are used in addition to color, and a stacked before/after table carries word labels).
+- Every block keeps the shape it has in the document, whatever its status: a list item shows its marker and lines up with the list items above and below it, added, removed or unchanged alike. The margin marking for an added or removed block is drawn in a gutter every block reserves, so marking a block never shifts it relative to its neighbours.
 
 ## Actions
 

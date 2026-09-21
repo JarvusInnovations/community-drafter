@@ -31,6 +31,20 @@ Document (title, phase, deadlines, `show_signatories`, `reply_to`), current vers
 
 **Personal links are never frameable** and never referenced from any public surface.
 
+## Share Preview
+
+Every HTML page this instance serves declares Open Graph and Twitter card metadata in its head, because a link to one of these pages is forwarded far more often than it is typed: into a group chat, a mailing list, a board packet. What the metadata may say depends entirely on who the link is for.
+
+**A public document page** (`/d/<slug>` and the routes under it, when the document would render rather than 404) declares:
+
+- title: the document's title, and `og:site_name` the instance name;
+- description: one line — the current version's `summary`; failing that, the first sentence of the current version's text; failing that, a generic line naming the instance;
+- `og:url` and the canonical link: `<instance>/d/<slug>`, whichever of the document's public routes was requested;
+- `og:type`: `article`;
+- image: a generic instance card, the same static image for every document. Nothing about a document is rendered into an image — the title and the one-line description are already in the preview's text, and a per-document image would put an image renderer in the path of an anonymous request.
+
+**Every other page** — an unknown slug, a document with `public_access = none` or `state = draft`, every `/i/<token>/…` personal-link page, every `/admin` page, and the instance root — declares the generic instance tags and nothing else: the instance name as the title, a generic one-line description, the instance's own URL, `og:type=website`, and the same instance card. The tags for a private slug are byte-identical to the tags for a slug that was never created. Personal-link and admin pages additionally declare `noindex`: they are nobody's to index, and the one that carries a credential in its URL must never end up in a crawler's corpus.
+
 ## Actions
 
 Read; history; **[phase 2]** request a personal link.
@@ -41,3 +55,6 @@ Read; history; **[phase 2]** request a personal link.
 - [Say exactly who signed](../principles.md#say-exactly-who-signed): every public number comes from the same query the participant page uses.
 - [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): nothing here links to any other document or to the instance root.
 - [The link is the identity](../principles.md#the-link-is-the-identity): the public view never offers a way to act as someone; **[phase 2]** it offers a way to get your own link.
+
+**Local**
+- **A share preview never confirms a document exists.** A preview is read by machines, before and without any human clicking: paste a URL into a chat and a scraper fetches it, unauthenticated, and shows the result to everyone in the room. So the metadata is held to the same standard as the response body — a private slug, a draft, and a slug that was never created all preview identically, and a personal link previews as the instance and never as the document it opens. Where a richer preview and this rule conflict, the preview loses: the cost of a plain card is a duller paste, and the cost of a leak is a document's title and existence disclosed to a room nobody chose.

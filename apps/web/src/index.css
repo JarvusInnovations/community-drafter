@@ -171,11 +171,34 @@
     text-decoration: underline;
   }
 
+  /*
+   * `specs/screens/version-history.md` § Display Rules "Compare": "the
+   * margin marking for an added or removed block is drawn in a gutter every
+   * block reserves, so marking a block never shifts it relative to its
+   * neighbours." Every block carries the gutter as a transparent left
+   * border plus its padding; a status only recolors it.
+   */
+  .diff-block {
+    @apply border-l-2 border-transparent pl-3;
+  }
   .diff-block[data-status="added"] {
-    @apply border-ok border-l-2 pl-3;
+    @apply border-ok;
   }
   .diff-block[data-status="removed"] {
-    @apply border-destructive border-l-2 pl-3 opacity-70;
+    @apply border-destructive opacity-70;
+  }
+
+  /*
+   * Same spec rule, "a list item shows its marker and lines up with the list
+   * items above and below it": each block is injected into its own
+   * `div.diff-block`, so an `li` lands outside any `<ul>`/`<ol>` with
+   * nothing to indent it and its outside-positioned marker renders left of
+   * the block's content edge, behind the gutter (#83). The same indent
+   * `.doc-body ul`/`ol` give their items puts the marker back inside the
+   * block, at the same offset for every status.
+   */
+  .doc-body .diff-block > li {
+    margin-left: 1.5em;
   }
 
   /*
