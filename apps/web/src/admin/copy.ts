@@ -114,7 +114,8 @@ export const copy = {
       "You're a superadmin on this deployment's own site, so this list shows every document on every site.",
     siteColumn: "Site",
     newDocumentHint: "New documents are created from the CLI (you become its first operator):",
-    newDocumentCommand: 'signatories-axi docs create <slug> --title "…" --sender-name … --reply-to …',
+    newDocumentCommand:
+      'signatories-axi docs create <slug> --title "…" --sender-name … --reply-to …',
   },
 
   dashboard: {
