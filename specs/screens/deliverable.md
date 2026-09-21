@@ -46,7 +46,7 @@ Top to bottom:
 2. **Title block**
    - "To: *the State Board of Education*" whenever `addressed_to` names recipients, several joined with commas and a final "and" (`data-model.md` § Audience). Absent when it names none, on a `public` or a legacy `closed` document alike.
    - The document `title`.
-   - One meta line: "Version *n* · *Sep 20, 2026*", plus " · final text" when the version is marked `final` (`behaviors/versioning.md` § The label). The date is the version's publication date, in the instance time zone, in the form `screens/document.md` § Design gives for a date-only point.
+   - One meta line: "Version *n* · *Sep 20, 2026*", plus " · final text" when the version is marked `final` (`behaviors/versioning.md` § The label). The date is the version's publication date in the instance time zone, written `Sep 20, 2026` — with the year always, unlike a screen's date-only point (`screens/document.md` § Design), because a printed statement outlives the year it was printed in and is read by people who were not in the room.
    - The draft note, when the deliverable is a draft (§ Draft and clean).
 3. **The statement** — the current version's rendered text, the same HTML the document screen shows, with the same heading hierarchy, lists and tables. Anchor links, highlights, comment markers and block ids leave no visible trace. A table wider than the measure shrinks to fit rather than clipping; nothing runs off the page.
 4. **Signatories**, honoring `show_signatories` exactly as every other surface does:
@@ -67,7 +67,7 @@ The deliverable is a printed document, not a screenshot of a web page. It follow
 - **Type**: Inter, self-hosted with the app and embedded in the render, with a system sans-serif fallback; no third-party font request, on paper as on screen. The statement's text sits a step above the interface size with a generous line height, as it does on the document card.
 - **Color**: near-black ink on white, the muted ink for the site line and the meta line, and the accent (the site's own, when it sets one) for the section rules and the organization names. Nothing depends on color to be understood: the watermark is text, the draft note is a sentence, and the signatory sections are labeled headings.
 - **Watermark**: the word DRAFT, set large and diagonally across the page in a pale tint, behind the text and never over it to the point of illegibility.
-- **Page breaks**: a heading never ends a page alone, the signatory list starts on a fresh page when it would otherwise be orphaned to two or three lines, and no signatory's name is split from the line that describes them.
+- **Page breaks**: a heading never ends a page alone; the Signatories heading and its counts line never separate from the first names beneath them; and no signatory's name is split from the line that describes them. Paragraphs keep at least two lines on either side of a break.
 
 ## Actions
 
