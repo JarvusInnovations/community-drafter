@@ -6,7 +6,11 @@
  * match gitsheets' `trailers` transaction option and real git trailer syntax.
  */
 
-/** `Action` trailer values, in the order `specs/data-model.md` lists them. */
+/**
+ * `Action` trailer values. `specs/data-model.md`'s "Commits are the events"
+ * table is the canonical list: this array is the same values in the same
+ * order, and a new action goes into that row first.
+ */
 export const ACTIONS = [
   "create",
   "settings",
@@ -28,11 +32,9 @@ export const ACTIONS = [
   "admin-revoke",
   "link-revoke",
   "link-reissue",
-  // Additive (`api-core`): `specs/api/admin.md` names both a "links export"
-  // action ("recorded as an admin event with the count exported") and a
-  // per-invitation `expire` endpoint, but `specs/data-model.md`'s trailer
-  // table (predating this plan) only lists `link-revoke`/`link-reissue`.
-  // Follow-up: fold these two into that table.
+  // `specs/api/admin.md` § People and invitations: the links export
+  // ("recorded as an admin event with the count exported") and the
+  // per-invitation `expire` endpoint.
   "link-export",
   "link-expire",
   // `specs/api/admin.md` § People and invitations: removing a not-yet-sent invitation.
