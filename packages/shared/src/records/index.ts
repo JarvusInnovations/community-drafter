@@ -8,6 +8,7 @@
 export * from "./documents.ts";
 export * from "./operators.ts";
 export * from "./people.ts";
+export * from "./sites.ts";
 export * from "./participations.ts";
 export * from "./submissions.ts";
 export * from "./trailers.ts";

@@ -57,6 +57,12 @@ export const DocumentRecordSchema = z.object({
   capacities: z.array(CapacitySchema).optional(),
   public_access: PublicAccessSchema.optional(),
   show_signatories: ShowSignatoriesSchema.optional(),
+  // `specs/behaviors/sites.md`: the site this document belongs to. Absent
+  // means the derived default site — which is what every document written
+  // before the field existed reads as, so nothing needs migrating. It is
+  // the hostname every personal link, public link and message for this
+  // document is built on.
+  site: z.string().regex(SLUG_PATTERN).optional(),
   // `specs/data-model.md` § Audience. `audience` is optional here for the
   // same reason it is optional in the sheet's JSON Schema: a record written
   // before the field existed still has to parse, and reads as `closed`.

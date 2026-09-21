@@ -3,6 +3,7 @@ import {
   OperatorRecordSchema,
   ParticipationRecordSchema,
   PersonRecordSchema,
+  SiteRecordSchema,
   SubmissionRecordSchema,
 } from "@community-drafter/shared";
 import type { Store } from "gitsheets";
@@ -17,6 +18,9 @@ export const validators = {
   people: PersonRecordSchema,
   participations: ParticipationRecordSchema,
   submissions: SubmissionRecordSchema,
+  // `specs/behaviors/sites.md`: the sixth sheet. The default site is not a
+  // record here — it is derived from the deployment's configuration.
+  sites: SiteRecordSchema,
 } as const;
 
 export type DataStore = Store<typeof validators>;
@@ -28,6 +32,7 @@ export const SHEET_LOCATIONS = {
   people: { root: "people", ext: "toml" },
   participations: { root: "participations", ext: "toml" },
   submissions: { root: "submissions", ext: "toml" },
+  sites: { root: "sites", ext: "toml" },
 } as const;
 
 export type SheetName = keyof typeof validators;

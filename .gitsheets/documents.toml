@@ -83,6 +83,14 @@ type = 'string'
 enum = ['list', 'count', 'none']
 default = 'list'
 
+# `specs/behaviors/sites.md`: the site this document belongs to. Absent =
+# the derived default site, which is what every document written before the
+# field existed reads as — no migration. It decides the hostname every
+# personal link, public link and message for this document is built on.
+[gitsheet.schema.properties.site]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
 [gitsheet.schema.properties.created_by]
 type = 'string'
 format = 'email'

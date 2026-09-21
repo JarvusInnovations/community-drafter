@@ -46,6 +46,12 @@ export const ACTIONS = [
   "operator-remove",
   "doc-operator-add",
   "doc-operator-remove",
+  // `specs/behaviors/sites.md` § Operators and tenancy: a site's identity
+  // and its operator group are both ordinary admin actions, each one commit.
+  "site-create",
+  "site-update",
+  "site-operator-add",
+  "site-operator-remove",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -120,6 +126,8 @@ export function parseDeadlinesTrailer(value: string): DeadlineChange[] {
 export interface Trailers {
   Action: Action;
   Document?: string;
+  /** `specs/data-model.md`: every commit about a site, and every commit about a document that belongs to one. */
+  Site?: string;
   Person?: string;
   Actor: string;
   Version?: number;
