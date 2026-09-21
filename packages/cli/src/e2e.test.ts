@@ -154,6 +154,81 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     delete process.env.DRAFTER_TOKEN;
   });
 
+  /**
+   * `specs/data-model.md` § Audience + `specs/api/admin-cli.md`: the
+   * audience is stored and orthogonal to `public_access`, and `docs show`
+   * prints the two side by side so an operator can see they differ.
+   */
+  it("docs create --audience closed --addressed-to ... --public read, then docs update", async () => {
+    const harness = await bootServer();
+    cleanups.push(harness.cleanup);
+    withAdminEnv(harness);
+
+    const missing = await run([
+      "docs",
+      "create",
+      "e2e-letter",
+      "--title",
+      "A letter",
+      "--sender-name",
+      "The Board",
+      "--reply-to",
+      "board@example.org",
+    ]);
+    expect(missing.exitCode).toBe(2);
+    expect(missing.output).toContain("--audience");
+
+    const created = await run([
+      "docs",
+      "create",
+      "e2e-letter",
+      "--title",
+      "A letter",
+      "--sender-name",
+      "The Board",
+      "--reply-to",
+      "board@example.org",
+      "--audience",
+      "closed",
+      "--addressed-to",
+      "St. Brigid Parish Council",
+      "--public",
+      "read",
+    ]);
+    expect(created.exitCode).toBe(0);
+    expect(created.output).toContain("audience: closed");
+    expect(created.output).toContain("St. Brigid Parish Council");
+    expect(created.output).toContain("public_access: read");
+
+    const shown = await run(["docs", "show", "e2e-letter"]);
+    expect(shown.exitCode).toBe(0);
+    expect(shown.output).toContain("audience: closed");
+    expect(shown.output).toContain("public_access: read");
+    expect(shown.output).toContain("St. Brigid Parish Council");
+
+    const updated = await run(["docs", "update", "e2e-letter", "--audience", "public"]);
+    expect(updated.exitCode).toBe(0);
+    expect(updated.output).toContain("audience: public");
+    // `--public` was never passed here, so the drafting-time setting stands.
+    expect(updated.output).toContain("public_access: read");
+
+    const unaddressed = await run([
+      "docs",
+      "create",
+      "e2e-unaddressed",
+      "--title",
+      "Unaddressed",
+      "--sender-name",
+      "The Board",
+      "--reply-to",
+      "board@example.org",
+      "--audience",
+      "closed",
+    ]);
+    expect(unaddressed.exitCode).toBe(2);
+    expect(unaddressed.output).toContain("addressed");
+  }, 30_000);
+
   it("docs create -> versions publish -> docs open -> people import -> people links round-trips against a real API", async () => {
     const harness = await bootServer();
     cleanups.push(harness.cleanup);
@@ -172,6 +247,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "The Board",
       "--reply-to",
       "board@example.org",
+      "--audience",
+      "public",
     ]);
     expect(create.exitCode).toBe(0);
     expect(create.output).toContain(slug);
@@ -289,6 +366,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "The Board",
       "--reply-to",
       "board@example.org",
+      "--audience",
+      "public",
     ]);
 
     const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
@@ -370,6 +449,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "The Board",
       "--reply-to",
       "board@example.org",
+      "--audience",
+      "public",
     ]);
 
     const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
@@ -542,6 +623,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "The Board",
       "--reply-to",
       "board@example.org",
+      "--audience",
+      "public",
     ]);
 
     const docAdd = await run(["docs", "operators", "add", slug, "new-op@example.org"]);

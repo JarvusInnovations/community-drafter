@@ -55,14 +55,19 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       {
         usage:
-          'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--audience public|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+          'docs create <slug> --title "<text>" --audience public|closed --sender-name "<text>" --reply-to <email> [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
         summary:
-          "Create a document in draft; the caller becomes its first operator. --audience declares who the document is for (default closed — invitees only); --list-visible-to names organizations a closed document's signatory list is shared with, which every signer is told before signing.",
+          "Create a document in draft; the caller becomes its first operator. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft.",
       },
       {
         usage: "docs show <slug>",
         summary:
-          "Dashboard numbers, versions, and schedule; prints public_url when the document is publicly readable.",
+          "Dashboard numbers, versions, and schedule; prints the audience, who the statement is addressed to, and public_url when the document is publicly readable.",
+      },
+      {
+        usage: 'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]...',
+        summary:
+          "Change the audience and who the statement is addressed to, and nothing else. --addressed-to replaces the recipients.",
       },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",

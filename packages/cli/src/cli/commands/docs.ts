@@ -1,6 +1,7 @@
 import {
   bool,
   csv,
+  list,
   parseSubcommand,
   requirePositional,
   requireStr,
@@ -16,6 +17,8 @@ import type {
   OpenResult,
   OperatorRecord,
 } from "../types.js";
+import { AxiError } from "axi-sdk-js";
+
 import { parseDeadline } from "../deadline.js";
 import { clientFrom, render } from "./common.js";
 
@@ -28,14 +31,23 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
       "--reply-to",
       "--capacities",
       "--audience",
-      "--list-visible-to",
       "--public",
       "--show-signatories",
       "--revocation-window-hours",
       "--tags",
     ],
+    multi: ["--addressed-to"],
+    deprecated: {
+      "--list-visible-to":
+        "--list-visible-to is now --addressed-to: who the statement goes to, repeatable once per recipient",
+    },
   },
   show: { positionals: 1 },
+  update: {
+    positionals: 1,
+    value: ["--audience"],
+    multi: ["--addressed-to"],
+  },
   open: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   extend: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   close: { positionals: 1 },
@@ -44,22 +56,30 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   operators: { positionals: 3 },
 };
 
-export const DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
+export const DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
-create <slug> --title <text> --sender-name <text> --reply-to <email>
-       [--capacities personal,official] [--audience public|closed]
-       [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none]
+create <slug> --title <text> --audience public|closed
+       --sender-name <text> --reply-to <email>
+       [--addressed-to "<name>"]... [--capacities personal,official]
+       [--show-signatories list|count|none]
        [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
 
---audience declares who the document is for, and defaults to closed:
-  closed  only the people you invite, each through their own personal link
-  public  anyone with the link can read it (sets public_access to read)
---list-visible-to names the organizations a closed document's signatory list is
-shared with besides its invitees. It is a disclosure, not a permission: every
-signer is shown those names before they sign. It has no meaning on a public
-document.
+--audience is required and says who the FINISHED statement is for:
+  public  it will be published for anyone to read
+  closed  it is delivered to the people and bodies it is addressed to
+--addressed-to names one of those recipients; repeat it once per recipient. It
+is required with --audience closed, and allowed with --audience public. It is a
+disclosure, not a permission: every signer is shown those names before they
+sign.
+
+--audience is not --public. --public sets public_access, which is whether
+anyone with the link may read the WORKING draft; the two are independent, so a
+letter to a named body can be drafted in the open and a public statement can be
+drafted invitee-only.
 show <slug>
+update <slug> [--audience public|closed] [--addressed-to "<name>"]...
+       (settings only; --addressed-to replaces the recipients)
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
@@ -103,13 +123,13 @@ function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string,
     comments_close_at: doc.comments_close_at,
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
+    // `specs/api/admin-cli.md` § Output rules: the audience and who the
+    // statement is addressed to, as stored, beside `public_access` — who
+    // the statement goes to and who may read the draft are two different
+    // answers, and an operator should see both at once.
     public_access: doc.public_access,
-    // `specs/api/admin-cli.md` § Output rules: every document view prints
-    // the audience, derived from `public_access` rather than stored beside
-    // it, so the CLI and the dashboard cannot disagree.
     audience: doc.audience,
-    list_visible_to:
-      doc.audience === "closed" && doc.list_visible_to?.length ? doc.list_visible_to : undefined,
+    addressed_to: doc.addressed_to?.length ? doc.addressed_to : undefined,
     public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
@@ -136,7 +156,6 @@ export async function docsCommand(args: string[]): Promise<string> {
         'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>',
       );
       const capacities = csv(str(parsed, "--capacities"));
-      const listVisibleTo = csv(str(parsed, "--list-visible-to"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
@@ -152,11 +171,15 @@ export async function docsCommand(args: string[]): Promise<string> {
           "drafter-axi docs create <slug> --reply-to <email> ...",
         ),
         capacities: capacities.length > 0 ? capacities : undefined,
-        // `specs/data-model.md` § Audience: `--audience` is the spelling an
-        // operator uses; it writes `public_access`, which is where the
-        // audience lives. `--public` stays for the phase-2 `participate`.
-        audience: str(parsed, "--audience") ?? (str(parsed, "--public") ? undefined : "closed"),
-        list_visible_to: listVisibleTo.length > 0 ? listVisibleTo : undefined,
+        // `specs/data-model.md` § Audience: `--audience` is required and is
+        // stored as given. `--public` is the separate drafting-time read
+        // setting and is never written from it.
+        audience: requireStr(
+          parsed,
+          "--audience",
+          "drafter-axi docs create <slug> --audience public|closed ...",
+        ),
+        addressed_to: list(parsed, "--addressed-to"),
         public_access: str(parsed, "--public"),
         show_signatories: str(parsed, "--show-signatories"),
         revocation_window_hours: str(parsed, "--revocation-window-hours")
@@ -197,6 +220,30 @@ export async function docsCommand(args: string[]): Promise<string> {
           ]),
         ),
       );
+    }
+
+    case "update": {
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        'drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]',
+      );
+      // `specs/api/admin-cli.md`: settings only, over `PATCH /documents/:slug`.
+      // Sending only what was given keeps an omitted flag from clearing a
+      // field the operator never mentioned.
+      const audience = str(parsed, "--audience");
+      const addressedTo = list(parsed, "--addressed-to");
+      if (audience === undefined && addressedTo === undefined) {
+        throw new AxiError("nothing to update", "USAGE", [
+          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."]`',
+        ]);
+      }
+      const doc = await client.patch<DocumentSummary>(
+        `/documents/${encodeURIComponent(slug)}`,
+        compact({ audience, addressed_to: addressedTo }),
+      );
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
 
     case "open": {

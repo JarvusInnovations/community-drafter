@@ -10,6 +10,14 @@ export interface FlagSpec {
   positionals?: number;
   /** Flags that take a value, e.g. `--summary "..."`. */
   value?: string[];
+  /**
+   * Value flags that may be repeated, accumulating into a list —
+   * `--addressed-to "A" --addressed-to "B"`. Repeatable rather than
+   * comma-separated because the values are proper names ("Board of
+   * Education, District 5") and a comma in one of them would silently
+   * split it in two.
+   */
+  multi?: string[];
   /** Flags that are standalone switches, e.g. `--final`. */
   boolean?: string[];
   /** Renamed or removed flags mapped to a targeted hint. */
@@ -19,6 +27,8 @@ export interface FlagSpec {
 export interface Parsed {
   positional: string[];
   flags: Record<string, string | true>;
+  /** Values of repeatable flags, in the order they were given. */
+  lists: Record<string, string[]>;
 }
 
 /** `--help` is universal and never reported as unknown (AXI §6). */
@@ -48,13 +58,19 @@ function isValueLike(arg: string | undefined): boolean {
  * fail with exit code 2 and list the valid flags inline.
  */
 export function parseFlags(command: string, argv: string[], spec: FlagSpec): Parsed {
-  const valueFlags = new Set(spec.value ?? []);
+  const multiFlags = new Set(spec.multi ?? []);
+  const valueFlags = new Set([...(spec.value ?? []), ...multiFlags]);
   const boolFlags = new Set(spec.boolean ?? []);
   const deprecated = spec.deprecated ?? {};
   const known = [...valueFlags, ...boolFlags].sort();
 
   const positional: string[] = [];
   const flags: Record<string, string | true> = {};
+  const lists: Record<string, string[]> = {};
+  const take = (name: string, value: string): void => {
+    if (multiFlags.has(name)) (lists[name] ??= []).push(value);
+    else flags[name] = value;
+  };
 
   const unknown = (name: string): never => {
     const hint = deprecated[name];
@@ -100,7 +116,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
 
     if (valueFlags.has(name) || GLOBAL_VALUE_FLAGS.has(name)) {
       if (inlineValue !== undefined) {
-        flags[name] = inlineValue;
+        take(name, inlineValue);
         continue;
       }
       const next = argv[i + 1];
@@ -109,7 +125,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
           `Run \`drafter-axi ${command} ${name} <value>\``,
         ]);
       }
-      flags[name] = next!;
+      take(name, next!);
       i++;
       continue;
     }
@@ -128,7 +144,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
     );
   }
 
-  return { positional, flags };
+  return { positional, flags, lists };
 }
 
 /** Read a value flag as a string, or fall back to a default. */
@@ -142,6 +158,17 @@ export function str(parsed: Parsed, name: string, fallback?: string): string | u
 /** True when a boolean (or present value) flag was supplied. */
 export function bool(parsed: Parsed, name: string): boolean {
   return parsed.flags[name] !== undefined;
+}
+
+/**
+ * Every value given for a repeatable flag, trimmed and non-empty.
+ * `undefined` when the flag was not given at all, which a caller needs to
+ * distinguish from an explicit empty list.
+ */
+export function list(parsed: Parsed, name: string): string[] | undefined {
+  const raw = parsed.lists[name];
+  if (raw === undefined) return undefined;
+  return raw.map((v) => v.trim()).filter((v) => v.length > 0);
 }
 
 /** Split a comma-separated flag value into a trimmed, non-empty list. */
