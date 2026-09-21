@@ -100,7 +100,12 @@ export function SitesScreen(): JSX.Element {
                   <td className="px-4 py-3">
                     <div className="text-foreground">{site.from_line}</div>
                     <div className="mt-1">
-                      {site.sender_email ? (
+                      {/*
+                       * The default site's sender *is* the platform's own
+                       * verified address, so it is never reported as
+                       * something a customer still has to verify.
+                       */}
+                      {site.sender_email && !site.default ? (
                         <Pill tone={site.sender_verified === true ? "ok" : "amber"}>
                           {site.sender_verified === true
                             ? copy.sites.senderVerified
