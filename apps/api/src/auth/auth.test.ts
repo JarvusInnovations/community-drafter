@@ -81,6 +81,11 @@ describe("POST /auth/login", () => {
     });
     expect(deactivate.statusCode).toBe(200);
 
+    // Creating the operator mailed them `operator-added`
+    // (`specs/behaviors/notifications.md` § Messages); what this test is
+    // about is whether the *sign-in* path mails a deactivated account.
+    mailer.sent.length = 0;
+
     const login = await server.inject({
       method: "POST",
       url: "/auth/login",
