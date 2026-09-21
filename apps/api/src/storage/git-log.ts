@@ -10,6 +10,10 @@
 // commit.
 const RECORD_SEP = "\x1e";
 const FIELD_SEP = "\x1f";
+// Closes the formatted fields so the `--name-only` path block — which git
+// appends after the format, outside any placeholder — is unambiguous even
+// when the trailer block itself contains a FIELD_SEP.
+const PATHS_SEP = "\x1d";
 
 export interface CommitLogEntry {
   hash: string;
@@ -18,6 +22,14 @@ export interface CommitLogEntry {
   authorEmail: string;
   subject: string;
   trailers: Record<string, string>;
+  /**
+   * Repo-relative paths this commit changed (for a merge, against its first
+   * parent). `specs/behaviors/versioning.md`: the version history is derived
+   * from every commit that changed the record's body, including one carrying
+   * none of this service's trailers — and the path it touched is the only
+   * thing such a commit can be recognized by.
+   */
+  paths: string[];
 }
 
 async function runGit(
@@ -61,6 +73,9 @@ function parseTrailerBlock(block: string): Record<string, string> {
  * post-commit operation, never called from a request handler. One `git log`
  * spawn covers the whole history — `%(trailers)` renders the parsed trailer
  * block inline, so there is no per-commit `git interpret-trailers` spawn.
+ * `--name-only` rides the same spawn to carry each commit's changed paths
+ * (`--first-parent` sets `--diff-merges=first-parent`, so a merge lists its
+ * first-parent diff rather than nothing).
  */
 export async function logWithTrailers(
   dataDir: string,
@@ -69,7 +84,8 @@ export async function logWithTrailers(
   const args = [
     "log",
     "--first-parent",
-    `--format=${RECORD_SEP}%H${FIELD_SEP}%cI${FIELD_SEP}%an${FIELD_SEP}%ae${FIELD_SEP}%s${FIELD_SEP}%(trailers)`,
+    "--name-only",
+    `--format=${RECORD_SEP}%H${FIELD_SEP}%cI${FIELD_SEP}%an${FIELD_SEP}%ae${FIELD_SEP}%s${FIELD_SEP}%(trailers)${PATHS_SEP}`,
   ];
   if (pathspec) args.push("--", pathspec);
 
@@ -84,7 +100,20 @@ export async function logWithTrailers(
   const entries: CommitLogEntry[] = [];
 
   for (const record of records) {
-    const fields = record.split(FIELD_SEP);
+    // Everything past the last PATHS_SEP is `--name-only`'s path block; the
+    // separator closes the format, and a path cannot contain a control byte.
+    const pathsAt = record.lastIndexOf(PATHS_SEP);
+    const formatted = pathsAt === -1 ? record : record.slice(0, pathsAt);
+    const paths =
+      pathsAt === -1
+        ? []
+        : record
+            .slice(pathsAt + 1)
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+    const fields = formatted.split(FIELD_SEP);
     const hash = fields[0] ?? "";
     const committerDate = fields[1] ?? "";
     const authorName = fields[2] ?? "";
@@ -95,7 +124,7 @@ export async function logWithTrailers(
     const trailerBlock = fields.slice(5).join(FIELD_SEP);
     const trailers = parseTrailerBlock(trailerBlock);
 
-    entries.push({ hash, committerDate, authorName, authorEmail, subject, trailers });
+    entries.push({ hash, committerDate, authorName, authorEmail, subject, trailers, paths });
   }
 
   // git log yields newest-first; version numbering is oldest = 1.

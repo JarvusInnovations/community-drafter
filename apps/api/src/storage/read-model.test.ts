@@ -187,6 +187,74 @@ describe("ReadModel — version derivation", () => {
     // Newest first: sign, then create.
     expect(activityActions).toEqual(["sign", "create"]);
   });
+
+  it("counts a body change made outside the service, with no trailers at all, as a version", async () => {
+    // specs/behaviors/versioning.md § Any body change is a version: a
+    // teammate editing the record with `gitsheets-axi` or by hand writes a
+    // commit carrying none of this service's trailers. It is still a
+    // version, read back from its subject and its git author; a trailerless
+    // settings-only commit still is not.
+    const { dataDir, cleanup } = await createTestDataRepo();
+    cleanups.push(cleanup);
+    const { store } = await openDataRepo({ dataDir });
+    const teammate = { name: "Alex Teammate", email: "alex@example.org" };
+
+    await commit(
+      store,
+      "create",
+      {
+        actor: { kind: "operator" as const, email: "team@example.org" },
+        subject: "create: doc-hand",
+        document: "doc-hand",
+        version: 1,
+        summary: "Initial draft",
+      },
+      async (tx) => {
+        await tx.documents.upsert({
+          slug: "doc-hand",
+          title: "Doc Hand",
+          state: "draft",
+          body: "v1 text",
+          created_by: "team@example.org",
+          operators: ["team@example.org"],
+        });
+      },
+    );
+
+    // Straight through the store, the way an outside editor writes: a
+    // message, an identity, no trailers.
+    await store.transact(
+      { message: "Fix the typo in term 2", author: teammate, committer: teammate },
+      async (tx) => {
+        await tx.documents.patch({ slug: "doc-hand" }, { body: "v2 text, typo fixed" });
+      },
+    );
+
+    await store.transact(
+      { message: "Tag it governance", author: teammate, committer: teammate },
+      async (tx) => {
+        await tx.documents.patch({ slug: "doc-hand" }, { tags: ["governance"] });
+      },
+    );
+
+    const readModel = new ReadModel(store, dataDir);
+    await readModel.build();
+    const doc = readModel.getDocument("doc-hand");
+
+    expect(doc?.versions.map((v) => v.summary)).toEqual([
+      "Initial draft",
+      "Fix the typo in term 2",
+    ]);
+    expect(doc?.versions[1]?.body).toBe("v2 text, typo fixed");
+    expect(doc?.versions[1]?.published_by).toBe("Alex Teammate");
+    // Both outside commits are events on the record even though only one is
+    // a version (specs/screens/admin-dashboard.md § Recent activity).
+    expect(doc?.activity.map((entry) => entry.subject)).toEqual([
+      "Tag it governance",
+      "Fix the typo in term 2",
+      "create: doc-hand",
+    ]);
+  });
 });
 
 describe("ReadModel — participations, positions, token index", () => {
