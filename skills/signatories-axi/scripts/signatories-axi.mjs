@@ -419,11 +419,11 @@ function resolveOptions(options) {
 }
 
 // ../../node_modules/.bun/axi-sdk-js@0.1.7/node_modules/axi-sdk-js/dist/output.js
-function collapseHomeDirectory(path, homeDir = homedir()) {
-  if (!path.startsWith(homeDir)) {
+function collapseHomeDirectory(path, homeDir2 = homedir()) {
+  if (!path.startsWith(homeDir2)) {
     return path;
   }
-  return `~${path.slice(homeDir.length)}`;
+  return `~${path.slice(homeDir2.length)}`;
 }
 function homeHeaderOutput(options) {
   return {
@@ -629,11 +629,21 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { homedir as homedir2 } from "node:os";
 import { join } from "node:path";
 var STRING_KEYS = ["url", "email", "token", "expires_at"];
+function homeDir() {
+  return process.env.HOME || homedir2();
+}
 function configDir() {
-  return join(process.env.HOME || homedir2(), ".config", "drafter");
+  return join(homeDir(), ".config", "signatories");
+}
+function legacyConfigDir() {
+  return join(homeDir(), ".config", "drafter");
 }
 function profilePath(profile) {
   return join(configDir(), `${profile}.toml`);
+}
+var legacyNoticeSaid = false;
+function envValue(name) {
+  return process.env[`SIGNATORIES_${name}`] ?? process.env[`DRAFTER_${name}`];
 }
 function parseFlatToml(text) {
   const result = {};
@@ -654,10 +664,24 @@ function parseFlatToml(text) {
   return result;
 }
 function readProfile(profile) {
-  const path = profilePath(profile);
-  if (!existsSync(path)) return {};
+  let path = profilePath(profile);
+  let fromLegacy = false;
+  if (!existsSync(path)) {
+    const legacy = join(legacyConfigDir(), `${profile}.toml`);
+    if (!existsSync(legacy)) return {};
+    path = legacy;
+    fromLegacy = true;
+  }
   try {
-    return parseFlatToml(readFileSync(path, "utf8"));
+    const parsed = parseFlatToml(readFileSync(path, "utf8"));
+    if (fromLegacy && !legacyNoticeSaid) {
+      legacyNoticeSaid = true;
+      process.stderr.write(
+        `note: read the profile from ${path}; the next \`login\` writes to ${configDir()}
+`
+      );
+    }
+    return parsed;
   } catch {
     return {};
   }
@@ -683,19 +707,19 @@ function clearProfileToken(profile) {
   writeProfile(profile, { url: existing.url, email: existing.email });
   return true;
 }
-var LOGIN_HINT = "Run `drafter-axi login <email> --url <instance>` to sign in";
+var LOGIN_HINT = "Run `signatories-axi login <email> --url <instance>` to sign in";
 function resolveProfileName(flagValue) {
-  const fromEnv = process.env.DRAFTER_PROFILE?.trim();
+  const fromEnv = envValue("PROFILE")?.trim();
   return flagValue ?? (fromEnv && fromEnv.length > 0 ? fromEnv : "default");
 }
 function resolveConfig(options = {}) {
   const profile = resolveProfileName(options.profile);
   const stored = readProfile(profile);
-  const url = process.env.DRAFTER_URL ?? stored.url;
+  const url = envValue("URL") ?? stored.url;
   if (!url) {
     throw new AxiError("Not signed in: no instance URL is configured", "USAGE", [LOGIN_HINT]);
   }
-  const envToken = process.env.DRAFTER_TOKEN;
+  const envToken = envValue("TOKEN");
   const token = envToken ?? stored.token;
   if (!token) {
     throw new AxiError("Not signed in: no token is configured", "USAGE", [LOGIN_HINT]);
@@ -708,16 +732,16 @@ function resolveConfig(options = {}) {
   };
 }
 function resolveLoginUrl(flagUrl) {
-  const url = flagUrl ?? process.env.DRAFTER_URL;
+  const url = flagUrl ?? envValue("URL");
   if (!url) {
     throw new AxiError("An instance URL is required", "USAGE", [
-      "Pass --url <instance>, or set DRAFTER_URL in the environment"
+      "Pass --url <instance>, or set SIGNATORIES_URL in the environment"
     ]);
   }
   return url.replace(/\/+$/, "");
 }
 function isConfigured(options = {}) {
-  if (process.env.DRAFTER_URL && process.env.DRAFTER_TOKEN) return true;
+  if (envValue("URL") && envValue("TOKEN")) return true;
   const stored = readProfile(resolveProfileName(options.profile));
   return Boolean(stored.url && stored.token);
 }
@@ -732,19 +756,21 @@ var ApiCallError = class extends AxiError {
 };
 var NetworkError = class extends AxiError {
   constructor(message) {
-    super(message, "NETWORK_ERROR", ["Check DRAFTER_URL and that the API is reachable"]);
+    super(message, "NETWORK_ERROR", ["Check SIGNATORIES_URL and that the API is reachable"]);
   }
 };
 var SignInExpiredError = class extends AxiError {
   constructor() {
     super("Sign-in expired or revoked; run login again.", "SIGN_IN_EXPIRED", [
-      "Run `drafter-axi login <email> --url <instance>` to sign in again"
+      "Run `signatories-axi login <email> --url <instance>` to sign in again"
     ]);
   }
 };
 var DeviceExpiredError = class extends AxiError {
   constructor(message) {
-    super(message, "DEVICE_EXPIRED", ["Run `drafter-axi login <email> [--url <instance>]` again"]);
+    super(message, "DEVICE_EXPIRED", [
+      "Run `signatories-axi login <email> [--url <instance>]` again"
+    ]);
   }
 };
 var EXIT_CODE_BY_CODE = {
@@ -836,14 +862,14 @@ async function pollDeviceToken(instanceUrl, deviceCode, serverIntervalSeconds, o
     if (response.status === 409 && body.error === "device_pending") {
       if (Date.now() >= deadline) {
         throw new DeviceExpiredError(
-          "Timed out waiting for the device to be approved (15 minutes). Run `drafter-axi login` again."
+          "Timed out waiting for the device to be approved (15 minutes). Run `signatories-axi login` again."
         );
       }
       await sleep(intervalMs);
       continue;
     }
     throw new DeviceExpiredError(
-      body.message ?? "The device code is unknown or has expired. Run `drafter-axi login` again."
+      body.message ?? "The device code is unknown or has expired. Run `signatories-axi login` again."
     );
   }
 }
@@ -897,7 +923,7 @@ function parseFlags(command, argv, spec) {
     if (boolFlags.has(name) || GLOBAL_BOOLEAN_FLAGS.has(name)) {
       if (inlineValue !== void 0) {
         throw new AxiError(`${name} is a switch and takes no value`, "USAGE", [
-          `Run \`drafter-axi ${command} ${name}\` without a value`
+          `Run \`signatories-axi ${command} ${name}\` without a value`
         ]);
       }
       flags[name] = true;
@@ -911,7 +937,7 @@ function parseFlags(command, argv, spec) {
       const next = argv[i + 1];
       if (!isValueLike(next)) {
         throw new AxiError(`${name} requires a value`, "USAGE", [
-          `Run \`drafter-axi ${command} ${name} <value>\``
+          `Run \`signatories-axi ${command} ${name} <value>\``
         ]);
       }
       take(name, next);
@@ -925,7 +951,7 @@ function parseFlags(command, argv, spec) {
     throw new AxiError(
       allowed === 0 ? `\`${command}\` takes no positional arguments, but got "${positional[0]}"` : `\`${command}\` takes at most ${allowed} positional argument${allowed === 1 ? "" : "s"}, but got ${positional.length}`,
       "USAGE",
-      [`Run \`drafter-axi ${command} --help\` for the expected form`]
+      [`Run \`signatories-axi ${command} --help\` for the expected form`]
     );
   }
   return { positional, flags, lists };
@@ -1021,7 +1047,7 @@ function decodeJwtIatSeconds(token) {
 // src/cli/client.ts
 var REFRESH_AFTER_DAYS = 30;
 var REAUTH_CODES = /* @__PURE__ */ new Set(["unauthenticated", "operator_inactive"]);
-var DrafterClient = class {
+var SignatoriesClient = class {
   config;
   refreshChecked = false;
   constructor(config) {
@@ -1031,9 +1057,9 @@ var DrafterClient = class {
    * `specs/behaviors/operators.md` § CLI sign-in: "The CLI refreshes it
    * silently when it is older than 30 days by calling `POST /auth/refresh`
    * with the current token; a refresh is refused for an inactive
-   * operator." Runs at most once per `DrafterClient` instance (i.e. once
+   * operator." Runs at most once per `SignatoriesClient` instance (i.e. once
    * per CLI invocation), and only for a token that came from the profile
-   * file — a `DRAFTER_TOKEN` override is never rewritten anywhere.
+   * file — a `SIGNATORIES_TOKEN` override is never rewritten anywhere.
    */
   async ensureFreshToken() {
     if (this.refreshChecked) return;
@@ -1130,7 +1156,7 @@ var DrafterClient = class {
 
 // src/cli/commands/common.ts
 function clientFrom(parsed) {
-  return new DrafterClient(resolveConfig({ profile: str(parsed, "--profile") }));
+  return new SignatoriesClient(resolveConfig({ profile: str(parsed, "--profile") }));
 }
 function wantsJson(parsed) {
   return bool(parsed, "--json");
@@ -1158,19 +1184,19 @@ function readStdin() {
 var LOGIN_FLAGS = { positionals: 1, value: ["--url"] };
 var LOGOUT_FLAGS = { positionals: 0 };
 var WHOAMI_FLAGS = { positionals: 0 };
-var LOGIN_HELP = `usage: drafter-axi login <email> [--url <instance>]
+var LOGIN_HELP = `usage: signatories-axi login <email> [--url <instance>]
 
-Device-code sign-in. Resolves the instance from --url, else DRAFTER_URL, else
+Device-code sign-in. Resolves the instance from --url, else SIGNATORIES_URL, else
 fails with exit 2. Sends the operator a magic-link email whose return path
 approves this device, prints the user code to watch for, then polls until
 approved (or the code expires \u2014 15 minutes). On success, writes the instance
 url, the operator's email and a 90-day token to
-~/.config/drafter/<profile>.toml (mode 600); every later command reads from
-there unless DRAFTER_URL/DRAFTER_TOKEN are set.`;
-var LOGOUT_HELP = `usage: drafter-axi logout
+~/.config/signatories/<profile>.toml (mode 600); every later command reads from
+there unless SIGNATORIES_URL/SIGNATORIES_TOKEN are set.`;
+var LOGOUT_HELP = `usage: signatories-axi logout
 
 Forgets the stored sign-in token for this profile (url/email are kept).`;
-var WHOAMI_HELP = `usage: drafter-axi whoami
+var WHOAMI_HELP = `usage: signatories-axi whoami
 
 Shows the signed-in operator (email, kind) and the token's expiry.`;
 async function loginCommand(args) {
@@ -1179,7 +1205,7 @@ async function loginCommand(args) {
     parsed,
     0,
     "email",
-    "drafter-axi login <email> [--url <instance>]"
+    "signatories-axi login <email> [--url <instance>]"
   ).trim().toLowerCase();
   const profile = resolveProfileName(str(parsed, "--profile"));
   const url = resolveLoginUrl(str(parsed, "--url"));
@@ -1202,8 +1228,8 @@ Check your email for the sign-in link, then approve this device.
     () => joinBlocks(
       renderObject({ signed_in_as: token.email, url, expires_at: token.expires_at }),
       renderHelp([
-        "Run `drafter-axi whoami` to confirm",
-        "Run `drafter-axi` to see your documents"
+        "Run `signatories-axi whoami` to confirm",
+        "Run `signatories-axi` to see your documents"
       ])
     )
   );
@@ -1302,7 +1328,7 @@ var DOCS_FLAGS = {
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
   operators: { positionals: 3 }
 };
-var DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
+var DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --audience public|closed
        [--site <slug>] [--sender-name <text>] [--reply-to <email>]
@@ -1394,7 +1420,7 @@ function detailObject(doc, instanceUrl) {
 async function docsCommand(args) {
   const { sub, parsed } = parseSubcommand("docs", args, DOCS_FLAGS);
   const client = clientFrom(parsed);
-  const cli = "drafter-axi";
+  const cli = "signatories-axi";
   const instanceUrl = resolveConfig({ profile: str(parsed, "--profile") }).url;
   switch (sub) {
     case "create": {
@@ -1402,13 +1428,17 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>'
+        'signatories-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>'
       );
       const capacities = csv(str(parsed, "--capacities"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
-        title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
+        title: requireStr(
+          parsed,
+          "--title",
+          'signatories-axi docs create <slug> --title "..." ...'
+        ),
         // `specs/behaviors/sites.md`: the document is created on the site
         // this profile is signed in to unless it names another the caller
         // operates; the site supplies the sender the document omits.
@@ -1422,7 +1452,7 @@ async function docsCommand(args) {
         audience: requireStr(
           parsed,
           "--audience",
-          "drafter-axi docs create <slug> --audience public|closed ..."
+          "signatories-axi docs create <slug> --audience public|closed ..."
         ),
         addressed_to: list(parsed, "--addressed-to"),
         public_access: str(parsed, "--public"),
@@ -1443,7 +1473,7 @@ async function docsCommand(args) {
       );
     }
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs show <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs show <slug>");
       const doc = await client.get(`/documents/${encodeURIComponent(slug)}`);
       return render(
         parsed,
@@ -1468,14 +1498,14 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]'
+        'signatories-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]'
       );
       const audience = str(parsed, "--audience");
       const addressedTo = list(parsed, "--addressed-to");
       const site = str(parsed, "--site");
       if (audience === void 0 && addressedTo === void 0 && site === void 0) {
         throw new AxiError("nothing to update", "USAGE", [
-          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`'
+          'Run `signatories-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`'
         ]);
       }
       const doc = await client.patch(
@@ -1498,9 +1528,9 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>"
+        "signatories-axi docs open <slug> --comments-close <when> --signing-closes <when>"
       );
-      const openUsage = "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>";
+      const openUsage = "signatories-axi docs open <slug> --comments-close <when> --signing-closes <when>";
       const comments = parseDeadline(
         requireStr(parsed, "--comments-close", openUsage),
         "--comments-close",
@@ -1543,9 +1573,9 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]"
+        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]"
       );
-      const extendUsage = "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
+      const extendUsage = "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
       const rawComments = str(parsed, "--comments-close");
       const rawSigning = str(parsed, "--signing-closes");
       const comments = rawComments ? parseDeadline(rawComments, "--comments-close", extendUsage) : void 0;
@@ -1568,7 +1598,7 @@ async function docsCommand(args) {
       );
     }
     case "close": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs close <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs close <slug>");
       const doc = await client.post(
         `/documents/${encodeURIComponent(slug)}/close`
       );
@@ -1579,9 +1609,9 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>"
+        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>"
       );
-      const reopenUsage = "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
+      const reopenUsage = "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
       const rawComments = str(parsed, "--comments-close");
       const comments = rawComments ? parseDeadline(rawComments, "--comments-close", reopenUsage) : void 0;
       const signing = parseDeadline(
@@ -1608,13 +1638,13 @@ async function docsCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi docs withdraw <slug> --reason "..." [--public]'
+        'signatories-axi docs withdraw <slug> --reason "..." [--public]'
       );
       const body = {
         reason: requireStr(
           parsed,
           "--reason",
-          'drafter-axi docs withdraw <slug> --reason "..." [--public]'
+          'signatories-axi docs withdraw <slug> --reason "..." [--public]'
         ),
         public: bool(parsed, "--public")
       };
@@ -1631,13 +1661,13 @@ async function docsCommand(args) {
           parsed,
           1,
           "slug",
-          `drafter-axi docs operators ${first} <slug> <email>`
+          `signatories-axi docs operators ${first} <slug> <email>`
         );
         const email = requirePositional(
           parsed,
           2,
           "email",
-          `drafter-axi docs operators ${first} <slug> <email>`
+          `signatories-axi docs operators ${first} <slug> <email>`
         );
         if (first === "add") {
           const result2 = await client.post(
@@ -1649,7 +1679,7 @@ async function docsCommand(args) {
         const result = await client.delete(`/documents/${encodeURIComponent(slug2)}/operators/${encodeURIComponent(email)}`);
         return render(parsed, result, () => renderObject(result));
       }
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs operators <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs operators <slug>");
       const operators = await client.get(
         `/documents/${encodeURIComponent(slug)}/operators`
       );
@@ -1674,7 +1704,7 @@ import { writeFileSync as writeFileSync2 } from "node:fs";
 var FEEDBACK_FLAGS = {
   export: { positionals: 1, value: ["--format", "--out"] }
 };
-var FEEDBACK_HELP = `usage: drafter-axi feedback export <slug> [--format json|md] [--out <file>]
+var FEEDBACK_HELP = `usage: signatories-axi feedback export <slug> [--format json|md] [--out <file>]
 
 The LLM-round bundle (\`specs/behaviors/review-and-judgement.md\`): every
 pending comment, organized by submission. Feed the json form straight into
@@ -1684,7 +1714,7 @@ async function feedbackCommand(args) {
   const client = clientFrom(parsed);
   switch (sub) {
     case "export": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi feedback export <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi feedback export <slug>");
       const format = str(parsed, "--format", "json");
       if (format !== "json" && format !== "md") {
         throw new AxiError(`"${format}" is not a valid --format`, "USAGE", [
@@ -1735,7 +1765,7 @@ function cliInvocation() {
   try {
     bundle = fileURLToPath(import.meta.url);
   } catch {
-    bundle = process.argv[1] ?? "drafter-axi";
+    bundle = process.argv[1] ?? "signatories-axi";
   }
   const shim = bundle.replace(/\.mjs$/, "");
   try {
@@ -1763,7 +1793,7 @@ var DRILL_DOWN_LIMIT = 10;
 async function homeCommand(args) {
   const parsed = parseFlags("home", args, HOME_FLAGS);
   const ifConfigured = bool(parsed, "--if-configured");
-  const cli = "drafter-axi";
+  const cli = "signatories-axi";
   const invokeAs = cliInvocation();
   if (!isConfigured({ profile: str(parsed, "--profile") })) {
     if (ifConfigured) return "";
@@ -1790,7 +1820,7 @@ async function homeCommand(args) {
     const identity2 = renderObject({
       signed_in: expired ? "no \u2014 the stored sign-in is expired or revoked" : "unknown",
       instance: config.url,
-      profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+      profile: config.tokenSource === "env" ? "(SIGNATORIES_TOKEN from the environment)" : config.profile,
       invoke_as: invokeAs
     });
     if (expired) {
@@ -1815,7 +1845,7 @@ async function homeCommand(args) {
     // profiles is two different tenants.
     site: who.site ? `${who.site.name} (${who.site.slug})` : "default",
     instance: config.url,
-    profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
+    profile: config.tokenSource === "env" ? "(SIGNATORIES_TOKEN from the environment)" : config.profile,
     token_expires: who.expires_at,
     invoke_as: invokeAs
   });
@@ -1904,19 +1934,20 @@ var HOOK_FLAGS = {
   uninstall: { positionals: 0, value: ["--scope"] },
   status: { positionals: 0 }
 };
-var HOOK_HELP = `usage: drafter-axi hook <install|uninstall> [--scope project|global] [--dir <path>]
-       drafter-axi hook status
+var HOOK_HELP = `usage: signatories-axi hook <install|uninstall> [--scope project|global] [--dir <path>]
+       signatories-axi hook status
 
 Manage the SessionStart hook that prints the home view (open documents, phase,
 next deadline, funnel counts) at the start of every agent session, when
-DRAFTER_URL is set (silent otherwise \u2014 a fresh clone without a configured
+SIGNATORIES_URL is set (silent otherwise \u2014 a fresh clone without a configured
 instance stays quiet).
 
 Default scope is project: written to <repo>/.claude/settings.json (so it is
 committed and portable for every contributor). --dir sets the repo root
 (default: the git repo root of the current directory). --scope global installs
 to ~/.claude/settings.json for every session on this machine instead.`;
-var MARKER = "drafter-axi";
+var MARKER = "signatories-axi";
+var LEGACY_MARKER = "drafter-axi";
 var TIMEOUT_SECONDS = 10;
 function gitRoot() {
   try {
@@ -1943,8 +1974,8 @@ function resolveScope(scopeFlag) {
   if (scopeFlag === void 0) return "project";
   if (scopeFlag !== "project" && scopeFlag !== "global") {
     throw new AxiError("--scope must be project or global", "USAGE", [
-      "drafter-axi hook install                 (project \u2014 the default)",
-      "drafter-axi hook install --scope global"
+      "signatories-axi hook install                 (project \u2014 the default)",
+      "signatories-axi hook install --scope global"
     ]);
   }
   return scopeFlag;
@@ -1954,9 +1985,9 @@ function settingsPath(scope, dirFlag) {
   return join2(base, ".claude", "settings.json");
 }
 function shimPath() {
-  return join2(dirname(fileURLToPath2(import.meta.url)), "drafter-axi");
+  return join2(dirname(fileURLToPath2(import.meta.url)), "signatories-axi");
 }
-var PROJECT_HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/.claude/skills/drafter-axi/scripts/drafter-axi" home --if-configured';
+var PROJECT_HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/.claude/skills/signatories-axi/scripts/signatories-axi" home --if-configured';
 function hookCommand(scope) {
   return scope === "global" ? `${JSON.stringify(shimPath())} home --if-configured` : PROJECT_HOOK_COMMAND;
 }
@@ -1976,38 +2007,55 @@ function writeSettings(path, settings) {
   writeFileSync3(path, `${JSON.stringify(settings, null, 2)}
 `, "utf8");
 }
+function isManaged(command) {
+  return typeof command === "string" && (command.includes(MARKER) || command.includes(LEGACY_MARKER));
+}
 function managedCommand(settings) {
   const groups = settings.hooks?.SessionStart;
   if (!Array.isArray(groups)) return void 0;
   for (const group of groups) {
     for (const hook of group.hooks ?? []) {
-      if (typeof hook.command === "string" && hook.command.includes(MARKER)) return hook.command;
+      if (isManaged(hook.command)) return hook.command;
     }
   }
   return void 0;
 }
+function stripHooks(settings, matches) {
+  const groups = settings.hooks?.SessionStart;
+  if (!Array.isArray(groups)) return 0;
+  let removed = 0;
+  for (const group of groups) {
+    const before = group.hooks?.length ?? 0;
+    if (group.hooks) group.hooks = group.hooks.filter((h) => !matches(h.command));
+    removed += before - (group.hooks?.length ?? 0);
+  }
+  settings.hooks.SessionStart = groups.filter((g) => (g.hooks?.length ?? 0) > 0);
+  return removed;
+}
+var isLegacy = (command) => typeof command === "string" && command.includes(LEGACY_MARKER);
 function install(args) {
   const parsed = parseFlags("hook install", args, HOOK_FLAGS.install);
   const scope = resolveScope(str(parsed, "--scope"));
   const path = settingsPath(scope, str(parsed, "--dir"));
   const command = hookCommand(scope);
   const settings = readSettings(path);
+  const legacyRemoved = stripHooks(settings, isLegacy) > 0;
   const [updated, changed] = computeSessionStartHookUpdate(settings, {
     marker: MARKER,
     command,
     timeoutSeconds: TIMEOUT_SECONDS
   });
-  if (changed) writeSettings(path, updated);
+  if (changed || legacyRemoved) writeSettings(path, updated);
   return joinBlocks(
     renderObject({
-      hook: changed ? "installed" : "already up to date",
+      hook: changed ? "installed" : legacyRemoved ? "replaced" : "already up to date",
       scope,
       file: path,
       runs: command
     }),
     renderHelp([
-      "Every session in this scope opens with the documents dashboard (when DRAFTER_URL is set)",
-      `Run \`drafter-axi hook uninstall --scope ${scope}\` to remove it`
+      "Every session in this scope opens with the documents dashboard (when SIGNATORIES_URL is set)",
+      `Run \`signatories-axi hook uninstall --scope ${scope}\` to remove it`
     ])
   );
 }
@@ -2019,20 +2067,7 @@ function uninstall(args) {
     return renderObject({ hook: "not installed (no-op)", scope, file: path });
   }
   const settings = readSettings(path);
-  const groups = settings.hooks?.SessionStart;
-  let removed = 0;
-  if (Array.isArray(groups)) {
-    for (const group of groups) {
-      const before = group.hooks?.length ?? 0;
-      if (group.hooks) {
-        group.hooks = group.hooks.filter(
-          (h) => !(typeof h.command === "string" && h.command.includes(MARKER))
-        );
-      }
-      removed += before - (group.hooks?.length ?? 0);
-    }
-    settings.hooks.SessionStart = groups.filter((g) => (g.hooks?.length ?? 0) > 0);
-  }
+  const removed = stripHooks(settings, isManaged);
   if (removed > 0) writeSettings(path, settings);
   return renderObject({
     hook: removed > 0 ? "removed" : "not installed (no-op)",
@@ -2066,7 +2101,7 @@ function status() {
       { name: "installed", extract: (r) => r.installed },
       { name: "file", extract: (r) => r.file }
     ]),
-    renderHelp(["Run `drafter-axi hook install` to load the documents dashboard each session"])
+    renderHelp(["Run `signatories-axi hook install` to load the documents dashboard each session"])
   );
 }
 async function hookCommand_(args) {
@@ -2088,7 +2123,7 @@ async function hookCommand_(args) {
 
 // src/cli/commands/instance.ts
 var INIT_DATA_REPO_FLAGS = { positionals: 0 };
-var INIT_DATA_REPO_HELP = `usage: drafter-axi init-data-repo
+var INIT_DATA_REPO_HELP = `usage: signatories-axi init-data-repo
 
 First-boot helper: writes the four sheet configs into an empty data repo.
 Refuses if sheets already exist.`;
@@ -2104,7 +2139,7 @@ var NOTIFICATIONS_FLAGS = {
   list: { positionals: 1 },
   retry: { positionals: 1, value: ["--event", "--person"] }
 };
-var NOTIFICATIONS_HELP = `usage: drafter-axi notifications <list|retry> ...
+var NOTIFICATIONS_HELP = `usage: signatories-axi notifications <list|retry> ...
 
 list <slug>
 retry <slug> [--event <name>] [--person <id>]`;
@@ -2113,7 +2148,12 @@ async function notificationsCommand(args) {
   const client = clientFrom(parsed);
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications list <slug>");
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi notifications list <slug>"
+      );
       const summary = await client.get(
         `/documents/${encodeURIComponent(slug)}/notifications`
       );
@@ -2137,12 +2177,17 @@ async function notificationsCommand(args) {
               (f) => f.error
             )
           ]) : "",
-          summary.failed > 0 ? renderHelp([`Run \`drafter-axi notifications retry ${slug}\` to re-dispatch`]) : ""
+          summary.failed > 0 ? renderHelp([`Run \`signatories-axi notifications retry ${slug}\` to re-dispatch`]) : ""
         )
       );
     }
     case "retry": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications retry <slug>");
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi notifications retry <slug>"
+      );
       const result = await client.post(
         `/documents/${encodeURIComponent(slug)}/notifications/retry`,
         {
@@ -2167,7 +2212,7 @@ var OPERATORS_FLAGS = {
   },
   remove: { positionals: 1 }
 };
-var OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|remove> ...
+var OPERATORS_HELP = `usage: signatories-axi operators <list|add|update|remove> ...
 
 list
 add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
@@ -2179,7 +2224,7 @@ operator on the instance: the directory, and who may be added to one of this
 site's documents. \`add\` creates the record if the email is new and joins it
 to this site in the same commit; \`remove\` deletes the record outright and is
 superadmin-only \u2014 to take someone off one site, use
-\`drafter-axi sites operators remove <site> <email>\`.
+\`signatories-axi sites operators remove <site> <email>\`.
 
 A superadmin sees and may act on every document; only a superadmin can grant
 or revoke the flag, and never on themself.
@@ -2200,7 +2245,7 @@ function parseBoolFlag(flag, value) {
   if (value === "true") return true;
   if (value === "false") return false;
   throw new AxiError(`${flag} must be true or false`, "USAGE", [
-    `drafter-axi operators update <email> ${flag} true|false`
+    `signatories-axi operators update <email> ${flag} true|false`
   ]);
 }
 async function operatorsCommand(args) {
@@ -2220,11 +2265,11 @@ async function operatorsCommand(args) {
         parsed,
         0,
         "email",
-        'drafter-axi operators add <email> --name "..."'
+        'signatories-axi operators add <email> --name "..."'
       );
       const body = {
         email,
-        name: requireStr(parsed, "--name", 'drafter-axi operators add <email> --name "..."'),
+        name: requireStr(parsed, "--name", 'signatories-axi operators add <email> --name "..."'),
         kind: str(parsed, "--kind"),
         title: str(parsed, "--title"),
         org: str(parsed, "--org"),
@@ -2238,7 +2283,7 @@ async function operatorsCommand(args) {
         parsed,
         0,
         "email",
-        "drafter-axi operators update <email> ..."
+        "signatories-axi operators update <email> ..."
       );
       const body = compact({
         name: str(parsed, "--name"),
@@ -2255,7 +2300,12 @@ async function operatorsCommand(args) {
       return render(parsed, result, () => renderObject(compact(result)));
     }
     case "remove": {
-      const email = requirePositional(parsed, 0, "email", "drafter-axi operators remove <email>");
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        "signatories-axi operators remove <email>"
+      );
       const result = await client.delete(
         `/operators/${encodeURIComponent(email)}`
       );
@@ -2283,7 +2333,7 @@ var PEOPLE_FLAGS = {
   "reissue-link": { positionals: 2 },
   expire: { positionals: 2, value: ["--expires-at"] }
 };
-var PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
+var PEOPLE_HELP = `usage: signatories-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
@@ -2406,7 +2456,7 @@ async function peopleCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi people import <slug> [<file.ndjson>|-]"
+        "signatories-axi people import <slug> [<file.ndjson>|-]"
       );
       const filePath = parsed.positional[1] ?? "-";
       const suggestedCapacity = str(parsed, "--suggested-capacity");
@@ -2436,13 +2486,13 @@ async function peopleCommand(args) {
             computed("changes", (r) => r.changes.join(","))
           ]) : "",
           renderHelp(
-            dryRun ? [`Nothing was written. Run again without --dry-run to import`] : [`Run \`drafter-axi people list ${slug}\` to see the imported invitees`]
+            dryRun ? [`Nothing was written. Run again without --dry-run to import`] : [`Run \`signatories-axi people list ${slug}\` to see the imported invitees`]
           )
         )
       );
     }
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people list <slug>");
       const contacts = bool(parsed, "--contacts");
       const rows = await client.get(
         `/documents/${encodeURIComponent(slug)}/invitations`,
@@ -2470,7 +2520,7 @@ async function peopleCommand(args) {
       );
     }
     case "links": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people links <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people links <slug>");
       const person = csv(str(parsed, "--person"));
       const csvText = await client.post(
         `/documents/${encodeURIComponent(slug)}/invitations/links`,
@@ -2505,7 +2555,7 @@ async function peopleCommand(args) {
       );
     }
     case "send": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people send <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people send <slug>");
       const person = csv(str(parsed, "--person"));
       const dryRun = bool(parsed, "--dry-run");
       const result = await client.post(
@@ -2552,7 +2602,7 @@ async function peopleCommand(args) {
             computed("error", (f) => f.error)
           ]) : "",
           failures.length > 0 ? renderHelp([
-            `${failures.length} invitation(s) were not delivered and are still not_sent \u2014 fix the address, then run \`drafter-axi people send ${slug}\` again`
+            `${failures.length} invitation(s) were not delivered and are still not_sent \u2014 fix the address, then run \`signatories-axi people send ${slug}\` again`
           ]) : ""
         )
       );
@@ -2562,13 +2612,13 @@ async function peopleCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi people remove <slug> <person>"
+        "signatories-axi people remove <slug> <person>"
       );
       const personId = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people remove <slug> <person>"
+        "signatories-axi people remove <slug> <person>"
       );
       const result = await client.delete(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(personId)}`
@@ -2587,12 +2637,12 @@ async function peopleCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi people remind <slug> --target unopened|opened-not-acted"
+        "signatories-axi people remind <slug> --target unopened|opened-not-acted"
       );
       const targetFlag = requireStr(
         parsed,
         "--target",
-        "drafter-axi people remind <slug> --target unopened|opened-not-acted"
+        "signatories-axi people remind <slug> --target unopened|opened-not-acted"
       );
       const target = targetFlag === "opened-not-acted" ? "opened_not_acted" : targetFlag;
       if (target !== "unopened" && target !== "opened_not_acted") {
@@ -2654,13 +2704,13 @@ async function peopleCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi people revoke-link <slug> <person>"
+        "signatories-axi people revoke-link <slug> <person>"
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people revoke-link <slug> <person>"
+        "signatories-axi people revoke-link <slug> <person>"
       );
       const result = await client.post(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/revoke-link`
@@ -2672,13 +2722,13 @@ async function peopleCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi people reissue-link <slug> <person>"
+        "signatories-axi people reissue-link <slug> <person>"
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people reissue-link <slug> <person>"
+        "signatories-axi people reissue-link <slug> <person>"
       );
       const result = await client.post(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/reissue-link`
@@ -2695,7 +2745,7 @@ async function peopleCommand(args) {
       );
     }
     case "expire": {
-      const usage = "drafter-axi people expire <slug> <person> --expires-at <when>";
+      const usage = "signatories-axi people expire <slug> <person> --expires-at <when>";
       const slug = requirePositional(parsed, 0, "slug", usage);
       const person = requirePositional(parsed, 1, "person", usage);
       const expiresAt = parseDeadline(
@@ -2714,7 +2764,7 @@ async function peopleCommand(args) {
           renderObject({ person, ...result }),
           renderHelp([
             expiresAt.note,
-            `The link stops working then; \`drafter-axi people reissue-link ${slug} ${person}\` issues a fresh one`
+            `The link stops working then; \`signatories-axi people reissue-link ${slug} ${person}\` issues a fresh one`
           ])
         )
       );
@@ -2729,7 +2779,7 @@ var SIGNATURES_FLAGS = {
   list: { positionals: 1, boolean: ["--include-revoked", "--conditional"] },
   revoke: { positionals: 2, value: ["--reason"] }
 };
-var SIGNATURES_HELP = `usage: drafter-axi signatures <list|revoke> ...
+var SIGNATURES_HELP = `usage: signatories-axi signatures <list|revoke> ...
 
 list <slug> [--include-revoked] [--conditional]
 revoke <slug> <person> --reason "<text>"
@@ -2739,7 +2789,7 @@ async function signaturesCommand(args) {
   const client = clientFrom(parsed);
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi signatures list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi signatures list <slug>");
       const includeRevoked = bool(parsed, "--include-revoked");
       const conditionalOnly = bool(parsed, "--conditional");
       let rows = await client.get(
@@ -2774,18 +2824,18 @@ async function signaturesCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."'
+        'signatories-axi signatures revoke <slug> <person> --reason "..."'
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."'
+        'signatories-axi signatures revoke <slug> <person> --reason "..."'
       );
       const reason = requireStr(
         parsed,
         "--reason",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."'
+        'signatories-axi signatures revoke <slug> <person> --reason "..."'
       );
       const result = await client.post(
         `/documents/${encodeURIComponent(slug)}/signatures/${encodeURIComponent(person)}/revoke`,
@@ -2796,7 +2846,7 @@ async function signaturesCommand(args) {
         result,
         () => joinBlocks(
           renderObject(result),
-          renderHelp([`Run \`drafter-axi signatures list ${slug}\` to confirm`])
+          renderHelp([`Run \`signatories-axi signatures list ${slug}\` to confirm`])
         )
       );
     }
@@ -2828,7 +2878,7 @@ var SITES_FLAGS = {
   remove: { positionals: 1 },
   operators: { positionals: 3 }
 };
-var SITES_HELP = `usage: drafter-axi sites <list|show|create|update|remove|operators> ...
+var SITES_HELP = `usage: signatories-axi sites <list|show|create|update|remove|operators> ...
 
 list
 show <slug>
@@ -2886,7 +2936,7 @@ function dnsBlock(records) {
 async function sitesCommand(args) {
   const { sub, parsed } = parseSubcommand("sites", args, SITES_FLAGS);
   const client = clientFrom(parsed);
-  const cli = "drafter-axi";
+  const cli = "signatories-axi";
   switch (sub) {
     case "list": {
       const sites = await client.get("/sites");
@@ -2912,7 +2962,7 @@ async function sitesCommand(args) {
       );
     }
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites show <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites show <slug>");
       const site = await client.get(`/sites/${encodeURIComponent(slug)}`);
       const missing = site.hostname_verified ? [] : site.dns;
       return render(
@@ -2928,7 +2978,7 @@ async function sitesCommand(args) {
       );
     }
     case "create": {
-      const usage = 'drafter-axi sites create <slug> --hostname <host> --name "..." --reply-to <email>';
+      const usage = 'signatories-axi sites create <slug> --hostname <host> --name "..." --reply-to <email>';
       const slug = requirePositional(parsed, 0, "slug", usage);
       const body = compact({
         slug,
@@ -2956,7 +3006,7 @@ async function sitesCommand(args) {
       );
     }
     case "update": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites update <slug> ...");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites update <slug> ...");
       const body = compact({
         name: str(parsed, "--name"),
         reply_to: str(parsed, "--reply-to"),
@@ -2969,7 +3019,7 @@ async function sitesCommand(args) {
       return render(parsed, site, () => renderObject(siteObject(site)));
     }
     case "remove": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites remove <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites remove <slug>");
       const result = await client.delete(
         `/sites/${encodeURIComponent(slug)}`
       );
@@ -2987,7 +3037,7 @@ async function sitesCommand(args) {
     case "operators": {
       const first = parsed.positional[0];
       if (first === "add" || first === "remove") {
-        const usage = `drafter-axi sites operators ${first} <slug> <email>`;
+        const usage = `signatories-axi sites operators ${first} <slug> <email>`;
         const slug2 = requirePositional(parsed, 1, "slug", usage);
         const email = requirePositional(parsed, 2, "email", usage);
         if (first === "add") {
@@ -3011,7 +3061,7 @@ async function sitesCommand(args) {
           )
         );
       }
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites operators <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites operators <slug>");
       const operators = await client.get(
         `/sites/${encodeURIComponent(slug)}/operators`
       );
@@ -3040,7 +3090,7 @@ var SUBMISSIONS_FLAGS = {
     boolean: ["--pending", "--include-drafts"]
   }
 };
-var SUBMISSIONS_HELP = `usage: drafter-axi submissions list <slug> [--pending] [--version <n>] [--person <id>] [--include-drafts]
+var SUBMISSIONS_HELP = `usage: signatories-axi submissions list <slug> [--pending] [--version <n>] [--person <id>] [--include-drafts]
 
 Whole submissions, each with its comments (shown as two tables: submissions,
 then comments). Drafts come only with --include-drafts, and every draft row
@@ -3050,7 +3100,7 @@ async function submissionsCommand(args) {
   const client = clientFrom(parsed);
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi submissions list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi submissions list <slug>");
       const includeDrafts = bool(parsed, "--include-drafts");
       const submissions = await client.get(
         `/documents/${encodeURIComponent(slug)}/submissions`,
@@ -3089,7 +3139,9 @@ async function submissionsCommand(args) {
             computed("body", (c) => truncate(String(c.body))),
             computed("disposition", (c) => c.disposition)
           ]),
-          renderHelp([`Run \`drafter-axi feedback export ${slug}\` for the full LLM-round bundle`])
+          renderHelp([
+            `Run \`signatories-axi feedback export ${slug}\` for the full LLM-round bundle`
+          ])
         )
       );
     }
@@ -3112,7 +3164,7 @@ var VERSIONS_FLAGS = {
   },
   compare: { positionals: 3, boolean: ["--unchanged"] }
 };
-var VERSIONS_HELP = `usage: drafter-axi versions <list|show|publish|compare> ...
+var VERSIONS_HELP = `usage: signatories-axi versions <list|show|publish|compare> ...
 
 list <slug>
 show <slug> <n> [--body]
@@ -3160,7 +3212,7 @@ async function versionsCommand(args) {
   const client = clientFrom(parsed);
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi versions list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi versions list <slug>");
       const versions = await client.get(
         `/documents/${encodeURIComponent(slug)}/versions`
       );
@@ -3177,8 +3229,8 @@ async function versionsCommand(args) {
       );
     }
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi versions show <slug> <n>");
-      const n = requirePositional(parsed, 1, "n", "drafter-axi versions show <slug> <n>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi versions show <slug> <n>");
+      const n = requirePositional(parsed, 1, "n", "signatories-axi versions show <slug> <n>");
       const version = await client.get(
         `/documents/${encodeURIComponent(slug)}/versions/${encodeURIComponent(n)}`
       );
@@ -3208,7 +3260,7 @@ async function versionsCommand(args) {
             computed("note", (d) => d.note ?? "")
           ]) : "",
           !showBody && version.body.length > BODY_PREVIEW_CHARS ? renderHelp([
-            `Run \`drafter-axi versions show ${slug} ${n} --body\` for the full body`
+            `Run \`signatories-axi versions show ${slug} ${n} --body\` for the full body`
           ]) : ""
         )
       );
@@ -3218,17 +3270,17 @@ async function versionsCommand(args) {
         parsed,
         0,
         "slug",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."'
+        'signatories-axi versions publish <slug> --file <path> --summary "..."'
       );
       const filePath = requireStr(
         parsed,
         "--file",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."'
+        'signatories-axi versions publish <slug> --file <path> --summary "..."'
       );
       const summary = requireStr(
         parsed,
         "--summary",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."'
+        'signatories-axi versions publish <slug> --file <path> --summary "..."'
       );
       const body = await readFileOrStdin(filePath);
       const notesFile = str(parsed, "--notes-file");
@@ -3259,7 +3311,7 @@ async function versionsCommand(args) {
             ...result.signing_closes_at ? { signing_closes_at: result.signing_closes_at } : {}
           }),
           renderObject({ notified: result.notified }),
-          renderHelp([`Run \`drafter-axi docs show ${slug}\` to see the updated dashboard`])
+          renderHelp([`Run \`signatories-axi docs show ${slug}\` to see the updated dashboard`])
         )
       );
     }
@@ -3268,19 +3320,19 @@ async function versionsCommand(args) {
         parsed,
         0,
         "slug",
-        "drafter-axi versions compare <slug> <from> <to>"
+        "signatories-axi versions compare <slug> <from> <to>"
       );
       const from = requirePositional(
         parsed,
         1,
         "from",
-        "drafter-axi versions compare <slug> <from> <to>"
+        "signatories-axi versions compare <slug> <from> <to>"
       );
       const to = requirePositional(
         parsed,
         2,
         "to",
-        "drafter-axi versions compare <slug> <from> <to>"
+        "signatories-axi versions compare <slug> <from> <to>"
       );
       const result = await client.get(
         `/documents/${encodeURIComponent(slug)}/compare`,
@@ -3303,7 +3355,7 @@ async function versionsCommand(args) {
           ]),
           renderHelp(
             includeUnchanged ? [] : [
-              `Run \`drafter-axi versions compare ${slug} ${from} ${to} --unchanged\` to include unchanged blocks`
+              `Run \`signatories-axi versions compare ${slug} ${from} ${to} --unchanged\` to include unchanged blocks`
             ]
           )
         )
@@ -3315,7 +3367,7 @@ async function versionsCommand(args) {
 }
 
 // src/cli/reference.ts
-var DESCRIPTION = "Drive a community-drafter document from the shell \u2014 create, open, publish revisions, invite and track signers, and export feedback bundles for an LLM round.";
+var DESCRIPTION = "Drive a Signatories document from the shell \u2014 create, open, publish revisions, invite and track signers, and export feedback bundles for an LLM round.";
 var COMMAND_GROUPS = [
   {
     group: "Session",
@@ -3545,17 +3597,21 @@ function renderCommandHelp(name) {
   const doc = commandDoc(name);
   if (!doc) return null;
   const lines = [
-    `usage: drafter-axi ${doc.usage}`,
+    `usage: signatories-axi ${doc.usage}`,
     "",
     doc.summary,
     "",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile."
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or SIGNATORIES_PROFILE) selects a config profile."
   ];
   return `${lines.join("\n")}
 `;
 }
 function renderTopLevelHelp() {
-  const lines = [`drafter-axi \u2014 ${DESCRIPTION}`, "", "usage: drafter-axi <command> [args] [flags]"];
+  const lines = [
+    `signatories-axi \u2014 ${DESCRIPTION}`,
+    "",
+    "usage: signatories-axi <command> [args] [flags]"
+  ];
   for (const group of COMMAND_GROUPS) {
     lines.push("", `${group.group}:`);
     for (const doc of group.commands) {
@@ -3565,16 +3621,16 @@ function renderTopLevelHelp() {
   }
   lines.push(
     "",
-    "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
-    "Run `drafter-axi <command> --help` for usage on any command.",
-    "Run `drafter-axi` with no arguments to see every open document's status."
+    "Config: run `login <email> --url <instance>` once, or set SIGNATORIES_URL / SIGNATORIES_TOKEN in the environment.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or SIGNATORIES_PROFILE) selects a config profile.",
+    "Run `signatories-axi <command> --help` for usage on any command.",
+    "Run `signatories-axi` with no arguments to see every open document's status."
   );
   return lines.join("\n");
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "1ee23c7" : "dev";
+var VERSION = true ? "3653156" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

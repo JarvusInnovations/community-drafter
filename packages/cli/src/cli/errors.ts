@@ -19,7 +19,7 @@ export class ApiCallError extends AxiError {
 /** A transport-level failure (connection refused, DNS, timeout) — not an API error envelope. */
 export class NetworkError extends AxiError {
   constructor(message: string) {
-    super(message, "NETWORK_ERROR", ["Check DRAFTER_URL and that the API is reachable"]);
+    super(message, "NETWORK_ERROR", ["Check SIGNATORIES_URL and that the API is reachable"]);
   }
 }
 
@@ -34,7 +34,7 @@ export class NetworkError extends AxiError {
 export class SignInExpiredError extends AxiError {
   constructor() {
     super("Sign-in expired or revoked; run login again.", "SIGN_IN_EXPIRED", [
-      "Run `drafter-axi login <email> --url <instance>` to sign in again",
+      "Run `signatories-axi login <email> --url <instance>` to sign in again",
     ]);
   }
 }
@@ -46,7 +46,9 @@ export class SignInExpiredError extends AxiError {
  */
 export class DeviceExpiredError extends AxiError {
   constructor(message: string) {
-    super(message, "DEVICE_EXPIRED", ["Run `drafter-axi login <email> [--url <instance>]` again"]);
+    super(message, "DEVICE_EXPIRED", [
+      "Run `signatories-axi login <email> [--url <instance>]` again",
+    ]);
   }
 }
 

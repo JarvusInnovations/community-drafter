@@ -1,5 +1,5 @@
 /**
- * bun scripts/build-cli.ts            # write skills/drafter-axi/scripts/drafter-axi.mjs
+ * bun scripts/build-cli.ts            # write skills/signatories-axi/scripts/signatories-axi.mjs
  * bun scripts/build-cli.ts --check    # fail if the committed bundle is stale
  */
 import { buildCliBundle } from "../src/build/bundle.js";

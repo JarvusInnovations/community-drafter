@@ -25,8 +25,9 @@ import { joinBlocks, renderHelp, renderObject } from "./output.js";
 import { DESCRIPTION, renderCommandHelp, renderTopLevelHelp } from "./reference.js";
 
 // Injected at build time by scripts/build-cli.ts (from `git describe`).
-declare const __DRAFTER_AXI_VERSION__: string;
-const VERSION = typeof __DRAFTER_AXI_VERSION__ === "string" ? __DRAFTER_AXI_VERSION__ : "dev";
+declare const __SIGNATORIES_AXI_VERSION__: string;
+const VERSION =
+  typeof __SIGNATORIES_AXI_VERSION__ === "string" ? __SIGNATORIES_AXI_VERSION__ : "dev";
 
 const COMMAND_HELP: Record<string, string> = {
   login: LOGIN_HELP,
@@ -99,7 +100,7 @@ export interface MainOptions {
 }
 
 /**
- * `drafter-axi --profile dinobot` (or `--json`) with no command means the
+ * `signatories-axi --profile dinobot` (or `--json`) with no command means the
  * home view for that profile. The SDK rejects flags ahead of a command, so
  * a leading run of global flags is peeled off here and handed to `home`.
  */

@@ -6,7 +6,7 @@ import type { BuildResult } from "./bundle.js";
 
 /**
  * Splice the generated command-reference region into
- * `skills/drafter-axi/SKILL.md`, or (with `check: true`) report whether it
+ * `skills/signatories-axi/SKILL.md`, or (with `check: true`) report whether it
  * is stale relative to `src/cli/reference.ts`.
  */
 export function buildSkillDoc(check: boolean): BuildResult {

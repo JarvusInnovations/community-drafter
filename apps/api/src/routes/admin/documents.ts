@@ -453,7 +453,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         if (current) return;
         throw new ApiError(
           "no_deadline_set",
-          `This document has no ${label} to extend. Open it first: drafter-axi docs open ${slug}.`,
+          `This document has no ${label} to extend. Open it first: signatories-axi docs open ${slug}.`,
           { field },
         );
       };

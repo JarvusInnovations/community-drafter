@@ -15,7 +15,7 @@ const OPERATORS_FLAGS: Record<string, FlagSpec> = {
   remove: { positionals: 1 },
 };
 
-export const OPERATORS_HELP = `usage: drafter-axi operators <list|add|update|remove> ...
+export const OPERATORS_HELP = `usage: signatories-axi operators <list|add|update|remove> ...
 
 list
 add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]
@@ -27,7 +27,7 @@ operator on the instance: the directory, and who may be added to one of this
 site's documents. \`add\` creates the record if the email is new and joins it
 to this site in the same commit; \`remove\` deletes the record outright and is
 superadmin-only — to take someone off one site, use
-\`drafter-axi sites operators remove <site> <email>\`.
+\`signatories-axi sites operators remove <site> <email>\`.
 
 A superadmin sees and may act on every document; only a superadmin can grant
 or revoke the flag, and never on themself.
@@ -50,7 +50,7 @@ function parseBoolFlag(flag: string, value: string | undefined): boolean | undef
   if (value === "true") return true;
   if (value === "false") return false;
   throw new AxiError(`${flag} must be true or false`, "USAGE", [
-    `drafter-axi operators update <email> ${flag} true|false`,
+    `signatories-axi operators update <email> ${flag} true|false`,
   ]);
 }
 
@@ -73,11 +73,11 @@ export async function operatorsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "email",
-        'drafter-axi operators add <email> --name "..."',
+        'signatories-axi operators add <email> --name "..."',
       );
       const body = {
         email,
-        name: requireStr(parsed, "--name", 'drafter-axi operators add <email> --name "..."'),
+        name: requireStr(parsed, "--name", 'signatories-axi operators add <email> --name "..."'),
         kind: str(parsed, "--kind"),
         title: str(parsed, "--title"),
         org: str(parsed, "--org"),
@@ -92,7 +92,7 @@ export async function operatorsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "email",
-        "drafter-axi operators update <email> ...",
+        "signatories-axi operators update <email> ...",
       );
       const body = compact({
         name: str(parsed, "--name"),
@@ -110,7 +110,12 @@ export async function operatorsCommand(args: string[]): Promise<string> {
     }
 
     case "remove": {
-      const email = requirePositional(parsed, 0, "email", "drafter-axi operators remove <email>");
+      const email = requirePositional(
+        parsed,
+        0,
+        "email",
+        "signatories-axi operators remove <email>",
+      );
       const result = await client.delete<{ ok: boolean; commit?: string | null }>(
         `/operators/${encodeURIComponent(email)}`,
       );

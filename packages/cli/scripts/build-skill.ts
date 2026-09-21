@@ -1,5 +1,5 @@
 /**
- * bun scripts/build-skill.ts            # rewrite skills/drafter-axi/SKILL.md
+ * bun scripts/build-skill.ts            # rewrite skills/signatories-axi/SKILL.md
  * bun scripts/build-skill.ts --check    # fail if SKILL.md is stale
  */
 import { buildSkillDoc } from "../src/build/skill-doc.js";

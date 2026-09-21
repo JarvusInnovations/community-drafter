@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { DrafterClient } from "../client.js";
+import { SignatoriesClient } from "../client.js";
 import { resolveConfig } from "../config.js";
 import { bool, str, type Parsed } from "../flags.js";
 import { renderJson } from "../output.js";
@@ -13,8 +13,8 @@ import { renderJson } from "../output.js";
  * there would crash uncaught instead of rendering as a structured error
  * (AXI §6).
  */
-export function clientFrom(parsed: Parsed): DrafterClient {
-  return new DrafterClient(resolveConfig({ profile: str(parsed, "--profile") }));
+export function clientFrom(parsed: Parsed): SignatoriesClient {
+  return new SignatoriesClient(resolveConfig({ profile: str(parsed, "--profile") }));
 }
 
 export function wantsJson(parsed: Parsed): boolean {

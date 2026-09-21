@@ -61,10 +61,10 @@ async function bootServer(env: Record<string, string | undefined> = {}): Promise
   };
 }
 
-/** Sets DRAFTER_URL/DRAFTER_TOKEN so commands bypass the profile file entirely (the pre-`login` style). */
+/** Sets SIGNATORIES_URL/SIGNATORIES_TOKEN so commands bypass the profile file entirely (the pre-`login` style). */
 function withAdminEnv(harness: Harness): void {
-  process.env.DRAFTER_URL = harness.url;
-  process.env.DRAFTER_TOKEN = TEST_ADMIN_TOKEN;
+  process.env.SIGNATORIES_URL = harness.url;
+  process.env.SIGNATORIES_TOKEN = TEST_ADMIN_TOKEN;
 }
 
 /** Run one CLI invocation, capturing stdout and the exit code. */
@@ -131,17 +131,17 @@ async function mintStaleCliToken(email: string, daysOld: number): Promise<string
   return minted.token;
 }
 
-describe("drafter-axi end to end (real API, temp data repo)", () => {
+describe("signatories-axi end to end (real API, temp data repo)", () => {
   const cleanups: Array<() => void> = [];
   let originalHome: string | undefined;
   let tempHome: string;
 
   beforeEach(() => {
     // Every test gets its own `$HOME`, so `login`/`whoami`/the silent
-    // refresh — which all read and write the *real* `~/.config/drafter/`
+    // refresh — which all read and write the *real* `~/.config/signatories/`
     // path via `os.homedir()` — never touch this machine's actual profile.
     originalHome = process.env.HOME;
-    tempHome = mkdtempSync(join(tmpdir(), "drafter-axi-home-"));
+    tempHome = mkdtempSync(join(tmpdir(), "signatories-axi-home-"));
     process.env.HOME = tempHome;
   });
 
@@ -150,8 +150,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     rmSync(tempHome, { recursive: true, force: true });
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
-    delete process.env.DRAFTER_URL;
-    delete process.env.DRAFTER_TOKEN;
+    delete process.env.SIGNATORIES_URL;
+    delete process.env.SIGNATORIES_TOKEN;
   });
 
   /**
@@ -255,7 +255,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(create.output).toContain("draft");
 
     // 2. versions publish
-    const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
+    const scratch = mkdtempSync(join(tmpdir(), "signatories-axi-e2e-"));
     const bodyFile = join(scratch, "body.md");
     writeFileSync(bodyFile, "# E2E Charter\n\nWe hold these truths.\n", "utf8");
 
@@ -385,7 +385,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "public",
     ]);
 
-    const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
+    const scratch = mkdtempSync(join(tmpdir(), "signatories-axi-e2e-"));
     const bodyFile = join(scratch, "body.md");
     writeFileSync(bodyFile, "# Bad Dispositions\n\nFirst text.\n", "utf8");
     await run(["versions", "publish", slug, "--file", bodyFile, "--summary", "v1"]);
@@ -430,7 +430,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(home.output).toMatch(
       new RegExp(`instance: "?${harness.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"?`, "u"),
     );
-    expect(home.output).toContain("profile: (DRAFTER_TOKEN from the environment)");
+    expect(home.output).toContain("profile: (SIGNATORIES_TOKEN from the environment)");
     expect(home.output.indexOf("signed_in")).toBeLessThan(home.output.indexOf("documents"));
   });
 
@@ -468,7 +468,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "public",
     ]);
 
-    const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
+    const scratch = mkdtempSync(join(tmpdir(), "signatories-axi-e2e-"));
     const peopleFile = join(scratch, "people.ndjson");
     const email = "secret-person@example.org";
     writeFileSync(peopleFile, JSON.stringify({ name: "Secret Person", email }), "utf8");
@@ -512,7 +512,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       "public",
     ]);
 
-    const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
+    const scratch = mkdtempSync(join(tmpdir(), "signatories-axi-e2e-"));
     const peopleFile = join(scratch, "people.ndjson");
     writeFileSync(
       peopleFile,
@@ -554,7 +554,7 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     rmSync(scratch, { recursive: true, force: true });
   }, 30_000);
 
-  it("login --url completes the device flow, writes a 600-mode profile, and the next command needs no DRAFTER_URL", async () => {
+  it("login --url completes the device flow, writes a 600-mode profile, and the next command needs no SIGNATORIES_URL", async () => {
     const harness = await bootServer({ DEV_ADMIN_EMAIL: TEST_ACTOR.email });
     cleanups.push(harness.cleanup);
 
@@ -599,23 +599,23 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain(TEST_ACTOR.email);
 
-    const profilePath = join(tempHome, ".config", "drafter", "default.toml");
+    const profilePath = join(tempHome, ".config", "signatories", "default.toml");
     const stat = statSync(profilePath);
     expect(stat.mode & 0o777).toBe(0o600);
     const contents = readFileSync(profilePath, "utf8");
     expect(contents).toContain(`url = "${harness.url}"`);
     expect(contents).toContain(`email = "${TEST_ACTOR.email}"`);
 
-    // The next command works from the profile alone — no DRAFTER_URL/DRAFTER_TOKEN in the environment.
-    delete process.env.DRAFTER_URL;
-    delete process.env.DRAFTER_TOKEN;
+    // The next command works from the profile alone — no SIGNATORIES_URL/SIGNATORIES_TOKEN in the environment.
+    delete process.env.SIGNATORIES_URL;
+    delete process.env.SIGNATORIES_TOKEN;
     const whoami = await run(["whoami"]);
     expect(whoami.exitCode).toBe(0);
     expect(whoami.output).toContain(TEST_ACTOR.email);
   }, 30_000);
 
-  it("login without --url or DRAFTER_URL exits 2 with a hint", async () => {
-    delete process.env.DRAFTER_URL;
+  it("login without --url or SIGNATORIES_URL exits 2 with a hint", async () => {
+    delete process.env.SIGNATORIES_URL;
     const result = await run(["login", "someone@example.org"]);
     expect(result.exitCode).toBe(2);
     expect(result.output.toLowerCase()).toContain("instance url");
@@ -632,14 +632,14 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       token: stale,
       expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    delete process.env.DRAFTER_URL;
-    delete process.env.DRAFTER_TOKEN;
+    delete process.env.SIGNATORIES_URL;
+    delete process.env.SIGNATORIES_TOKEN;
 
     const result = await run(["whoami"]);
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain(TEST_ACTOR.email);
 
-    const profilePath = join(tempHome, ".config", "drafter", "default.toml");
+    const profilePath = join(tempHome, ".config", "signatories", "default.toml");
     const contents = readFileSync(profilePath, "utf8");
     expect(contents).not.toContain(stale);
   }, 30_000);
@@ -667,8 +667,8 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
       token: stale,
       expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    delete process.env.DRAFTER_URL;
-    delete process.env.DRAFTER_TOKEN;
+    delete process.env.SIGNATORIES_URL;
+    delete process.env.SIGNATORIES_TOKEN;
 
     const result = await run(["whoami"]);
     expect(result.exitCode).toBe(5);

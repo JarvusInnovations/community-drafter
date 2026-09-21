@@ -37,7 +37,7 @@ const ALWAYS_ALLOWED = new Set(["--help", "-h"]);
 /**
  * Global flags accepted on every command without per-command declaration:
  * `--json` switches to raw JSON output, `--profile` selects a
- * `~/.config/drafter/<profile>.toml` block. Never reported as unknown.
+ * `~/.config/signatories/<profile>.toml` block. Never reported as unknown.
  * There is no actor label (`specs/api/admin-cli.md` § Configuration:
  * "every write is attributed to the signed-in operator") — no `--actor`.
  */
@@ -107,7 +107,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
     if (boolFlags.has(name) || GLOBAL_BOOLEAN_FLAGS.has(name)) {
       if (inlineValue !== undefined) {
         throw new AxiError(`${name} is a switch and takes no value`, "USAGE", [
-          `Run \`drafter-axi ${command} ${name}\` without a value`,
+          `Run \`signatories-axi ${command} ${name}\` without a value`,
         ]);
       }
       flags[name] = true;
@@ -122,7 +122,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
       const next = argv[i + 1];
       if (!isValueLike(next)) {
         throw new AxiError(`${name} requires a value`, "USAGE", [
-          `Run \`drafter-axi ${command} ${name} <value>\``,
+          `Run \`signatories-axi ${command} ${name} <value>\``,
         ]);
       }
       take(name, next!);
@@ -140,7 +140,7 @@ export function parseFlags(command: string, argv: string[], spec: FlagSpec): Par
         ? `\`${command}\` takes no positional arguments, but got "${positional[0]}"`
         : `\`${command}\` takes at most ${allowed} positional argument${allowed === 1 ? "" : "s"}, but got ${positional.length}`,
       "USAGE",
-      [`Run \`drafter-axi ${command} --help\` for the expected form`],
+      [`Run \`signatories-axi ${command} --help\` for the expected form`],
     );
   }
 

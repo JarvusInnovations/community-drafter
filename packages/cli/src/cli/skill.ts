@@ -2,17 +2,17 @@ import { COMMAND_GROUPS } from "./reference.js";
 
 /**
  * Generator for the machine-maintained region of
- * `skills/drafter-axi/SKILL.md`. The prose in SKILL.md is hand-authored and
+ * `skills/signatories-axi/SKILL.md`. The prose in SKILL.md is hand-authored and
  * lives outside the markers; this produces only the command reference,
  * derived from the same `COMMAND_GROUPS` the CLI uses — so the skill can
  * never drift from the implementation.
  *
  * Inside the skill, the bundled CLI is documented by its path relative to
- * the skill directory (`scripts/drafter-axi`), since the skill may be
+ * the skill directory (`scripts/signatories-axi`), since the skill may be
  * installed without the binary on PATH. (At runtime, emit `cliInvocation()`
  * instead.)
  */
-const SKILL_INVOCATION = "scripts/drafter-axi";
+const SKILL_INVOCATION = "scripts/signatories-axi";
 
 export function commandReferenceMarkdown(): string {
   return COMMAND_GROUPS.map((group) => {

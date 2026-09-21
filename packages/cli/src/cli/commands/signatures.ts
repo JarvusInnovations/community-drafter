@@ -8,7 +8,7 @@ const SIGNATURES_FLAGS: Record<string, FlagSpec> = {
   revoke: { positionals: 2, value: ["--reason"] },
 };
 
-export const SIGNATURES_HELP = `usage: drafter-axi signatures <list|revoke> ...
+export const SIGNATURES_HELP = `usage: signatories-axi signatures <list|revoke> ...
 
 list <slug> [--include-revoked] [--conditional]
 revoke <slug> <person> --reason "<text>"
@@ -20,7 +20,7 @@ export async function signaturesCommand(args: string[]): Promise<string> {
 
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi signatures list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi signatures list <slug>");
       const includeRevoked = bool(parsed, "--include-revoked");
       const conditionalOnly = bool(parsed, "--conditional");
       let rows = await client.get<SignatureListRow[]>(
@@ -57,18 +57,18 @@ export async function signaturesCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."',
+        'signatories-axi signatures revoke <slug> <person> --reason "..."',
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."',
+        'signatories-axi signatures revoke <slug> <person> --reason "..."',
       );
       const reason = requireStr(
         parsed,
         "--reason",
-        'drafter-axi signatures revoke <slug> <person> --reason "..."',
+        'signatories-axi signatures revoke <slug> <person> --reason "..."',
       );
       const result = await client.post<RevokeSignatureResult>(
         `/documents/${encodeURIComponent(slug)}/signatures/${encodeURIComponent(person)}/revoke`,
@@ -77,7 +77,7 @@ export async function signaturesCommand(args: string[]): Promise<string> {
       return render(parsed, result, () =>
         joinBlocks(
           renderObject(result),
-          renderHelp([`Run \`drafter-axi signatures list ${slug}\` to confirm`]),
+          renderHelp([`Run \`signatories-axi signatures list ${slug}\` to confirm`]),
         ),
       );
     }

@@ -11,7 +11,7 @@ const SUBMISSIONS_FLAGS: Record<string, FlagSpec> = {
   },
 };
 
-export const SUBMISSIONS_HELP = `usage: drafter-axi submissions list <slug> [--pending] [--version <n>] [--person <id>] [--include-drafts]
+export const SUBMISSIONS_HELP = `usage: signatories-axi submissions list <slug> [--pending] [--version <n>] [--person <id>] [--include-drafts]
 
 Whole submissions, each with its comments (shown as two tables: submissions,
 then comments). Drafts come only with --include-drafts, and every draft row
@@ -23,7 +23,7 @@ export async function submissionsCommand(args: string[]): Promise<string> {
 
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi submissions list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi submissions list <slug>");
       const includeDrafts = bool(parsed, "--include-drafts");
       const submissions = await client.get<SubmissionView[]>(
         `/documents/${encodeURIComponent(slug)}/submissions`,
@@ -66,7 +66,9 @@ export async function submissionsCommand(args: string[]): Promise<string> {
                 computed("body", (c) => truncate(String(c.body))),
                 computed("disposition", (c) => c.disposition),
               ]),
-          renderHelp([`Run \`drafter-axi feedback export ${slug}\` for the full LLM-round bundle`]),
+          renderHelp([
+            `Run \`signatories-axi feedback export ${slug}\` for the full LLM-round bundle`,
+          ]),
         ),
       );
     }

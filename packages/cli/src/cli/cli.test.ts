@@ -51,11 +51,11 @@ describe("formatError", () => {
 
   it("includes suggestions as a help block", () => {
     const result = formatError(
-      new AxiError("--title is required", "USAGE", ["Run `drafter-axi docs create ...`"]),
+      new AxiError("--title is required", "USAGE", ["Run `signatories-axi docs create ...`"]),
     );
     expect(result.exitCode).toBe(2);
     expect(result.output).toContain("help[1]:");
-    expect(result.output).toContain("Run `drafter-axi docs create ...`");
+    expect(result.output).toContain("Run `signatories-axi docs create ...`");
   });
 
   it("never leaks a raw stack trace for an unexpected error", () => {

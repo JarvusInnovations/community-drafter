@@ -4,7 +4,7 @@ import { clientFrom, render } from "./common.js";
 
 const INIT_DATA_REPO_FLAGS: FlagSpec = { positionals: 0 };
 
-export const INIT_DATA_REPO_HELP = `usage: drafter-axi init-data-repo
+export const INIT_DATA_REPO_HELP = `usage: signatories-axi init-data-repo
 
 First-boot helper: writes the four sheet configs into an empty data repo.
 Refuses if sheets already exist.`;

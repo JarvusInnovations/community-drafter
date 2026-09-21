@@ -4,12 +4,12 @@ import { fileURLToPath } from "node:url";
 
 /**
  * How to invoke this CLI, as a runnable command prefix. The bundle ships
- * inside `skills/drafter-axi/` and is **not on `PATH`**, so emitted
+ * inside `skills/signatories-axi/` and is **not on `PATH`**, so emitted
  * examples (home view, hook output, `help[]` hints, error suggestions)
- * must use the resolved path — a bare `drafter-axi` would make an agent
+ * must use the resolved path — a bare `signatories-axi` would make an agent
  * assume it's on PATH and the call would fail.
  *
- * Prefers the sibling shim (`…/scripts/drafter-axi`) when it's executable,
+ * Prefers the sibling shim (`…/scripts/signatories-axi`) when it's executable,
  * since that matches how SKILL.md documents invocation; falls back to
  * `node <bundle>` which always works. Home dir is collapsed to `~`.
  */
@@ -22,7 +22,7 @@ export function cliInvocation(): string {
   try {
     bundle = fileURLToPath(import.meta.url);
   } catch {
-    bundle = process.argv[1] ?? "drafter-axi";
+    bundle = process.argv[1] ?? "signatories-axi";
   }
 
   const shim = bundle.replace(/\.mjs$/, "");
