@@ -73,7 +73,7 @@ export function VersionsScreen(): JSX.Element {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <button
                   type="button"
-                  className={quietLinkClass}
+                  className={`${quietLinkClass} text-left`}
                   onClick={() => void toggle(v.number)}
                 >
                   v{v.number} — {v.summary}

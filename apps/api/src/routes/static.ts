@@ -173,8 +173,12 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
    * default-deny used to turn these into a raw JSON 403). A client that
    * asked for JSON, and every non-`GET`, still gets the JSON 404, so an
    * API caller is never handed a page to parse.
+   *
+   * No `config.capability` here: `setNotFoundHandler` takes no route
+   * config, and it needs none — the gateway hook lets an unmatched request
+   * through precisely because there is no route to have declared one.
    */
-  fastify.setNotFoundHandler({ config: PUBLIC_ROUTE }, (request, reply) => {
+  fastify.setNotFoundHandler((request, reply) => {
     const accept = request.headers.accept ?? "";
     const wantsHtml = request.method === "GET" && accept.includes("text/html");
     const found = wantsHtml ? safeFile("index.html") : null;
