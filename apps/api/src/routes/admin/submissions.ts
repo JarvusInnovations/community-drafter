@@ -31,7 +31,7 @@ function isFullyDispositioned(entry: SubmissionEntry): boolean {
 }
 
 function submissionView(fastify: FastifyInstance, entry: SubmissionEntry) {
-  const person = fastify.storage.readModel.getPerson(entry.record.person);
+  const person = fastify.storage.readModel.getPersonOn(entry.record.document, entry.record.person);
   return {
     id: entry.record.id,
     author: person?.name ?? entry.record.person,

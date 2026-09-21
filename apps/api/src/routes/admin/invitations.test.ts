@@ -3,10 +3,13 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { FakeMailer } from "../../lib/mailer/index.ts";
 import {
   adminHeaders,
+  bearerFor,
   buildTestServer,
   commitCount,
   seedDocument,
+  seedOperator,
   seedParticipant,
+  seedSite,
   TEST_ACTOR,
 } from "../test-support.ts";
 
@@ -35,7 +38,7 @@ describe("POST /admin/api/documents/:slug/invitations/import", () => {
       { actor: TEST_ACTOR, subject: "invite: pre-seed people" },
       async (tx) => {
         for (const person of preexisting) {
-          await tx.people.upsert({ ...person, source: "crm" });
+          await tx.people.upsert({ site: "default", ...person, source: "crm" });
         }
       },
     );
@@ -62,8 +65,13 @@ describe("POST /admin/api/documents/:slug/invitations/import", () => {
 
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toEqual({
+      update: false,
+      site: "default",
       people_created: 45,
-      people_updated: 5,
+      // The 5 matched people carry a name already and the rows repeat it, so
+      // nothing on their records changes — matching is not updating.
+      people_updated: 0,
+      people_overwritten: 0,
       invitations_created: 50,
       skipped_existing: 0,
       rows: expect.any(Array),
@@ -104,8 +112,11 @@ describe("POST /admin/api/documents/:slug/invitations/import", () => {
     // participation) — the underlying commit may collapse to no real tree
     // change, so `commit` can be null here (unlike the first import above).
     expect(secondBody).toEqual({
+      update: false,
+      site: "default",
       people_created: 0,
-      people_updated: 1,
+      people_updated: 0,
+      people_overwritten: 0,
       invitations_created: 0,
       skipped_existing: 1,
       rows: expect.any(Array),
@@ -260,7 +271,7 @@ describe("staged invitations: import --dry-run, remove, send --dry-run", () => {
     });
     expect(removed.statusCode).toBe(200);
     expect(server.storage.readModel.getParticipation("doc-remove", "dan-oops")).toBeUndefined();
-    expect(server.storage.readModel.getPerson("dan-oops")).toBeDefined();
+    expect(server.storage.readModel.getPerson("default", "dan-oops")).toBeDefined();
 
     const sent = await server.inject({
       method: "POST",
@@ -516,6 +527,385 @@ describe("POST /admin/api/documents/:slug/invitations/remind", () => {
     });
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toBe("validation_failed");
+
+    await server.close();
+  });
+});
+
+describe("people belong to a site (issue #51)", () => {
+  const A_HOST = "letters.example.test";
+  const B_HOST = "notes.other.test";
+
+  async function twoSites() {
+    const built = await buildTestServer({
+      env: { PUBLIC_URL: "https://drafter.test", INSTANCE_FROM_EMAIL: "platform@example.org" },
+    });
+    cleanups.push(built.cleanup);
+    const { server } = built;
+    await seedOperator(server, { email: "ann@a.test", name: "Ann" });
+    await seedOperator(server, { email: "bob@b.test", name: "Bob" });
+    await seedSite(server, {
+      slug: "site-a",
+      hostname: A_HOST,
+      name: "Site A",
+      reply_to: "a-team@a.test",
+      operators: ["ann@a.test"],
+    });
+    await seedSite(server, {
+      slug: "site-b",
+      hostname: B_HOST,
+      name: "Site B",
+      reply_to: "b-team@b.test",
+      operators: ["bob@b.test"],
+    });
+    await seedDocument(server, {
+      slug: "a-letter",
+      site: "site-a",
+      operators: ["ann@a.test"],
+      created_by: "ann@a.test",
+    });
+    await seedDocument(server, {
+      slug: "b-note",
+      site: "site-b",
+      operators: ["bob@b.test"],
+      created_by: "bob@b.test",
+    });
+    return built;
+  }
+
+  it("one email invited on two sites is two independent records, and neither import touches the other", async () => {
+    const { server } = await twoSites();
+    const ann = await bearerFor("ann@a.test", "site-a", "Ann");
+    const bob = await bearerFor("bob@b.test", "site-b", "Bob");
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/a-letter/invitations/import",
+      headers: { ...ann, host: A_HOST },
+      payload: [{ name: "Jane Doe", email: "jane@example.org", org: "River Alliance" }],
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/b-note/invitations/import",
+      headers: { ...bob, host: B_HOST },
+      payload: [{ name: "Jane Doe", email: "JANE@example.org", org: "Housing Coalition" }],
+    });
+
+    const onA = server.storage.readModel.getPerson("site-a", "jane-doe");
+    const onB = server.storage.readModel.getPerson("site-b", "jane-doe");
+    expect(onA?.org).toBe("River Alliance");
+    expect(onB?.org).toBe("Housing Coalition");
+    expect(server.storage.readModel.listPeopleForSite("site-a")).toHaveLength(1);
+    expect(server.storage.readModel.listPeopleForSite("site-b")).toHaveLength(1);
+
+    await server.close();
+  });
+
+  it("resolves a person through the document's site, not the caller's standing", async () => {
+    const { server } = await twoSites();
+    const ann = await bearerFor("ann@a.test", "site-a", "Ann");
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/a-letter/invitations/import",
+      headers: { ...ann, host: A_HOST },
+      payload: [{ name: "Jane Doe", email: "jane@example.org", org: "River Alliance" }],
+    });
+    // The same address on the default site — a different person entirely.
+    await server.storage.commit(
+      "invite",
+      { actor: TEST_ACTOR, subject: "invite: a default-site Jane" },
+      async (tx) => {
+        await tx.people.upsert({
+          site: "default",
+          id: "jane-doe",
+          name: "Jane Doe",
+          email: "jane@example.org",
+          org: "Somewhere Else",
+          source: "crm",
+        });
+      },
+    );
+
+    // `TEST_ACTOR` is the bootstrap superadmin, reading site A's document on
+    // the default host: the person they see is site A's, because the scope
+    // follows the document.
+    const list = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/a-letter/invitations",
+      headers: adminHeaders(),
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json<Array<{ person: string; org: string }>>()[0]?.org).toBe("River Alliance");
+
+    await server.close();
+  });
+});
+
+describe("the sign card's prefill belongs to the document (issue #51)", () => {
+  it("resolves field by field: the participation's prefill, then the person's default, then nothing", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-prefill" });
+    await seedParticipant(server, {
+      document: "doc-prefill",
+      person: "jane-doe",
+      token: "prefilltoken0000000",
+      name: "Jane Doe",
+      org: "River Alliance",
+      role: "Chair",
+      // no site-level descriptor
+      prefill: { org: "Parish Council", title: "Trustee" },
+    });
+
+    const bundle = await server.inject({ method: "GET", url: "/i/prefilltoken0000000/api/bundle" });
+    expect(bundle.statusCode).toBe(200);
+    expect(bundle.json().prefill).toEqual({
+      // the participation overrides
+      org: "Parish Council",
+      role: "Trustee",
+      // the person's site-level default
+      name: "Jane Doe",
+      // neither supplies one
+      descriptor: undefined,
+      suggested_capacity: undefined,
+    });
+
+    await server.close();
+  });
+
+  it("a participation with no prefill resolves exactly as it did before the field existed", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-legacy-prefill" });
+    await seedParticipant(server, {
+      document: "doc-legacy-prefill",
+      person: "rick-roe",
+      token: "legacyprefilltoken00",
+      name: "Rick Roe",
+      org: "River Alliance",
+      role: "Treasurer",
+      descriptor: "long-time neighbour",
+    });
+
+    const bundle = await server.inject({
+      method: "GET",
+      url: "/i/legacyprefilltoken00/api/bundle",
+    });
+    expect(bundle.json().prefill).toEqual({
+      name: "Rick Roe",
+      org: "River Alliance",
+      role: "Treasurer",
+      descriptor: "long-time neighbour",
+      suggested_capacity: undefined,
+    });
+
+    await server.close();
+  });
+
+  it("an import on a second document never changes what the first one prefills", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-one" });
+    await seedDocument(server, { slug: "doc-two" });
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-one/invitations/import",
+      headers: adminHeaders(),
+      payload: [
+        { name: "Jane Doe", email: "jane@example.org", org: "River Alliance", role: "Chair" },
+      ],
+    });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-two/invitations/import",
+      headers: adminHeaders(),
+      payload: [
+        { name: "Jane Doe", email: "jane@example.org", org: "Parish Council", role: "Trustee" },
+      ],
+    });
+
+    const one = server.storage.readModel.getParticipation("doc-one", "jane-doe");
+    const two = server.storage.readModel.getParticipation("doc-two", "jane-doe");
+    expect(one?.record.prefill).toEqual({
+      name: "Jane Doe",
+      org: "River Alliance",
+      title: "Chair",
+    });
+    expect(two?.record.prefill).toEqual({
+      name: "Jane Doe",
+      org: "Parish Council",
+      title: "Trustee",
+    });
+    // …and the shared person record still carries what the first import set.
+    expect(server.storage.readModel.getPerson("default", "jane-doe")?.org).toBe("River Alliance");
+
+    await server.close();
+  });
+
+  it("the participant bundle exposes nothing from `people` beyond the resolved prefill", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-boundary" });
+    await seedParticipant(server, {
+      document: "doc-boundary",
+      person: "jane-doe",
+      token: "boundarytoken0000000",
+      name: "Jane Doe",
+      email: "jane-private@example.org",
+    });
+    await server.storage.commit(
+      "invite",
+      { actor: TEST_ACTOR, subject: "invite: give jane private fields" },
+      async (tx) => {
+        await tx.people.patch(
+          { site: "default", id: "jane-doe" },
+          { phone: "+15555550123", external_id: "crm-9999" },
+        );
+      },
+    );
+
+    const bundle = await server.inject({
+      method: "GET",
+      url: "/i/boundarytoken0000000/api/bundle",
+    });
+    expect(bundle.body).not.toContain("jane-private@example.org");
+    expect(bundle.body).not.toContain("+15555550123");
+    expect(bundle.body).not.toContain("crm-9999");
+
+    await server.close();
+  });
+});
+
+describe("import --update decides what may be overwritten (issue #51)", () => {
+  async function seedJane(server: Awaited<ReturnType<typeof buildTestServer>>["server"]) {
+    await seedDocument(server, { slug: "doc-update" });
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update/invitations/import",
+      headers: adminHeaders(),
+      payload: [{ name: "Jane Doe", email: "jane@example.org", org: "River Alliance" }],
+    });
+    await seedDocument(server, { slug: "doc-update-2" });
+  }
+
+  it("without --update, an existing person's blanks are filled and their set fields are kept", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedJane(server);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update-2/invitations/import",
+      headers: adminHeaders(),
+      payload: [
+        { name: "Jane Doe", email: "jane@example.org", org: "Parish Council", role: "Trustee" },
+      ],
+    });
+    const body = response.json();
+    expect(body.people_overwritten).toBe(0);
+    expect(body.rows[0].would_change).toEqual(["role"]);
+    expect(body.rows[0].kept).toEqual(["org"]);
+
+    const person = server.storage.readModel.getPerson("default", "jane-doe");
+    expect(person?.org).toBe("River Alliance");
+    expect(person?.role).toBe("Trustee");
+
+    await server.close();
+  });
+
+  it("with --update, the row's values replace what the person already carries", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedJane(server);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update-2/invitations/import?update=1",
+      headers: adminHeaders(),
+      payload: [
+        { name: "Jane Doe", email: "jane@example.org", org: "Parish Council", role: "Trustee" },
+      ],
+    });
+    const body = response.json();
+    expect(body.update).toBe(true);
+    expect(body.people_overwritten).toBe(1);
+    expect(body.rows[0].would_change.sort()).toEqual(["org", "role"]);
+    expect(body.rows[0].kept).toEqual([]);
+    expect(server.storage.readModel.getPerson("default", "jane-doe")?.org).toBe("Parish Council");
+
+    await server.close();
+  });
+
+  it("a dry run reports would_change and kept in either mode and writes nothing", async () => {
+    const { server, dataDir, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedJane(server);
+    const before = await commitCount(dataDir);
+
+    const row = {
+      name: "Jane Doe",
+      email: "jane@example.org",
+      org: "Parish Council",
+      descriptor: "long-time neighbour",
+    };
+    const plain = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update-2/invitations/import?dry_run=1",
+      headers: adminHeaders(),
+      payload: [row],
+    });
+    expect(plain.json().rows[0].would_change).toEqual(["descriptor"]);
+    expect(plain.json().rows[0].kept).toEqual(["org"]);
+
+    const updating = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update-2/invitations/import?dry_run=1&update=1",
+      headers: adminHeaders(),
+      payload: [row],
+    });
+    expect(updating.json().rows[0].would_change.sort()).toEqual(["descriptor", "org"]);
+    expect(updating.json().rows[0].kept).toEqual([]);
+    expect(updating.json().people_overwritten).toBe(1);
+
+    expect(await commitCount(dataDir)).toBe(before);
+    expect(server.storage.readModel.getPerson("default", "jane-doe")?.descriptor).toBeUndefined();
+
+    await server.close();
+  });
+
+  it("--update refreshes an already-invited person's prefill; without it the participation is untouched", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedJane(server);
+
+    const sameDoc = {
+      name: "Jane Doe",
+      email: "jane@example.org",
+      org: "Parish Council",
+      role: "Trustee",
+    };
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update/invitations/import",
+      headers: adminHeaders(),
+      payload: [sameDoc],
+    });
+    expect(
+      server.storage.readModel.getParticipation("doc-update", "jane-doe")?.record.prefill,
+    ).toEqual({ name: "Jane Doe", org: "River Alliance" });
+
+    const updated = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-update/invitations/import?update=1",
+      headers: adminHeaders(),
+      payload: [sameDoc],
+    });
+    expect(updated.json().rows[0].would_change).toContain("prefill.org");
+    expect(
+      server.storage.readModel.getParticipation("doc-update", "jane-doe")?.record.prefill,
+    ).toEqual({ name: "Jane Doe", org: "Parish Council", title: "Trustee" });
 
     await server.close();
   });

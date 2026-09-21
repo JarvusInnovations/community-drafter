@@ -19,7 +19,10 @@ export function buildRecipientContext(
   document: DocumentEntry,
   participation: ParticipationEntry,
 ): RecipientContext {
-  const person = fastify.storage.readModel.getPerson(participation.record.person);
+  const person = fastify.storage.readModel.getPersonOn(
+    document.record.slug,
+    participation.record.person,
+  );
   const now = new Date();
   const phase = derivePhase(document.record, now);
   const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";

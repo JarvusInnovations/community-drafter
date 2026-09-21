@@ -60,7 +60,7 @@ export function operatorFacingName(
   const participation = fastify.storage.readModel.getParticipation(document, person);
   const signed = participation?.record.signature?.display_name;
   if (signed) return signed;
-  return fastify.storage.readModel.getPerson(person)?.name || person;
+  return fastify.storage.readModel.getPersonOn(document, person)?.name || person;
 }
 
 function unique(names: string[]): string[] {

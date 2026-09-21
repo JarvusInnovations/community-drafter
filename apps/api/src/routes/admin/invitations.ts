@@ -1,4 +1,4 @@
-import type { Capacity } from "@signatories/shared";
+import type { Capacity, PersonRecord, Prefill } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
@@ -6,6 +6,7 @@ import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { toCsv } from "../../lib/csv.ts";
 import { lastMessagedAt, prefOn } from "../../lib/notify.ts";
 import { participationStatus } from "../../lib/participation-status.ts";
+import { prefillFromRow, resolvePrefill } from "../../lib/prefill.ts";
 import { buildPrefsView } from "../../lib/prefs.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { uniqueSlug } from "../../lib/slug.ts";
@@ -33,6 +34,11 @@ interface ImportRow {
   external_id?: string;
   suggested_capacity?: Capacity;
   tags?: string[];
+}
+
+interface ImportQuery {
+  dry_run?: string;
+  update?: string;
 }
 
 interface ListInvitationsQuery {
@@ -106,6 +112,97 @@ function parseImportRows(request: FastifyRequest): ImportRow[] {
   throw new ApiError("invalid_request", "Expected a JSON array or NDJSON body of import rows.");
 }
 
+/** The person fields an import row may carry, in the order they are reported. */
+const PERSON_FIELDS = ["name", "phone", "org", "role", "descriptor", "external_id"] as const;
+type PersonField = (typeof PERSON_FIELDS)[number];
+
+interface PlanRow {
+  email: string;
+  name: string;
+  person: string;
+  action: "invite_new_person" | "invite_existing_person" | "skip_existing";
+  would_change: string[];
+  kept: string[];
+  apply: {
+    fields: Partial<Record<PersonField, string>>;
+    prefill: Prefill | undefined;
+    overwrites: number;
+  };
+}
+
+function isTrue(value: string | undefined): boolean {
+  return value === "1" || value === "true";
+}
+
+function present(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed !== undefined && trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * `specs/api/admin.md` § People and invitations: "Without it, a row fills an
+ * existing person's *blank* fields and keeps every value they already carry.
+ * With `update=1`, the row's values replace them." `would_change` is what
+ * this mode would really change, `kept` what it would leave alone, and
+ * `overwrites` counts the already-set values a change replaces.
+ */
+function planPersonFields(
+  row: ImportRow,
+  existing: PersonRecord | null | undefined,
+  update: boolean,
+): {
+  fields: Partial<Record<PersonField, string>>;
+  would_change: string[];
+  kept: string[];
+  overwrites: number;
+} {
+  const fields: Partial<Record<PersonField, string>> = {};
+  const would_change: string[] = [];
+  const kept: string[] = [];
+  let overwrites = 0;
+  if (!existing) return { fields, would_change, kept, overwrites };
+
+  for (const field of PERSON_FIELDS) {
+    const next = present(row[field]);
+    if (next === undefined) continue;
+    const current = present(existing[field]);
+    if (current === undefined) {
+      fields[field] = next;
+      would_change.push(field);
+      continue;
+    }
+    if (current === next) continue;
+    if (update) {
+      fields[field] = next;
+      would_change.push(field);
+      overwrites += 1;
+    } else {
+      kept.push(field);
+    }
+  }
+  return { fields, would_change, kept, overwrites };
+}
+
+const PREFILL_FIELDS = ["name", "org", "title", "descriptor"] as const;
+
+/** Which of an existing participation's prefill fields this row would change. */
+function changedPrefillFields(current: Prefill | undefined, next: Prefill | undefined): string[] {
+  return PREFILL_FIELDS.filter(
+    (key) => (current?.[key] ?? undefined) !== (next?.[key] ?? undefined),
+  );
+}
+
+/**
+ * An RFC 7396 merge patch that makes a participation's `prefill` exactly
+ * `next`: a field the row no longer carries is deleted with `null`, which
+ * the record type cannot express because it describes the merged result.
+ */
+function prefillPatch(next: Prefill | undefined): Prefill {
+  return Object.fromEntries(
+    PREFILL_FIELDS.map((key) => [key, next?.[key] ?? null]),
+  ) as unknown as Prefill;
+}
+
 const invitationsRoute: FastifyPluginAsync = async (fastify) => {
   // NDJSON is a line-delimited body, not a single JSON document — parse it
   // as raw text here and split in the handler, alongside the ordinary JSON
@@ -118,30 +215,31 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  fastify.post<{ Params: DocumentParams; Querystring: { dry_run?: string } }>(
+  fastify.post<{ Params: DocumentParams; Querystring: ImportQuery }>(
     "/documents/:slug/invitations/import",
     { config: DOCUMENT_SCOPED_ROUTE },
     async (request) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
       const slug = document.record.slug;
+      // `specs/behaviors/sites.md` § People are per site: the merge key is
+      // the email **within the document's site**. The same address on
+      // another site is a different person and is never read or written.
+      const site = fastify.storage.readModel.siteSlugForDocument(slug);
       const rows = parseImportRows(request);
-      const dryRun = request.query?.dry_run === "1" || request.query?.dry_run === "true";
+      const dryRun = isTrue(request.query?.dry_run);
+      const update = isTrue(request.query?.update);
 
       // `specs/api/admin.md` § People and invitations: the plan is computed
       // read-only first, so a dry run reports exactly what the commit below
-      // would do — including which existing person fields a row overwrites.
-      const plan: Array<{
-        email: string;
-        name: string;
-        person: string;
-        action: "invite_new_person" | "invite_existing_person" | "skip_existing";
-        changes: string[];
-      }> = [];
+      // would do — including which existing person fields a row would
+      // change and which it would keep.
+      const plan: PlanRow[] = [];
       const plannedIds = new Set<string>();
       for (const row of rows) {
         const email = row.email.trim();
         const existing = await fastify.storage.store.people.queryFirst({
+          site,
           email: (value) => value.toLowerCase() === email.toLowerCase(),
         });
         const personId =
@@ -149,44 +247,53 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           uniqueSlug(
             row.name,
             (candidate) =>
-              plannedIds.has(candidate) || Boolean(fastify.storage.readModel.getPerson(candidate)),
+              plannedIds.has(candidate) ||
+              Boolean(fastify.storage.readModel.getPerson(site, candidate)),
           );
         if (!existing) plannedIds.add(personId);
-        const changes: string[] = [];
-        if (existing) {
-          for (const field of [
-            "name",
-            "phone",
-            "org",
-            "role",
-            "descriptor",
-            "external_id",
-          ] as const) {
-            const next = row[field];
-            if (next !== undefined && next !== existing[field]) changes.push(field);
-          }
-        }
-        const alreadyOn = fastify.storage.readModel.getParticipation(slug, personId);
+
+        const { fields, would_change, kept, overwrites } = planPersonFields(row, existing, update);
+        const participation = fastify.storage.readModel.getParticipation(slug, personId);
+        const prefill = prefillFromRow(row);
+        // An already-invited person's participation is left alone unless the
+        // file is declared authoritative: `--update` is what lets it refresh
+        // the prefill this document shows.
+        const prefillChanges =
+          participation && update
+            ? changedPrefillFields(participation.record.prefill, prefill)
+            : [];
+
         plan.push({
           email,
           name: row.name,
           person: personId,
-          action: alreadyOn
+          action: participation
             ? "skip_existing"
             : existing
               ? "invite_existing_person"
               : "invite_new_person",
-          changes,
+          would_change: [...would_change, ...prefillChanges.map((field) => `prefill.${field}`)],
+          kept,
+          // Not part of the response — the write pass reads it so the plan
+          // and the commit can never disagree about what changes.
+          apply: { fields, prefill, overwrites },
         });
       }
+
       const counts = {
+        update,
+        site,
         people_created: plan.filter((p) => p.action === "invite_new_person").length,
-        people_updated: plan.filter((p) => p.action !== "invite_new_person").length,
+        people_updated: plan.filter(
+          (p) => p.action !== "invite_new_person" && Object.keys(p.apply.fields).length > 0,
+        ).length,
+        people_overwritten: plan.filter((p) => p.apply.overwrites > 0).length,
         invitations_created: plan.filter((p) => p.action !== "skip_existing").length,
         skipped_existing: plan.filter((p) => p.action === "skip_existing").length,
       };
+      const planRows = plan.map(({ apply: _apply, ...row }) => row);
       if (dryRun) {
-        return { dry_run: true, ...counts, rows: plan, commit: null };
+        return { dry_run: true, ...counts, rows: planRows, commit: null };
       }
 
       const result = await fastify.storage.commit(
@@ -198,37 +305,26 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           requestId: request.requestId,
         },
         async (tx) => {
-          const takenIds = new Set<string>();
           const mintedTokens = new Set<string>();
-          for (const row of rows) {
+          for (let index = 0; index < rows.length; index += 1) {
+            const row = rows[index]!;
+            const planned = plan[index]!;
             const email = row.email.trim();
             const existing = await tx.people.queryFirst({
+              site,
               email: (value) => value.toLowerCase() === email.toLowerCase(),
             });
 
-            let personId: string;
             if (existing) {
-              personId = existing.id;
-              await tx.people.patch(
-                { id: existing.id },
-                {
-                  name: row.name ?? existing.name,
-                  phone: row.phone ?? existing.phone,
-                  org: row.org ?? existing.org,
-                  role: row.role ?? existing.role,
-                  descriptor: row.descriptor ?? existing.descriptor,
-                  external_id: row.external_id ?? existing.external_id,
-                },
-              );
+              // Only the fields the plan named — an unnamed field keeps the
+              // value the person already carries.
+              if (Object.keys(planned.apply.fields).length > 0) {
+                await tx.people.patch({ site, id: existing.id }, planned.apply.fields);
+              }
             } else {
-              personId = uniqueSlug(row.name, (candidate) => {
-                if (takenIds.has(candidate)) return true;
-                if (fastify.storage.readModel.getPerson(candidate)) return true;
-                return false;
-              });
-              takenIds.add(personId);
               await tx.people.upsert({
-                id: personId,
+                site,
+                id: planned.person,
                 name: row.name,
                 email,
                 phone: row.phone,
@@ -242,9 +338,17 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
 
             const existingParticipation = await tx.participations.queryFirst({
               document: slug,
-              person: personId,
+              person: planned.person,
             });
-            if (existingParticipation) continue;
+            if (existingParticipation) {
+              if (update && planned.would_change.some((field) => field.startsWith("prefill."))) {
+                await tx.participations.patch(
+                  { document: slug, person: planned.person },
+                  { prefill: prefillPatch(planned.apply.prefill) },
+                );
+              }
+              continue;
+            }
 
             const token = mintUniqueToken(
               (candidate) =>
@@ -254,16 +358,19 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
             mintedTokens.add(token);
             await tx.participations.upsert({
               document: slug,
-              person: personId,
+              person: planned.person,
               token,
               source: "crm",
               suggested_capacity: row.suggested_capacity,
+              // `specs/data-model.md` → `participations`: the row's sign-card
+              // values belong to *this* document, not to the person.
+              prefill: planned.apply.prefill,
             });
           }
         },
       );
 
-      return { ...counts, rows: plan, commit: result.commitHash };
+      return { ...counts, rows: planRows, commit: result.commitHash };
     },
   );
 
@@ -332,10 +439,15 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       const { status, source, q } = request.query;
 
       const rows = fastify.storage.readModel.listParticipationsForDocument(slug).map((entry) => {
-        const person = fastify.storage.readModel.getPerson(entry.record.person);
+        const person = fastify.storage.readModel.getPersonOn(slug, entry.record.person);
+        // `specs/api/admin.md`: a row's `name` and `org` are what **this**
+        // document prefills, so the list, "view as" and the sign card agree.
+        const prefill = resolvePrefill(person, entry.record);
         return {
           person: entry.record.person,
-          name: person?.name ?? "",
+          name: prefill.name ?? "",
+          org: prefill.org ?? "",
+          prefill,
           email: person?.email ?? "",
           status: participationStatus(fastify, entry),
           source: entry.record.source,
@@ -394,7 +506,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           skipped.push({ person: entry.record.person, reason: "already_sent" });
           continue;
         }
-        const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
+        const personRecord = fastify.storage.readModel.getPersonOn(slug, entry.record.person);
         if (!personRecord?.email) {
           skipped.push({ person: entry.record.person, reason: "no_email" });
           continue;
@@ -408,7 +520,8 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           would_send: candidates.map((entry) => ({
             person: entry.record.person,
             name:
-              fastify.storage.readModel.getPerson(entry.record.person)?.name ?? entry.record.person,
+              fastify.storage.readModel.getPersonOn(slug, entry.record.person)?.name ??
+              entry.record.person,
           })),
           skipped,
         };
@@ -450,7 +563,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         const rows = candidates
           .filter((entry) => sentPeople.has(entry.record.person))
           .map((entry) => {
-            const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
+            const personRecord = fastify.storage.readModel.getPersonOn(slug, entry.record.person);
             return [
               personRecord?.name ?? entry.record.person,
               personRecord?.email ?? "",
@@ -482,7 +595,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       const now = new Date().toISOString();
       const rows: string[][] = [];
       for (const entry of candidates) {
-        const personRecord = fastify.storage.readModel.getPerson(entry.record.person);
+        const personRecord = fastify.storage.readModel.getPersonOn(slug, entry.record.person);
         rows.push([
           entry.record.person,
           personRecord?.name ?? "",

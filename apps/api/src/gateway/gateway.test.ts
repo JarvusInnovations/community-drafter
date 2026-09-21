@@ -290,6 +290,7 @@ describe("gateway: participant token resolution", () => {
           operators: [actor.email],
         });
         await tx.people.upsert({
+          site: "default",
           id: "revoked-person",
           name: "Revoked Person",
           email: "revoked@example.org",
@@ -303,6 +304,7 @@ describe("gateway: participant token resolution", () => {
           link_revoked: true,
         });
         await tx.people.upsert({
+          site: "default",
           id: "expired-person",
           name: "Expired Person",
           email: "expired@example.org",
@@ -363,6 +365,7 @@ describe("gateway: participant token resolution", () => {
           operators: [actor.email],
         });
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",
@@ -409,6 +412,7 @@ describe("gateway: participant token resolution", () => {
           operators: [actor.email],
         });
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",

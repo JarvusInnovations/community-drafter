@@ -73,6 +73,7 @@ describe("POST /admin/api/documents/:slug/versions", () => {
       { actor: TEST_ACTOR, subject: "invite: jane-doe on doc-disposed", document: "doc-disposed" },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",
@@ -144,6 +145,7 @@ describe("POST /admin/api/documents/:slug/versions", () => {
       },
       async (tx) => {
         await tx.people.upsert({
+          site: "default",
           id: "jane-doe",
           name: "Jane Doe",
           email: "jane@example.org",
