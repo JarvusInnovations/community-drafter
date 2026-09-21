@@ -15,6 +15,20 @@ interface RequestOptions {
   /** Sent as-is with the given content type instead of JSON-encoding `body`. */
   raw?: { text: string; contentType: string };
   query?: Record<string, string | undefined>;
+  /** Read the successful response as bytes rather than as text or JSON. */
+  binary?: boolean;
+}
+
+/**
+ * A binary download — today only the deliverable
+ * (`specs/screens/deliverable.md`). `filename` is what the server's
+ * `Content-Disposition` named, which is where the version number and the
+ * draft-or-clean word come from: the CLI reads them off the name rather
+ * than asking a second time and reporting a different moment.
+ */
+export interface BinaryResponse {
+  bytes: Uint8Array;
+  filename?: string;
 }
 
 interface RefreshResponse {
@@ -140,6 +154,12 @@ export class SignatoriesClient {
       throw new ApiCallError("internal_error", text || `HTTP ${response.status}`);
     }
 
+    if (options.binary) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const filename = filenameFromDisposition(response.headers.get("content-disposition"));
+      return { bytes, filename } as unknown as T;
+    }
+
     if (response.status === 204) return undefined as unknown as T;
     if (contentType.includes("text/csv") || contentType.includes("text/markdown")) {
       return (await response.text()) as unknown as T;
@@ -152,6 +172,10 @@ export class SignatoriesClient {
 
   get<T>(path: string, query?: Record<string, string | undefined>): Promise<T> {
     return this.request<T>("GET", path, { query });
+  }
+
+  getBinary(path: string, query?: Record<string, string | undefined>): Promise<BinaryResponse> {
+    return this.request<BinaryResponse>("GET", path, { query, binary: true });
   }
 
   post<T>(path: string, body?: unknown): Promise<T> {
@@ -170,4 +194,12 @@ export class SignatoriesClient {
   delete<T>(path: string): Promise<T> {
     return this.request<T>("DELETE", path);
   }
+}
+
+/** `attachment; filename="charter-v3-draft.pdf"` → `charter-v3-draft.pdf`. */
+function filenameFromDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const match = /filename\*?=(?:"([^"]+)"|([^;]+))/u.exec(header);
+  const value = match?.[1] ?? match?.[2];
+  return value?.trim() || undefined;
 }
