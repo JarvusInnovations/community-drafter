@@ -136,3 +136,43 @@ describe("DashboardScreen — signatures behind the current version", () => {
     expect(screen.queryByText("Behind current")).toBeNull();
   });
 });
+
+/**
+ * `specs/screens/admin-dashboard.md` § Dashboard: the audience is its own
+ * line and reads off `audience` / `addressed_to`, never `public_access` —
+ * a letter to a named body may be drafted link-readable (issue #88).
+ */
+describe("DashboardScreen — the audience line", () => {
+  beforeEach(() => {
+    mockFetch([]);
+  });
+
+  it("says who a closed statement is delivered to even when the draft is link-readable", () => {
+    renderDashboard({
+      document: {
+        ...documentAt(1),
+        audience: "closed",
+        addressed_to: ["St. Brigid Parish Council"],
+        public_access: "read",
+      },
+      refetch: noopRefetch,
+    });
+
+    const line = screen.getByText("Audience:").parentElement;
+    expect(line?.textContent).toContain("Delivered, not published");
+    expect(line?.textContent).toContain("addressed to St. Brigid Parish Council");
+    // `public_access` drives only the copy-link affordance, not this line.
+    expect(screen.getByText("Copy public link")).toBeTruthy();
+  });
+
+  it("says a public statement is published for anyone to read", () => {
+    renderDashboard({
+      document: { ...documentAt(1), audience: "public" },
+      refetch: noopRefetch,
+    });
+
+    const line = screen.getByText("Audience:").parentElement;
+    expect(line?.textContent).toContain("Published for anyone to read");
+    expect(line?.textContent).not.toContain("addressed to");
+  });
+});

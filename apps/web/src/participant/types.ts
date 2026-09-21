@@ -12,7 +12,11 @@
 
 export type Capacity = "personal" | "official";
 export type ShowSignatories = "list" | "count" | "none";
-/** `specs/data-model.md` § Audience — derived server-side from `public_access`. */
+/**
+ * `specs/data-model.md` § Audience — a stored field saying who the finished
+ * statement is published or delivered to. Not `public_access`, which is read
+ * access to the working draft and never reaches a participant surface.
+ */
 export type Audience = "public" | "closed";
 export type DocumentState = "draft" | "open" | "closed" | "withdrawn";
 export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
@@ -48,8 +52,8 @@ export interface DocumentInfo {
   capacities: Capacity[];
   show_signatories: ShowSignatories;
   audience: Audience;
-  /** Organizations a closed document's signatory list is shared with (`specs/data-model.md` § Audience). */
-  list_visible_to: string[];
+  /** Who the finished statement goes to (`specs/data-model.md` § Audience). */
+  addressed_to: string[];
   reply_to?: string;
   sender_name?: string;
 }

@@ -63,11 +63,12 @@ export function buildParticipantBundle(
       capacities: document.record.capacities ?? ["personal", "official"],
       show_signatories: document.record.show_signatories ?? "list",
       // `specs/behaviors/signatures.md` § Consent at signing: the sign card
-      // says who will see the signer's name, which is the audience
-      // (`specs/data-model.md` § Audience) plus, on a closed document, the
-      // organizations the list is shared with.
+      // says who will see the signer's name, which is the audience and who
+      // the statement is addressed to (`specs/data-model.md` § Audience).
+      // `public_access` is deliberately absent — who may read the draft is
+      // not a fact a signer is asked to stand behind.
       audience: audienceOf(document.record),
-      list_visible_to: document.record.list_visible_to ?? [],
+      addressed_to: document.record.addressed_to ?? [],
       reply_to: document.record.reply_to,
       sender_name: document.record.sender_name,
     },

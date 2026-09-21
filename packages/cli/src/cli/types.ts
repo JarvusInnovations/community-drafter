@@ -34,10 +34,14 @@ export interface DocumentSummary {
   sender_name: string;
   reply_to: string;
   capacities?: string[];
+  /** Drafting-time read access to the working document. */
   public_access?: string;
-  /** `specs/data-model.md` § Audience — derived server-side from `public_access`. */
+  /**
+   * `specs/data-model.md` § Audience — stored on the document, and
+   * independent of `public_access`.
+   */
   audience?: string;
-  list_visible_to?: string[];
+  addressed_to?: string[];
   show_signatories?: string;
   revocation_window_hours?: number;
   tags?: string[];

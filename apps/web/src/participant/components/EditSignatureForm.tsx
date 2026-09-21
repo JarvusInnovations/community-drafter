@@ -44,7 +44,6 @@ export function EditSignatureForm({
   const isOfficial = signature.capacity === "official";
   const orgChanged = isOfficial && org.trim() !== (signature.org ?? "").trim();
   const showListingChoice = document.show_signatories === "list";
-  const sharedWith = document.audience === "closed" ? document.list_visible_to : [];
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -145,8 +144,7 @@ export function EditSignatureForm({
         </label>
       )}
       <p className="rounded-xl bg-muted px-3 py-2.5 text-sm text-muted-foreground">
-        {copy.signForm.whoSees(document.audience, document.show_signatories)}
-        {sharedWith.length > 0 ? ` ${copy.signForm.alsoSharedWith(sharedWith)}` : ""}
+        {copy.signForm.whoSees(document.audience, document.addressed_to, document.show_signatories)}
       </p>
       {showListingChoice ? (
         <label className="flex items-center gap-2 text-sm">

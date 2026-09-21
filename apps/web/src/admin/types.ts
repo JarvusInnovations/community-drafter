@@ -35,10 +35,14 @@ export interface DocumentSummary {
   sender_name?: string;
   reply_to?: string;
   capacities?: Capacity[];
+  /**
+   * `specs/data-model.md` § Audience. `public_access` is drafting-time read
+   * access to the working document; `audience` and `addressed_to` say who
+   * the finished statement is published or delivered to. Independent.
+   */
   public_access?: "none" | "read" | "participate";
-  /** `specs/data-model.md` § Audience — derived server-side from `public_access`. */
   audience: "public" | "closed";
-  list_visible_to?: string[];
+  addressed_to?: string[];
   show_signatories?: ShowSignatories;
   revocation_window_hours?: number;
   tags?: string[];

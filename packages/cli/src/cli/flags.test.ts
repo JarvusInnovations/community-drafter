@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import {
   bool,
   csv,
+  list,
   parseFlags,
   parseSubcommand,
   requirePositional,
@@ -86,6 +87,56 @@ describe("csv", () => {
   it("splits and trims, dropping empty entries", () => {
     expect(csv("a, b ,,c")).toEqual(["a", "b", "c"]);
     expect(csv(undefined)).toEqual([]);
+  });
+});
+
+/**
+ * `specs/api/admin-cli.md`: `--addressed-to` repeats once per recipient
+ * rather than taking a comma-separated list, because the values are proper
+ * names and a comma inside one would silently split it in two.
+ */
+describe("repeatable flags", () => {
+  it("accumulates every occurrence, in order, and trims", () => {
+    const parsed = parseFlags(
+      "docs create",
+      [
+        "my-slug",
+        "--addressed-to",
+        " St. Brigid Parish Council ",
+        "--addressed-to",
+        "Board of Education, District 5",
+      ],
+      { positionals: 1, multi: ["--addressed-to"] },
+    );
+    expect(list(parsed, "--addressed-to")).toEqual([
+      "St. Brigid Parish Council",
+      "Board of Education, District 5",
+    ]);
+  });
+
+  it("distinguishes a flag never given from one given empty", () => {
+    const absent = parseFlags("docs update", ["s"], { positionals: 1, multi: ["--addressed-to"] });
+    expect(list(absent, "--addressed-to")).toBeUndefined();
+
+    const empty = parseFlags("docs update", ["s", "--addressed-to="], {
+      positionals: 1,
+      multi: ["--addressed-to"],
+    });
+    expect(list(empty, "--addressed-to")).toEqual([]);
+  });
+
+  it("names the replacement when a renamed flag is used", () => {
+    try {
+      parseFlags("docs create", ["s", "--list-visible-to", "X"], {
+        positionals: 1,
+        multi: ["--addressed-to"],
+        deprecated: { "--list-visible-to": "--list-visible-to is now --addressed-to" },
+      });
+      throw new Error("expected a throw");
+    } catch (error) {
+      expect((error as AxiError).code).toBe("UNKNOWN_FLAG");
+      expect(JSON.stringify(error)).toContain("--addressed-to");
+    }
   });
 });
 

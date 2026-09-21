@@ -52,19 +52,31 @@ default = ['personal', 'official']
 type = 'string'
 enum = ['personal', 'official']
 
+# `specs/data-model.md` § Audience: who the *finished* statement is for.
+# Stored, never derived, and orthogonal to `public_access` below, which is
+# read access to the *working* document. Optional in the schema so every
+# record written before the field existed still validates; such a record
+# reads as `closed`.
+[gitsheet.schema.properties.audience]
+type = 'string'
+enum = ['public', 'closed']
+
+# Who the finished statement is published or delivered to. Required when
+# `audience = 'closed'` — enforced by the admin API rather than the schema,
+# because the schema cannot make one field's presence depend on another's
+# value here without rejecting pre-field records.
+[gitsheet.schema.properties.addressed_to]
+type = 'array'
+
+[gitsheet.schema.properties.addressed_to.items]
+type = 'string'
+
+# Drafting-time read access to the working document (`specs/data-model.md`
+# § Audience). Independent of `audience`.
 [gitsheet.schema.properties.public_access]
 type = 'string'
 enum = ['none', 'read', 'participate']
 default = 'none'
-
-# `specs/data-model.md` § Audience: organizations the team will show a
-# closed document's signatory list to besides the invitees. Optional, so
-# every record written before the field existed still validates.
-[gitsheet.schema.properties.list_visible_to]
-type = 'array'
-
-[gitsheet.schema.properties.list_visible_to.items]
-type = 'string'
 
 [gitsheet.schema.properties.show_signatories]
 type = 'string'
@@ -105,7 +117,7 @@ type = 'string'
 [gitsheet.schema.properties.body]
 type = 'string'
 
-[gitsheet.fields.list_visible_to]
+[gitsheet.fields.addressed_to]
 sort = true
 
 [gitsheet.fields.tags]

@@ -24,6 +24,15 @@ export type SignedWho = Pick<
   "capacity" | "display_name" | "descriptor" | "org" | "title" | "signed_on_version"
 >;
 
+/**
+ * "A", "A and B", "A, B and C" — the way a person reads a list of names
+ * (`specs/screens/document.md` § Display Rules 3).
+ */
+function nameList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 export const copy = {
   instanceBar: (name: string) => name,
 
@@ -131,24 +140,26 @@ export const copy = {
      * see this name. It never promises more privacy than the document's
      * settings give.
      */
-    whoSees(audience: Audience, show: ShowSignatories): string {
+    whoSees(audience: Audience, addressedTo: string[], show: ShowSignatories): string {
+      // The audience picks the verb: a public statement is published, a
+      // closed one is delivered to the people it is addressed to.
+      const verb = audience === "public" ? "published" : "delivered";
       if (show === "none") {
-        return "No signatory list is shown for this document; your name goes to the team.";
+        return `No signatory list will be ${verb} with this statement; your name goes to the team.`;
       }
       if (show === "count") {
-        return "Only the number of signatories is shown; your name goes to the team.";
+        return `Only the number of signatories will be ${verb} with this statement; your name goes to the team.`;
       }
-      return audience === "public"
-        ? "Your name will appear on the signatory list, which anyone with the link can read."
-        : "Your name will appear on the signatory list, which only the people invited to this document can see.";
-    },
-    /** The second sentence, when a closed document's list is shared beyond its invitees. */
-    alsoSharedWith(organizations: string[]): string {
-      const named =
-        organizations.length === 1
-          ? organizations[0]
-          : `${organizations.slice(0, -1).join(", ")} and ${organizations[organizations.length - 1]}`;
-      return `The team also shares the list with ${named}.`;
+      if (audience === "public") {
+        return addressedTo.length > 0
+          ? `This statement and its signatory list will be published for anyone to read, addressed to ${nameList(addressedTo)}.`
+          : "This statement and its signatory list will be published for anyone to read.";
+      }
+      // A closed document always names its recipients — except on a record
+      // written before the field existed, which names none.
+      return addressedTo.length > 0
+        ? `This statement and its signatory list go to ${nameList(addressedTo)}; the people invited to sign can also see the list.`
+        : "This statement and its signatory list go to the people invited to sign.";
     },
     titleError: "Add your title before signing for an organization.",
     signButton: (name: string) => `Sign as ${name || "…"}`,

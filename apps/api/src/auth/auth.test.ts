@@ -314,6 +314,7 @@ describe("cookie-authenticated writes require the CSRF header", () => {
         title: "Doc CSRF 2",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     expect(withoutHeader.statusCode).toBe(403);
@@ -328,6 +329,7 @@ describe("cookie-authenticated writes require the CSRF header", () => {
         title: "Doc CSRF 3",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     expect(withHeader.statusCode).toBe(201);
@@ -356,6 +358,7 @@ describe("cookie-authenticated writes require the CSRF header", () => {
         title: "Doc Bearer",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     expect(response.statusCode).toBe(201);
@@ -385,6 +388,7 @@ describe("cookie-authenticated writes require the CSRF header", () => {
         title: "Doc Both Transports",
         sender_name: "Team",
         reply_to: "team@example.org",
+        audience: "public",
       },
     });
     expect(response.statusCode).toBe(401);

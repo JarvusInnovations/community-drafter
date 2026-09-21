@@ -858,12 +858,18 @@ function isValueLike(arg) {
   return /^-[.\d]/.test(arg);
 }
 function parseFlags(command, argv, spec) {
-  const valueFlags = new Set(spec.value ?? []);
+  const multiFlags = new Set(spec.multi ?? []);
+  const valueFlags = /* @__PURE__ */ new Set([...spec.value ?? [], ...multiFlags]);
   const boolFlags = new Set(spec.boolean ?? []);
   const deprecated = spec.deprecated ?? {};
   const known = [...valueFlags, ...boolFlags].sort();
   const positional = [];
   const flags = {};
+  const lists = {};
+  const take = (name, value) => {
+    if (multiFlags.has(name)) (lists[name] ??= []).push(value);
+    else flags[name] = value;
+  };
   const unknown = (name) => {
     const hint = deprecated[name];
     throw new AxiError(`unknown flag ${name} for \`${command}\``, "UNKNOWN_FLAG", [
@@ -899,7 +905,7 @@ function parseFlags(command, argv, spec) {
     }
     if (valueFlags.has(name) || GLOBAL_VALUE_FLAGS.has(name)) {
       if (inlineValue !== void 0) {
-        flags[name] = inlineValue;
+        take(name, inlineValue);
         continue;
       }
       const next = argv[i + 1];
@@ -908,7 +914,7 @@ function parseFlags(command, argv, spec) {
           `Run \`drafter-axi ${command} ${name} <value>\``
         ]);
       }
-      flags[name] = next;
+      take(name, next);
       i++;
       continue;
     }
@@ -922,7 +928,7 @@ function parseFlags(command, argv, spec) {
       [`Run \`drafter-axi ${command} --help\` for the expected form`]
     );
   }
-  return { positional, flags };
+  return { positional, flags, lists };
 }
 function str(parsed, name, fallback) {
   const raw = parsed.flags[name];
@@ -930,6 +936,11 @@ function str(parsed, name, fallback) {
 }
 function bool(parsed, name) {
   return parsed.flags[name] !== void 0;
+}
+function list(parsed, name) {
+  const raw = parsed.lists[name];
+  if (raw === void 0) return void 0;
+  return raw.map((v) => v.trim()).filter((v) => v.length > 0);
 }
 function csv(value) {
   if (!value) return [];
@@ -1267,14 +1278,22 @@ var DOCS_FLAGS = {
       "--reply-to",
       "--capacities",
       "--audience",
-      "--list-visible-to",
       "--public",
       "--show-signatories",
       "--revocation-window-hours",
       "--tags"
-    ]
+    ],
+    multi: ["--addressed-to"],
+    deprecated: {
+      "--list-visible-to": "--list-visible-to is now --addressed-to: who the statement goes to, repeatable once per recipient"
+    }
   },
   show: { positionals: 1 },
+  update: {
+    positionals: 1,
+    value: ["--audience"],
+    multi: ["--addressed-to"]
+  },
   open: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   extend: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   close: { positionals: 1 },
@@ -1282,22 +1301,30 @@ var DOCS_FLAGS = {
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
   operators: { positionals: 3 }
 };
-var DOCS_HELP = `usage: drafter-axi docs <create|show|open|extend|close|reopen|withdraw|operators> ...
+var DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
-create <slug> --title <text> --sender-name <text> --reply-to <email>
-       [--capacities personal,official] [--audience public|closed]
-       [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none]
+create <slug> --title <text> --audience public|closed
+       --sender-name <text> --reply-to <email>
+       [--addressed-to "<name>"]... [--capacities personal,official]
+       [--show-signatories list|count|none]
        [--revocation-window-hours <n>] [--tags a,b]
        (the caller becomes the document's first operator)
 
---audience declares who the document is for, and defaults to closed:
-  closed  only the people you invite, each through their own personal link
-  public  anyone with the link can read it (sets public_access to read)
---list-visible-to names the organizations a closed document's signatory list is
-shared with besides its invitees. It is a disclosure, not a permission: every
-signer is shown those names before they sign. It has no meaning on a public
-document.
+--audience is required and says who the FINISHED statement is for:
+  public  it will be published for anyone to read
+  closed  it is delivered to the people and bodies it is addressed to
+--addressed-to names one of those recipients; repeat it once per recipient. It
+is required with --audience closed, and allowed with --audience public. It is a
+disclosure, not a permission: every signer is shown those names before they
+sign.
+
+--audience is not --public. --public sets public_access, which is whether
+anyone with the link may read the WORKING draft; the two are independent, so a
+letter to a named body can be drafted in the open and a public statement can be
+drafted invitee-only.
 show <slug>
+update <slug> [--audience public|closed] [--addressed-to "<name>"]...
+       (settings only; --addressed-to replaces the recipients)
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
@@ -1332,12 +1359,13 @@ function detailObject(doc, instanceUrl) {
     comments_close_at: doc.comments_close_at,
     signing_closes_at: doc.signing_closes_at,
     capacities: doc.capacities,
+    // `specs/api/admin-cli.md` § Output rules: the audience and who the
+    // statement is addressed to, as stored, beside `public_access` — who
+    // the statement goes to and who may read the draft are two different
+    // answers, and an operator should see both at once.
     public_access: doc.public_access,
-    // `specs/api/admin-cli.md` § Output rules: every document view prints
-    // the audience, derived from `public_access` rather than stored beside
-    // it, so the CLI and the dashboard cannot disagree.
     audience: doc.audience,
-    list_visible_to: doc.audience === "closed" && doc.list_visible_to?.length ? doc.list_visible_to : void 0,
+    addressed_to: doc.addressed_to?.length ? doc.addressed_to : void 0,
     public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
@@ -1359,7 +1387,6 @@ async function docsCommand(args) {
         'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>'
       );
       const capacities = csv(str(parsed, "--capacities"));
-      const listVisibleTo = csv(str(parsed, "--list-visible-to"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
@@ -1375,11 +1402,15 @@ async function docsCommand(args) {
           "drafter-axi docs create <slug> --reply-to <email> ..."
         ),
         capacities: capacities.length > 0 ? capacities : void 0,
-        // `specs/data-model.md` § Audience: `--audience` is the spelling an
-        // operator uses; it writes `public_access`, which is where the
-        // audience lives. `--public` stays for the phase-2 `participate`.
-        audience: str(parsed, "--audience") ?? (str(parsed, "--public") ? void 0 : "closed"),
-        list_visible_to: listVisibleTo.length > 0 ? listVisibleTo : void 0,
+        // `specs/data-model.md` § Audience: `--audience` is required and is
+        // stored as given. `--public` is the separate drafting-time read
+        // setting and is never written from it.
+        audience: requireStr(
+          parsed,
+          "--audience",
+          "drafter-axi docs create <slug> --audience public|closed ..."
+        ),
+        addressed_to: list(parsed, "--addressed-to"),
         public_access: str(parsed, "--public"),
         show_signatories: str(parsed, "--show-signatories"),
         revocation_window_hours: str(parsed, "--revocation-window-hours") ? Number(str(parsed, "--revocation-window-hours")) : void 0,
@@ -1417,6 +1448,26 @@ async function docsCommand(args) {
           ])
         )
       );
+    }
+    case "update": {
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        'drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]'
+      );
+      const audience = str(parsed, "--audience");
+      const addressedTo = list(parsed, "--addressed-to");
+      if (audience === void 0 && addressedTo === void 0) {
+        throw new AxiError("nothing to update", "USAGE", [
+          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."]`'
+        ]);
+      }
+      const doc = await client.patch(
+        `/documents/${encodeURIComponent(slug)}`,
+        compact({ audience, addressed_to: addressedTo })
+      );
+      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
     }
     case "open": {
       const slug = requirePositional(
@@ -3001,12 +3052,16 @@ var COMMAND_GROUPS = [
     group: "Documents",
     commands: [
       {
-        usage: 'docs create <slug> --title "<text>" --sender-name "<text>" --reply-to <email> [--capacities personal,official] [--audience public|closed] [--list-visible-to "Org A,Org B"] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft; the caller becomes its first operator. --audience declares who the document is for (default closed \u2014 invitees only); --list-visible-to names organizations a closed document's signatory list is shared with, which every signer is told before signing."
+        usage: 'docs create <slug> --title "<text>" --audience public|closed --sender-name "<text>" --reply-to <email> [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary: "Create a document in draft; the caller becomes its first operator. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft."
       },
       {
         usage: "docs show <slug>",
-        summary: "Dashboard numbers, versions, and schedule; prints public_url when the document is publicly readable."
+        summary: "Dashboard numbers, versions, and schedule; prints the audience, who the statement is addressed to, and public_url when the document is publicly readable."
+      },
+      {
+        usage: 'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]...',
+        summary: "Change the audience and who the statement is addressed to, and nothing else. --addressed-to replaces the recipients."
       },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",
@@ -3182,7 +3237,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "4d9db4f" : "dev";
+var VERSION = true ? "985f652" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
