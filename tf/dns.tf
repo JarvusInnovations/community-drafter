@@ -59,3 +59,14 @@ resource "google_dns_record_set" "sites_alias" {
   ttl          = 300
   rrdatas      = ["ghs.googlehosted.com."]
 }
+
+# Search Console domain-property verification for signatories.app, so Cloud
+# Run domain mappings under it can be created by the verified owners (the
+# operator's account and the CI service account; docs/operations.md step 7).
+resource "google_dns_record_set" "signatories_app_site_verification" {
+  name         = google_dns_managed_zone.signatories_app.dns_name
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "TXT"
+  ttl          = 300
+  rrdatas      = ["\"google-site-verification=zEAZPNI0KjeYt81Ux_E4tIQSMGFOYMnrYOdNWPwPtIo\""]
+}
