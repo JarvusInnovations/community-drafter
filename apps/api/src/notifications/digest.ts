@@ -4,6 +4,7 @@ import { prefOn } from "../lib/notify.ts";
 import { computeSignatories } from "../lib/signatories.ts";
 import { digestTemplate } from "./templates.ts";
 import { dateInTimezone, hourInTimezone } from "./format.ts";
+import { sendOperatorDigest } from "./operator-digest.ts";
 
 const OBSERVER_ACTOR = { kind: "system" } as const;
 
@@ -51,10 +52,27 @@ export class DigestScheduler {
     if (hourInTimezone(now, timezone) !== this.fastify.config.INSTANCE_DIGEST_HOUR) return;
 
     const today = dateInTimezone(now, timezone);
+    const since = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
 
     for (const documentEntry of this.fastify.storage.readModel.listDocuments()) {
       if (documentEntry.record.state !== "open") continue;
       const slug = documentEntry.record.slug;
+
+      // `specs/behaviors/notifications.md` § Sending: the participant
+      // digest and the operator digest (§ Operator digest) both run on this
+      // tick. The operator one is not preference-gated and goes to the
+      // document's own operators, so it runs whatever the participants'
+      // preferences say — and sends nothing on a quiet day.
+      try {
+        await sendOperatorDigest(this.fastify, documentEntry, today, since, now);
+      } catch (err) {
+        // Operator mail is logged and never allowed to fail anything
+        // (§ Operator mail); one document's digest must not stop the rest.
+        this.fastify.log.warn(
+          { document: slug, err: err instanceof Error ? err.message : String(err) },
+          "operator digest: failed",
+        );
+      }
 
       const versionsToday = documentEntry.versions.filter(
         (version) => dateInTimezone(new Date(version.published_at), timezone) === today,

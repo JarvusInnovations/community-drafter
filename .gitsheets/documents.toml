@@ -103,6 +103,14 @@ minItems = 1
 type = 'string'
 format = 'email'
 
+# `specs/behaviors/notifications.md` § Operator digest: event -> value, the
+# operator messages this document has already produced (`digest` holds a
+# date, the two first-response notices a timestamp). Optional and
+# open-keyed, so a record written before it existed still validates.
+[gitsheet.schema.properties.operator_notified]
+type = 'object'
+additionalProperties = true
+
 [gitsheet.schema.properties.sender_name]
 type = 'string'
 

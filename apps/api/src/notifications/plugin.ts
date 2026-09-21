@@ -1,4 +1,4 @@
-import type { Signature } from "@signatories/shared";
+import type { Judgement, Signature } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
@@ -8,6 +8,7 @@ import { ClosingSoonScheduler } from "./closing-soon.ts";
 import { NotificationDispatcher } from "./dispatcher.ts";
 import { DigestScheduler } from "./digest.ts";
 import { formatWhen } from "./format.ts";
+import { sendFirstResponseNotice } from "./operator-digest.ts";
 import {
   closedRecipients,
   scheduleChangedRecipients,
@@ -84,6 +85,13 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
         );
         const signature = participation?.record.signature;
         if (!signature) return;
+        if (event.type === "sign") {
+          // `specs/behaviors/notifications.md` § Operator digest: the first
+          // signature is told to the document's operators the moment it
+          // lands, once per document. A `resign` follows a revoke, which
+          // follows a sign, so it is never the first.
+          await sendFirstResponseNotice(fastify, event.document, "first_signature", event.person);
+        }
         await dispatcher.deliver({
           document: event.document,
           eventKey: `signature-confirmation-${new Date().toISOString()}`,
@@ -145,6 +153,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
       case "decline":
       case "submit": {
         await deliverReviewReceipt(fastify, dispatcher, event.document, event.person);
+        if (event.type === "submit") await notifyFirstResponses(fastify, event);
         return;
       }
       case "signing-opened": {
@@ -257,6 +266,28 @@ function listedAs(signature: Signature): string {
   const detail = signature.capacity === "official" ? signature.title : signature.descriptor;
   const named = detail ? `${signature.display_name}, ${detail}` : signature.display_name;
   return signature.capacity === "official" && signature.org ? `${signature.org} — ${named}` : named;
+}
+
+/**
+ * `specs/behaviors/notifications.md` § Operator digest — comment mode is
+ * the one path that can produce a document's first comment *and* its first
+ * signature in a single commit (`specs/data-model.md` → `Signature`
+ * trailer), so both notices are considered here.
+ */
+async function notifyFirstResponses(
+  fastify: FastifyInstance,
+  event: { document: string; person: string; submission: string; judgement: Judgement },
+): Promise<void> {
+  const submission = fastify.storage.readModel.getSubmission(event.document, event.submission);
+  if ((submission?.record.comments?.length ?? 0) > 0) {
+    await sendFirstResponseNotice(fastify, event.document, "first_comment", event.person);
+  }
+
+  const signature = fastify.storage.readModel.getParticipation(event.document, event.person)?.record
+    .signature;
+  if (signature && !signature.revoked) {
+    await sendFirstResponseNotice(fastify, event.document, "first_signature", event.person);
+  }
 }
 
 async function deliverReviewReceipt(

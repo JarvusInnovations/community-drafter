@@ -162,13 +162,15 @@ describe("Idempotency-Key replay", () => {
     expect(second.statusCode).toBe(200);
     expect(second.body).toBe(first.body);
 
-    // One real execution now makes two commits — `sign` itself, plus the
-    // `notifications` plan's `send` commit marking
-    // `notified.signature-confirmation-<ts>` for the confirmation email
-    // (`specs/behaviors/notifications.md` § Sending). What this test
-    // guards is that the *replay* added zero more; a re-run would be 4.
+    // One real execution now makes three commits — `sign` itself, the
+    // `send` commit marking `notified.signature-confirmation-<ts>` for the
+    // confirmation email (`specs/behaviors/notifications.md` § Sending),
+    // and the `send` commit recording `operator_notified.first_signature`
+    // for the operators' first-signature notice (§ Operator digest). What
+    // this test guards is that the *replay* added zero more; a re-run
+    // would be 6.
     const after = await commitCount(dataDir);
-    expect(after - before).toBe(2);
+    expect(after - before).toBe(3);
 
     await server.close();
   });

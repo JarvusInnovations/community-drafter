@@ -1,7 +1,9 @@
+import type { DocumentRecord } from "@signatories/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { firstName, renderEmail } from "../lib/mailer/shell.ts";
 import { resolveSender } from "./sender.ts";
+import { type ResolvedSite, siteForDocument } from "../sites/site.ts";
 
 /**
  * `specs/behaviors/notifications.md` § Operator mail — the messages that go
@@ -43,7 +45,15 @@ function actorLabel(fastify: FastifyInstance, actorEmail: string): string {
 
 interface SendOptions {
   eventKey: string;
-  request: FastifyRequest;
+  /**
+   * The site the message speaks for. An access message belongs to the
+   * **resolved** site (the host the action happened on); a message about a
+   * document belongs to the **document's** site, which is the one every
+   * link in it is built on (`specs/behaviors/sites.md` § Mail).
+   */
+  site: ResolvedSite;
+  /** Set for a message about a document, so its own `sender_name`/`reply_to` win. */
+  document?: DocumentRecord;
   to: OperatorRecipient;
   subject: string;
   body: string[];
@@ -65,7 +75,7 @@ async function send(fastify: FastifyInstance, opts: SendOptions): Promise<boolea
     smallPrint: opts.smallPrint,
   });
 
-  const sender = resolveSender(fastify, undefined, opts.request.site);
+  const sender = resolveSender(fastify, opts.document, opts.site);
 
   try {
     await fastify.mailer.send({
@@ -111,7 +121,7 @@ export async function sendOperatorAdded(
 
   return send(fastify, {
     eventKey: "operator-added",
-    request,
+    site: request.site,
     to: opts.operator,
     subject: `You're an operator on ${name}`,
     body: [
@@ -147,7 +157,7 @@ export async function sendOperatorAddedToDocument(
 
   return send(fastify, {
     eventKey: "operator-added-to-document",
-    request,
+    site: request.site,
     to: opts.operator,
     subject: `${opts.documentTitle} — you were added as an operator`,
     body: [
@@ -162,4 +172,54 @@ export async function sendOperatorAddedToDocument(
       "There is no password: enter your address at the sign-in page and the instance emails you a link.",
     ],
   });
+}
+
+/**
+ * `specs/behaviors/notifications.md` § Operator digest — one message to
+ * every **active operator of the document** (not of its site: the site's
+ * group is who *may* be given a document, not who is running this one).
+ *
+ * Takes no request: the digest runs on a timer, and a message about a
+ * document belongs to the document's site whichever host — or none —
+ * triggered it. Returns what the mailer accepted, because the caller only
+ * records the message as sent when at least one was (§ "A sent count is a
+ * delivery count").
+ */
+export async function sendToDocumentOperators(
+  fastify: FastifyInstance,
+  opts: {
+    eventKey: string;
+    document: DocumentRecord;
+    subject: string;
+    body: string[];
+    buttonLabel?: string;
+  },
+): Promise<{ delivered: number; failed: number }> {
+  const site = siteForDocument(fastify, opts.document);
+  const base = site.baseUrl.replace(/\/$/u, "");
+  const url = `${base}/admin/d/${encodeURIComponent(opts.document.slug)}`;
+
+  let delivered = 0;
+  let failed = 0;
+  for (const email of opts.document.operators ?? []) {
+    const operator = fastify.storage.readModel.getOperatorByEmail(email);
+    if (!operator || !operator.active) continue;
+    const ok = await send(fastify, {
+      eventKey: opts.eventKey,
+      site,
+      document: opts.document,
+      to: { email: operator.email, name: operator.name || operator.email },
+      subject: opts.subject,
+      body: opts.body,
+      button: { label: opts.buttonLabel ?? "Open the dashboard", url },
+      // No small print: the participant line ("this link is yours alone")
+      // is about a personal link, and § Operator mail rules out a "you are
+      // receiving this because" footer and any preference link.
+      smallPrint: [],
+    });
+    if (ok) delivered += 1;
+    else failed += 1;
+  }
+
+  return { delivered, failed };
 }
