@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { ShowSignatories } from "@community-drafter/shared";
+import type { ShowSignatories } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 import { ApiError } from "../errors.ts";
