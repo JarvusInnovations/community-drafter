@@ -45,6 +45,9 @@ const DocumentListScreen = lazy(() =>
 const OperatorsScreen = lazy(() =>
   import("./admin/OperatorsScreen.tsx").then((m) => ({ default: m.OperatorsScreen })),
 );
+const SitesScreen = lazy(() =>
+  import("./admin/SitesScreen.tsx").then((m) => ({ default: m.SitesScreen })),
+);
 const DocumentLayout = lazy(() =>
   import("./admin/DocumentLayout.tsx").then((m) => ({ default: m.DocumentLayout })),
 );
@@ -261,6 +264,14 @@ function App(): JSX.Element {
           element={
             <Suspense fallback={<LazyFallback />}>
               <OperatorsScreen />
+            </Suspense>
+          }
+        />
+        <Route
+          path="sites"
+          element={
+            <Suspense fallback={<LazyFallback />}>
+              <SitesScreen />
             </Suspense>
           }
         />

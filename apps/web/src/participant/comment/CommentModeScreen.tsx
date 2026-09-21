@@ -160,7 +160,7 @@ export function CommentModeScreen(): JSX.Element {
     <main className={`mx-auto max-w-[1120px] px-5 lg:pb-10 ${sheetOpen ? "pb-[70vh]" : "pb-28"}`}>
       {/*
        * `specs/screens/comment-mode.md` § Design "Frame": beneath the
-       * sticky top bar (`InstanceBar`, rendered by `ParticipantLayout`) a
+       * sticky top bar (`SiteBar`, rendered by `ParticipantLayout`) a
        * slim second bar holds the version chip, the one-line signature
        * status, and "Back to document" on the right.
        */}

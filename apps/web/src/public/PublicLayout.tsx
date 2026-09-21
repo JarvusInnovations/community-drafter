@@ -6,6 +6,8 @@ import { copy } from "./copy.ts";
 import { PublicBundleContext, type PublicBundleContextValue } from "./PublicBundleContext.tsx";
 import { type PublicBundle } from "./types.ts";
 import { NotFoundScreen } from "../participant/NotFoundScreen.tsx";
+import { SiteBar } from "../participant/components/SiteBar.tsx";
+import { SiteTheme } from "../participant/components/SiteTheme.tsx";
 
 type LoadState =
   | { status: "loading" }
@@ -94,7 +96,15 @@ export function PublicLayout(): JSX.Element | null {
 
   return (
     <PublicBundleContext.Provider value={contextValue}>
-      <Outlet />
+      {/*
+        `specs/screens/public-and-embed.md` § Site identity: the top bar
+        names the document's site and the accent follows its own. Nothing
+        here names, links to or hints at the platform or any other site.
+      */}
+      <SiteTheme site={state.bundle.site}>
+        <SiteBar site={state.bundle.site} document={state.bundle.document} />
+        <Outlet />
+      </SiteTheme>
     </PublicBundleContext.Provider>
   );
 }

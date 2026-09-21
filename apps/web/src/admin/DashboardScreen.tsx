@@ -157,7 +157,11 @@ export function DashboardScreen(): JSX.Element {
   }
 
   async function handleCopyPublicLink() {
-    const link = `${window.location.origin}/d/${document.slug}`;
+    // `specs/behaviors/sites.md`: the public link is built on the
+    // **document's** site, not on whichever host this dashboard was
+    // reached on.
+    const base = document.site_url || window.location.origin;
+    const link = `${base}/d/${document.slug}`;
     try {
       await navigator.clipboard.writeText(link);
     } catch {
@@ -198,6 +202,17 @@ export function DashboardScreen(): JSX.Element {
         {(document.addressed_to?.length ?? 0) > 0
           ? ` · ${copy.dashboard.addressedTo(document.addressed_to ?? [])}`
           : ""}
+      </p>
+
+      {/*
+       * `specs/screens/admin-dashboard.md` § Dashboard "Site": the team
+       * reads the address their participants are actually sent before they
+       * send anything. A document on the default site says so rather than
+       * showing nothing.
+       */}
+      <p className="mt-1 text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">{copy.dashboard.siteLabel}:</span>{" "}
+        {copy.dashboard.siteLine(document.site, document.site_url)}
       </p>
 
       <Timeline document={document} />

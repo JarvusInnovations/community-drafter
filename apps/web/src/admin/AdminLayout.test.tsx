@@ -85,17 +85,18 @@ describe("AdminLayout — session guard", () => {
 
   /**
    * `specs/screens/admin-dashboard.md` § Design "Frame": the top bar shows
-   * the configured instance name, read from the session — never a
-   * build-time literal (#37).
+   * the resolved site's name, read from the session — never a build-time
+   * literal and never `INSTANCE_NAME` directly (#37,
+   * `specs/behaviors/sites.md`).
    */
-  it("shows the session's instance_name in the top bar, falling back to the literal", async () => {
+  it("shows the session site's name in the top bar, falling back to the literal", async () => {
     globalThis.fetch = ((url: string) => {
       if (url === "/auth/session") {
         return Promise.resolve(
           jsonResponse(200, {
             email: "ops@example.org",
             expires_at: "2026-01-01T00:00:00Z",
-            instance_name: "Test Instance",
+            site: { slug: "default", name: "Test Instance" },
           }),
         );
       }

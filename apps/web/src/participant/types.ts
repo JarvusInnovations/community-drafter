@@ -32,8 +32,15 @@ export type SubmissionJudgement = "sign" | "sign_conditional" | "comment" | "dec
 export type Disposition = "accepted" | "partial" | "declined" | "noted";
 export type BlockStatus = "same" | "changed" | "added" | "removed";
 
-export interface InstanceInfo {
+/**
+ * `specs/api/participant.md`: the **document's** site — name, and logo and
+ * accent where set (`specs/behaviors/sites.md` § Identity on a surface). It
+ * replaces the earlier `instance: { name }`.
+ */
+export interface SiteInfo {
   name: string;
+  logo_url?: string;
+  accent?: string;
 }
 
 export interface PersonInfo {
@@ -164,7 +171,7 @@ export interface NotifyPrefs {
 }
 
 export interface Bundle {
-  instance: InstanceInfo;
+  site: SiteInfo;
   person: PersonInfo;
   document: DocumentInfo;
   version: VersionInfo;

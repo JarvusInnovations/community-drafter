@@ -25,6 +25,10 @@ export type ParticipationStatus =
 export interface DocumentSummary {
   slug: string;
   title: string;
+  /** `specs/api/admin.md`: the document's site — `default` when it names none. */
+  site?: string;
+  /** The origin this document's personal and public links are built on. */
+  site_url?: string;
   state: DocumentState;
   phase: Phase;
   opened_at?: string;
@@ -193,8 +197,42 @@ export interface SessionInfo {
   kind?: "person" | "bot";
   superadmin?: boolean;
   expires_at: string;
-  /** `specs/api/auth.md`: the configured `INSTANCE_NAME`, shown in the admin frame. */
-  instance_name?: string;
+  /**
+   * `specs/api/auth.md`: the **resolved site**, shown in the admin frame on
+   * every page. Replaces the earlier `instance_name` string.
+   */
+  site?: SessionSite;
+}
+
+export interface SessionSite {
+  slug: string;
+  name: string;
+  hostname?: string;
+  logo_url?: string;
+  accent?: string;
+}
+
+/**
+ * `specs/api/admin.md` § Sites — one row of the superadmin Sites page
+ * (`specs/screens/admin-dashboard.md`). `hostname_verified` and
+ * `sender_verified` are observations: `null` is "not observed yet".
+ */
+export interface SiteRow {
+  slug: string;
+  hostname?: string;
+  name: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to?: string;
+  logo_url?: string;
+  accent?: string;
+  operators: string[];
+  documents: number;
+  from_line: string;
+  hostname_verified: boolean;
+  sender_verified: boolean | null;
+  dns: Array<{ type: string; name: string; value: string; purpose: string }>;
+  default: boolean;
 }
 
 /** `specs/api/admin.md` § Operators — the global operator directory. */

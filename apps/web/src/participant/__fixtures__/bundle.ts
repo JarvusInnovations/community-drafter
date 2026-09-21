@@ -19,7 +19,7 @@ export function makeBundle(overrides: {
   prefill?: Partial<Bundle["prefill"]>;
 }): Bundle {
   return {
-    instance: { name: "Community Drafter" },
+    site: { name: "Community Drafter" },
     person: { id: "jane-doe", name: "Jane Doe" },
     document: {
       slug: "coalition-charter",

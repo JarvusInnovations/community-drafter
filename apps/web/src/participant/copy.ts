@@ -34,7 +34,7 @@ function nameList(names: string[]): string {
 }
 
 export const copy = {
-  instanceBar: (name: string) => name,
+  siteBar: (name: string) => name,
 
   skipToDocument: "Skip to document",
 
