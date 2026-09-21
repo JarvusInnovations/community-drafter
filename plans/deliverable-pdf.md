@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: []
+pr: 106
 specs:
   - specs/screens/deliverable.md
   - specs/api/participant.md
@@ -47,19 +48,19 @@ The thing the whole service exists to produce: the finished statement, with its 
 
 ## Validation
 
-- [ ] The public route serves a PDF for `audience = public` + `public_access = read`, and 404s — same body as an unknown slug — for `audience = closed`, for `public_access = none`, for `state = draft`, and for a `withdrawn` document.
-- [ ] The participant route serves a PDF for any personal link on a readable document, including one whose `audience` is `closed`.
-- [ ] The operator route is document-scoped: an operator who is not on the document gets the same 404 as an unknown slug.
-- [ ] A document with a `final` version and a closed signing phase renders clean; every other combination renders with the DRAFT watermark and the version number, and `?draft=1` forces the watermarked form on the admin route only.
-- [ ] The signatory section honors `show_signatories`: `list` prints organizations then individuals, `count` prints the counts line alone, `none` prints no section at all; an unlisted signer is counted once, in the trailing clause.
-- [ ] Nothing from the `people` sheet appears in the rendered HTML — asserted against a seeded participant whose person record carries an email and a phone the signature does not.
-- [ ] The public route is rate-limited to 10/min per source address and answers 429 `rate_limited` past that.
-- [ ] Golden render: the produced bytes are a PDF of at least one page whose extracted text contains the document title and a signatory's name (`pdf-parse`).
-- [ ] `signatories-axi docs export <slug> --pdf` writes a file, prints the path, the version and the draft-or-clean word, and never puts PDF bytes on stdout; the committed bundle and SKILL.md are rebuilt and the drift gate passes.
-- [ ] Gates in every touched package: `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test`; `apps/web` also `bun run build` and `bun run check:bundle-size` (120 KB).
-- [ ] The image builds with Chromium in it, the size delta against the current image is recorded, and a render inside the container proves Chromium launches there.
-- [ ] Peak memory for one render is measured against Cloud Run's 1 GiB, and `tf/cloudrun.tf` is raised in this PR if it does not fit.
-- [ ] Both states are looked at: page one of a draft render and of a clean render, committed under `.verification/` and deleted at closeout.
+- [x] The public route serves a PDF for `audience = public` + `public_access = read`, and 404s — same body as an unknown slug — for `audience = closed`, for `public_access = none`, for `state = draft`, and for a `withdrawn` document. `apps/api/src/routes/statement-pdf.test.ts`; the bodies are compared byte for byte, which is what caught the withdrawn case answering in its own words (fixed in its own commit).
+- [x] The participant route serves a PDF for any personal link on a readable document, including one whose `audience` is `closed`. Asserted on a `closed`, `public_access: none` letter whose PDF still names its recipient in the title block.
+- [x] The operator route is document-scoped: an operator who is not on the document gets the same 404 as an unknown slug. The admin API's not-found body names the slug asked for, so the assertion compares the two sentences with the slug substituted — nothing else distinguishes them.
+- [x] A document with a `final` version and a closed signing phase renders clean; every other combination renders with the DRAFT watermark and the version number, and `?draft=1` forces the watermarked form on the admin route only.
+- [x] The signatory section honors `show_signatories`: `list` prints organizations then individuals, `count` prints the counts line alone, `none` prints no section at all; an unlisted signer is counted once, in the trailing clause.
+- [x] Nothing from the `people` sheet appears in the rendered HTML — asserted against a seeded participant whose person record carries an email and a filed name the signature does not.
+- [x] The public route is rate-limited to 10/min per source address and answers 429 `rate_limited` past that. The limiter runs before the slug is looked up, so an unknown slug costs a slot too.
+- [x] Golden render: the produced bytes are a PDF of at least one page whose extracted text contains the document title and a signatory's name (`pdf-parse`).
+- [x] `signatories-axi docs export <slug> --pdf` writes a file, prints the path, the version and the draft-or-clean word, and never puts PDF bytes on stdout; the committed bundle and SKILL.md are rebuilt and the drift gate passes. `packages/cli/src/e2e.test.ts` runs the real command against the real API.
+- [x] Gates in every touched package: `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test`; `apps/web` also `bun run build` and `bun run check:bundle-size` — 106.75 KB against the 120 KB budget.
+- [x] The image builds with Chromium in it, the size delta against the current image is recorded, and a render inside the container proves Chromium launches there. 688 MB → 1.58 GB; the container served `GET /d/coalition-charter/statement.pdf` against a throwaway data repo and returned a real PDF (see Notes).
+- [x] Peak memory for one render is measured against Cloud Run's 1 GiB, and `tf/cloudrun.tf` is raised in this PR if it does not fit. It fits with room: 196 MB for a six-page, 300-signatory render, 291 MB for the running service serving the route. `tf/` is untouched.
+- [x] Both states are looked at: page one of a draft render and of a clean render, committed under `.verification/` and deleted at closeout.
 
 ## Risks / unknowns
 
@@ -71,8 +72,26 @@ The thing the whole service exists to produce: the finished statement, with its 
 
 ## Notes
 
-(populated at closeout)
+**Chromium is expensive, and it is worth saying how expensive.** The image goes from 688 MB to **1.58 GB** — a delta of 892 MB, almost all of it in one apt layer: `chromium` at 318 MB installed, `chromium-common` at 66 MB, and the software-GL stack its dependencies drag in whether or not a headless render touches it (`libllvm19` at 127 MB, `mesa-libgallium` at 42 MB). `--no-install-recommends` was already in force; the rest is Depends, not Recommends, so it cannot be trimmed by asking apt more politely. The two real ways down are leaving Debian's package (Google's `chrome-headless-shell` is roughly 170 MB, but it is a download at build time, which `specs/architecture.md` rules out on purpose) or moving the render to a second service, which would need its own copy of the record. Neither is obviously right; both are follow-ups rather than blockers, because the thing being printed is the artifact the whole service exists to produce.
+
+**Memory was the risk that did not materialize.** A render of a six-page statement carrying 300 signatories peaks the whole container at **196 MB** (cgroup `memory.peak`, measured inside the image under `--memory=1g`), of which Bun is 58 MB. The full service — read model, data-repo checkout, API, one render — peaks at **291 MB** while serving the public route. Cloud Run's 1 GiB stands untouched. Two things earn that number: only one page renders at a time, and the browser shuts down after five idle minutes, so an instance that never serves a PDF holds nothing.
+
+**Two Chromium behaviors carry the design.** A `position: fixed` element is repainted on every printed page, which is what makes one element a watermark rather than a mark on the first sheet. And page numbers come from Chromium's own footer template rather than CSS, because `counter(page)` in a page margin box is in no shipping browser — that is why the running footer lives in `footerTemplate()` and not in the stylesheet.
+
+**The cache key is the interesting part of the cache.** It carries a hash of the signatory summary alongside the version commit, so a hit is only ever the redrawing of a list that has not changed. That is what lets a cache sit in front of a document whose local principle is "says exactly what the record says at the moment it is rendered": the list is computed on every request either way, and the TTL and the entry bound are about memory alone.
+
+**The public door's 404s had to be flattened.** `assertDeliverableAvailable` refuses a withdrawn document and one with no version, each with a message of its own — useful on the operator and participant doors, a disclosure on the anonymous one. The public route now converts any `not_found` from behind it into the one shared body, and the test compares bytes rather than status codes, which is the only way that class of leak gets caught.
+
+**Two spec corrections came out of building it.** The deliverable's date carries the year, unlike a screen's date-only point, because a printed statement outlives the year it was printed in. And `docs export` prints what it wrote rather than who signed: fetching the counts would take a second request and could only report a moment other than the one the file was rendered at.
+
+**A test suite that renders has to close its server.** The existing route-test pattern cleans up the temp data repo and leaves the Fastify instance to be garbage-collected, which is harmless until the instance owns a browser: the renderer's Chromium is shut down by the app's `onClose` hook, so without a `server.close()` the process outlived `bun test`, held the run's stdout open and made a finished suite look like a hanging one. Worth knowing for any future plan that puts a child process behind a decorator.
+
+**The rename landed mid-flight.** `drafter-axi` became `signatories-axi` on develop while this branch was open; the rebase carried it, and one commit subject on this branch still says the old name.
 
 ## Follow-ups
 
-(populated at closeout)
+- **Get the image back under a gigabyte.** *Issue.* The two candidates are Google's `chrome-headless-shell` (roughly 170 MB, but downloaded at build time, which `specs/architecture.md` currently forbids) and dropping the software-GL packages a headless render never calls. Either changes a spec before it changes a Dockerfile.
+- **The post-close revocation footnote is specified and implemented nowhere.** `specs/behaviors/signatures.md` § Revocation asks every signatory list and count to carry "1 signature removed after closing at the signer's request". No surface does it, and this plan deliberately did not add it here first — the deliverable will inherit it for free from `computeSignatories` the day one does. *Tracked as* a pre-existing gap, not introduced by this plan.
+- **The public route's rate limit is a literal.** 10/min per address, fixed in code. If it ever bites a legitimate press moment, it becomes configuration the way `AUTH_LOGIN_RATE_LIMIT` did. *Deferred.*
+- **A PDF of an older version, a signatory-list-only export, and mailing the deliverable** were all out of scope and stay out. *None* of them is claimed by a downstream plan.
+- No downstream plan absorbs anything from this one.
