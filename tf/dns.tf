@@ -80,18 +80,6 @@ resource "google_dns_record_set" "signatories_org_site_verification" {
   rrdatas      = ["\"google-site-verification=F2ZwTZ9xmDeJS_g6X9AaWyWb63Qdf2D727kYu50iuVw\""]
 }
 
-# The pilot coalition's whitelabel hostname under the platform domain (the
-# alias was proven end to end with demo.signatories.app on 2026-09-21): a
-# customer hostname CNAMEs to sites.signatories.org, never to Google's
-# endpoint directly.
-resource "google_dns_record_set" "stac_site" {
-  name         = "stac.${google_dns_managed_zone.signatories_app.dns_name}"
-  managed_zone = google_dns_managed_zone.signatories_app.name
-  type         = "CNAME"
-  ttl          = 300
-  rrdatas      = ["sites.signatories.org."]
-}
-
 # The product site (specs/screens/marketing-site.md) is GitHub Pages with
 # signatories.org as its custom domain: apex A/AAAA to GitHub's Pages
 # addresses, www as a CNAME to the org's Pages host. GitHub issues the

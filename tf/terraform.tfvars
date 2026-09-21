@@ -13,4 +13,4 @@ auth_login_rate_limit = 5
 # Customer site hostnames, one Cloud Run domain mapping each (docs/operations.md
 # step 7). Empty until the first customer is onboarded; pinned here so a bare
 # `tofu apply -concise` never drops a mapping that a -var once added.
-site_hostnames = ["stac.signatories.app", "sign.save-the-academy.org"]
+site_hostnames = ["sign.save-the-academy.org"]
