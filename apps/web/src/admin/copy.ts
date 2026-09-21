@@ -109,7 +109,13 @@ export const copy = {
     organizations: "Organizations",
     individuals: "Individuals",
     conditional: "Conditional",
-    revoked: "Revoked",
+    /**
+     * `specs/screens/admin-dashboard.md` § Funnel: two counts, never one.
+     * "REVOKED 1" beside the signature tiles was read as a withdrawn
+     * signature when what had been revoked was a personal link (#60).
+     */
+    revokedSignatures: "Signatures revoked",
+    revokedLinks: "Links revoked",
     /**
      * `specs/screens/admin-dashboard.md` § Funnel: the number the team
      * needs before marking anything final — live signatures still attached
@@ -140,10 +146,14 @@ export const copy = {
      * with standing from a write that should not have been possible.
      */
     superadminActor: "superadmin",
+    notOpenedYet: "This document has not been opened, so it has no deadlines to extend. Open it from the CLI:",
+    openCommand: (slug: string) =>
+      `drafter-axi docs open ${slug} --comments-close "…" --signing-closes "…"`,
     notificationHealth: "Notification health",
     sentLabel: "Sent",
     pendingLabel: "Pending",
     failedLabel: "Failed",
+    sinceRestart: "Queued and failed are counted since the process last started.",
   },
 
   extendDeadline: {
@@ -192,7 +202,9 @@ export const copy = {
       version: "Version",
       judgement: "Judgement",
       person: "Person",
+      personHint: "Person id…",
       disposition: "Disposition",
+      any: "Any",
     },
     empty: "No submissions match these filters.",
     previewLink: "View full submission",
@@ -200,6 +212,8 @@ export const copy = {
 
   versions: {
     heading: "Versions",
+    /** `specs/screens/admin-dashboard.md` § Versions: the current version is marked. */
+    current: "current",
     downloadRaw: "Download raw markdown",
     dispositions: (n: number) => `${n} disposition${n === 1 ? "" : "s"}`,
   },

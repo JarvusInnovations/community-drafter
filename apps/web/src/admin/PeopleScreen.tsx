@@ -22,6 +22,7 @@ import {
   type ParticipationStatus,
   type SubmissionView,
 } from "./types.ts";
+import { formatAbsolute } from "../participant/format.ts";
 
 const STATUSES = [
   "not_sent",
@@ -309,10 +310,10 @@ export function PeopleScreen(): JSX.Element {
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{row.source}</td>
                       <td className="px-4 py-2.5 text-muted-foreground">
-                        {row.opened_at ? new Date(row.opened_at).toLocaleString() : "—"}
+                        {row.opened_at ? formatAbsolute(row.opened_at) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
-                        {row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : "—"}
+                        {row.last_seen_at ? formatAbsolute(row.last_seen_at) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{row.opens}</td>
                       <td className="px-4 py-2.5 text-foreground">

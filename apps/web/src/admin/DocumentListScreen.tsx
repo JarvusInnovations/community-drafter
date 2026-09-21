@@ -6,6 +6,7 @@ import { TableScroller } from "./components/TableScroller.tsx";
 import { copy } from "./copy.ts";
 import { useAdminSession } from "./SessionContext.tsx";
 import { type DocumentSummary } from "./types.ts";
+import { formatAbsolute } from "../participant/format.ts";
 
 function formatDeadline(doc: DocumentSummary): string {
   const next =
@@ -14,7 +15,7 @@ function formatDeadline(doc: DocumentSummary): string {
       : doc.phase === "signing"
         ? doc.signing_closes_at
         : undefined;
-  return next ? new Date(next).toLocaleString() : "—";
+  return next ? formatAbsolute(next) : "—";
 }
 
 /** `/admin` — the document list, `specs/screens/admin-dashboard.md` § "Document list". */

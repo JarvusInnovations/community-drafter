@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 
 import { ApiError, getVersionDetail } from "./api.ts";
 import { Card } from "./components/Card.tsx";
+import { Pill } from "./components/Pill.tsx";
 import { copy } from "./copy.ts";
 import { useAdminDocument } from "./DocumentContext.tsx";
 import { quietButtonClass, quietLinkClass } from "./styles.ts";
 import { type VersionDetail } from "./types.ts";
+import { formatAbsolute } from "../participant/format.ts";
 
 function downloadMarkdown(slug: string, n: number, body: string): void {
   const blob = new Blob([body], { type: "text/markdown" });
@@ -20,6 +22,7 @@ function downloadMarkdown(slug: string, n: number, body: string): void {
 /** `/admin/d/:slug/versions` — `specs/screens/admin-dashboard.md` § "Versions". */
 export function VersionsScreen(): JSX.Element {
   const { document } = useAdminDocument();
+  const currentVersion = document.versions.reduce((max, v) => Math.max(max, v.number), 0);
   const [details, setDetails] = useState<Record<number, VersionDetail>>({});
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
@@ -75,8 +78,17 @@ export function VersionsScreen(): JSX.Element {
                 >
                   v{v.number} — {v.summary}
                 </button>
+                {/*
+                  `specs/screens/admin-dashboard.md` § Versions: the current
+                  version is marked as such — the list read as four
+                  equivalent rows with no way to tell which one participants
+                  are looking at (#60).
+                */}
+                {v.number === currentVersion ? (
+                  <Pill tone="ok">{copy.versions.current}</Pill>
+                ) : null}
                 <span className="text-muted-foreground">
-                  {new Date(v.published_at).toLocaleString()} ·{" "}
+                  {formatAbsolute(v.published_at)} ·{" "}
                   {copy.versions.dispositions(v.dispositions)}
                   {v.final ? " · final" : ""}
                 </span>
@@ -91,6 +103,15 @@ export function VersionsScreen(): JSX.Element {
                       {details[v.number]?.notes ? (
                         <p className="mt-1 text-foreground">Notes: {details[v.number]?.notes}</p>
                       ) : null}
+                      {/*
+                        `specs/screens/admin-dashboard.md` § Versions: "A
+                        version's text is readable in place — the console is
+                        where the team reads what it published, and a
+                        download is not reading." (#60)
+                      */}
+                      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-card p-3 text-xs text-foreground">
+                        {details[v.number]?.body ?? ""}
+                      </pre>
                       <button
                         type="button"
                         className={`mt-2 ${quietButtonClass}`}

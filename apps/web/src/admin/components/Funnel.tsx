@@ -34,13 +34,22 @@ export function FunnelBar({
         className="flex h-3 w-full gap-1 overflow-hidden rounded-full bg-muted"
         role="presentation"
       >
-        {stages.map((stage, index) => (
-          <div
-            key={stage.key}
-            className={`h-full rounded-full ${STAGE_TONE[index]}`}
-            style={{ width: `${Math.max(6, (stage.count / max) * 100)}%` }}
-          />
-        ))}
+        {/*
+          `specs/screens/admin-dashboard.md` § Funnel: "a stage whose count
+          is zero draws no segment, because a bar drawn for nothing reads as
+          a small quantity rather than none" (#60). The 4 % floor keeps a
+          genuine 1-of-200 visible; zero is drawn as nothing at all.
+        */}
+        {stages
+          .map((stage, index) => ({ stage, index }))
+          .filter(({ stage }) => stage.count > 0)
+          .map(({ stage, index }) => (
+            <div
+              key={stage.key}
+              className={`h-full rounded-full ${STAGE_TONE[index]}`}
+              style={{ width: `${Math.max(4, (stage.count / max) * 100)}%` }}
+            />
+          ))}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stages.map((stage) => (
