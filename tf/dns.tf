@@ -163,3 +163,13 @@ resource "google_dns_record_set" "signatories_app_postmark_return_path" {
   ttl          = 300
   rrdatas      = ["pm.mtasv.net."]
 }
+
+# DMARC for signatories.app: monitor-only to start (p=none), aggregate
+# reports to Postmark's DMARC digest service.
+resource "google_dns_record_set" "signatories_app_dmarc" {
+  name         = "_dmarc.${google_dns_managed_zone.signatories_app.dns_name}"
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "TXT"
+  ttl          = 300
+  rrdatas      = ["\"v=DMARC1; p=none; pct=100; rua=mailto:re+ywah5il5vup@dmarc.postmarkapp.com; sp=none; aspf=r;\""]
+}
