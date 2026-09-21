@@ -93,6 +93,12 @@ function parseDeadline(value: unknown, field: string): string {
  * (`specs/behaviors/notifications.md` § Content rules). Must be called
  * before the commit, while `previous` is still the pre-change record.
  */
+/** How a deadline is named in a commit subject a person will read. */
+const DEADLINE_LABELS: Record<DeadlineChange["deadline"], string> = {
+  comments_close_at: "comments",
+  signing_closes_at: "signing",
+};
+
 function deadlineChanges(
   patch: Record<string, string>,
   previous: { comments_close_at?: string; signing_closes_at?: string },
@@ -438,8 +444,15 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         "extend",
         {
           actor: adminActor(request),
-          subject: `extend: ${slug} ${Object.keys(patch).join(", ")}`,
+          // `specs/data-model.md` § Commits are the events: the subject of
+          // an extension names where each deadline landed ("extend:
+          // coalition-charter signing to 2026-09-30T21:00Z"); the
+          // `Deadlines` trailer carries the pairs a reader can compute from.
+          subject: `extend: ${slug} ${changes
+            .map((change) => `${DEADLINE_LABELS[change.deadline]} to ${change.to}`)
+            .join(", ")}`.trim(),
           document: slug,
+          deadlines: changes,
           requestId: request.requestId,
         },
         async (tx) => {
@@ -537,6 +550,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
           actor: adminActor(request),
           subject: `reopen: ${slug}`,
           document: slug,
+          deadlines: changes,
           requestId: request.requestId,
         },
         async (tx) => {

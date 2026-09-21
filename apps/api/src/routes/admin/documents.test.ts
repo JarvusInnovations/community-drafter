@@ -87,6 +87,51 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
 
     await server.close();
   });
+
+  /**
+   * Issue #21 — `specs/screens/admin-dashboard.md` § Recent activity: the
+   * feed reads the commit, so the commit has to carry the times. The email
+   * already had them; the activity entry did not.
+   */
+  it("records the old and new time of each deadline on the commit, for the activity feed", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    const commentsCloseAt = new Date(Date.now() + 3_600_000).toISOString();
+    const signingClosesAt = new Date(Date.now() + 7_200_000).toISOString();
+    await seedDocument(server, {
+      slug: "doc-schedule-activity",
+      comments_close_at: commentsCloseAt,
+      signing_closes_at: signingClosesAt,
+    });
+
+    const laterComments = new Date(Date.now() + 5_400_000).toISOString();
+    const laterSigning = new Date(Date.now() + 10_800_000).toISOString();
+    const extended = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-schedule-activity/schedule",
+      headers: adminHeaders(),
+      payload: { comments_close_at: laterComments, signing_closes_at: laterSigning },
+    });
+    expect(extended.statusCode).toBe(200);
+
+    const activity = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-schedule-activity/activity",
+      headers: adminHeaders(),
+    });
+    expect(activity.statusCode).toBe(200);
+    const entry = activity.json()[0];
+    expect(entry.action).toBe("extend");
+    expect(entry.deadlines).toEqual([
+      { deadline: "comments_close_at", from: commentsCloseAt, to: laterComments },
+      { deadline: "signing_closes_at", from: signingClosesAt, to: laterSigning },
+    ]);
+    // The subject says where the deadlines landed, per specs/data-model.md.
+    expect(entry.subject).toContain(`signing to ${laterSigning}`);
+
+    await server.close();
+  });
 });
 
 describe("POST /admin/api/documents/:slug/open", () => {

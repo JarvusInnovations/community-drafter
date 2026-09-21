@@ -338,6 +338,19 @@ export function DashboardScreen(): JSX.Element {
                       {entry.actor_superadmin ? ` · ${copy.dashboard.superadminActor}` : ""})
                     </span>
                   ) : null}
+                  {entry.deadlines?.length ? (
+                    <ul className="mt-1 flex flex-col text-muted-foreground">
+                      {entry.deadlines.map((shift) => (
+                        <li key={shift.deadline}>
+                          {copy.dashboard.deadlineNames[shift.deadline] ?? shift.deadline}:{" "}
+                          {shift.from
+                            ? new Date(shift.from).toLocaleString()
+                            : copy.dashboard.deadlineUnset}{" "}
+                          → {new Date(shift.to).toLocaleString()}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               ))}
             </ul>

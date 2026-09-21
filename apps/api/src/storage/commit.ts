@@ -1,4 +1,11 @@
-import type { Action, Judgement, SignatureTrailer, Trailers } from "@community-drafter/shared";
+import {
+  type Action,
+  type DeadlineChange,
+  formatDeadlinesTrailer,
+  type Judgement,
+  type SignatureTrailer,
+  type Trailers,
+} from "@community-drafter/shared";
 import type { StoreTx } from "gitsheets";
 
 import { actorIdentity, actorTrailerValue, type Actor } from "./actor.ts";
@@ -33,6 +40,12 @@ export interface CommitInput {
    */
   signature?: SignatureTrailer;
   disposed?: string;
+  /**
+   * The deadlines an `extend`/`reopen` moved, with what they moved from —
+   * `specs/screens/admin-dashboard.md` § Recent activity shows the literal
+   * old and new times, and the commit is the only place they are recorded.
+   */
+  deadlines?: DeadlineChange[];
   reason?: string;
   requestId?: string;
 }
@@ -58,6 +71,10 @@ function buildTrailers(action: Action, input: CommitInput): Trailers {
   if (input.judgement !== undefined) trailers.Judgement = input.judgement;
   if (input.signature !== undefined) trailers.Signature = input.signature;
   if (input.disposed !== undefined) trailers.Disposed = input.disposed;
+  if (input.deadlines !== undefined) {
+    const deadlines = formatDeadlinesTrailer(input.deadlines);
+    if (deadlines !== undefined) trailers.Deadlines = deadlines;
+  }
   if (input.reason !== undefined) trailers.Reason = input.reason;
   if (input.requestId !== undefined) trailers["Request-Id"] = input.requestId;
   return trailers;

@@ -148,12 +148,24 @@ export interface ActivityEntry {
   version?: number;
   judgement?: string;
   reason?: string;
+  /**
+   * `specs/screens/admin-dashboard.md` § Recent activity: the deadlines an
+   * `extend`/`reopen` moved, with the literal times they moved from and to.
+   */
+  deadlines?: DeadlineShift[];
   actor: string;
   /**
    * `specs/behaviors/operators.md` § Superadmins: set when the actor is
    * not one of the document's operators and holds the superadmin flag.
    */
   actor_superadmin?: boolean;
+}
+
+export interface DeadlineShift {
+  deadline: "comments_close_at" | "signing_closes_at";
+  /** Absent when the document had no such deadline before. */
+  from?: string;
+  to: string;
 }
 
 export interface NotificationsHealth {
