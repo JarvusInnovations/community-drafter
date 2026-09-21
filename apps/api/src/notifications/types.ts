@@ -17,13 +17,14 @@ export interface TemplateResult {
  * criterion).
  */
 export interface RecipientContext {
-  instanceName: string;
+  /** The **document's** site name (`specs/behaviors/sites.md` § Identity on a surface). */
+  siteName: string;
   documentTitle: string;
   personName: string;
   /** "Jane" — the greeting name (`shell.ts` `firstName`). */
   firstName: string;
   personEmail: string;
-  /** Who the message speaks as: `documents.sender_name`, else the instance name. */
+  /** Who the message speaks as: `documents.sender_name`, else the site's, else the site's name. */
   senderName: string;
   /** "Comments close Thu, Sep 24 · 5:00 PM EDT, and signatures are due …" — absent when the document is not open. */
   clockLine?: string;
@@ -33,4 +34,6 @@ export interface RecipientContext {
   fromName: string;
   fromEmail: string;
   replyTo?: string;
+  /** The site's slug, carried to the provider as a tag (`specs/behaviors/sites.md` § Mail). */
+  tag: string;
 }

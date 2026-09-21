@@ -5,6 +5,8 @@ import { firstName } from "../lib/mailer/shell.ts";
 import { derivePhase } from "../phase/phase.ts";
 import { clockLine } from "./format.ts";
 import { personalLink, prefsLink, stopOptionalLink } from "./links.ts";
+import { resolveSender } from "./sender.ts";
+import { siteForDocument } from "../sites/site.ts";
 import type { RecipientContext } from "./types.ts";
 
 /**
@@ -21,12 +23,16 @@ export function buildRecipientContext(
   const now = new Date();
   const phase = derivePhase(document.record, now);
   const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
-  const instanceName = fastify.config.INSTANCE_NAME || "Community Drafter";
+  // `specs/behaviors/sites.md`: every link and every address in this
+  // message belongs to the **document's** site, whichever host the send was
+  // triggered from.
+  const site = siteForDocument(fastify, document.record);
+  const sender = resolveSender(fastify, document.record, site);
   const personName = person?.name ?? participation.record.person;
-  const senderName = document.record.sender_name ?? instanceName;
+  const senderName = sender.from.name;
 
   return {
-    instanceName,
+    siteName: site.name,
     documentTitle: document.record.title,
     personName,
     firstName: firstName(personName),
@@ -39,11 +45,12 @@ export function buildRecipientContext(
       timezone,
       now,
     ),
-    personalLink: personalLink(fastify.config.PUBLIC_URL, participation.record.token),
-    prefsLink: prefsLink(fastify.config.PUBLIC_URL, participation.record.token),
-    stopOptionalLink: stopOptionalLink(fastify.config.PUBLIC_URL, participation.record.token),
-    fromName: senderName,
-    fromEmail: fastify.config.INSTANCE_FROM_EMAIL ?? "",
-    replyTo: document.record.reply_to,
+    personalLink: personalLink(site.baseUrl, participation.record.token),
+    prefsLink: prefsLink(site.baseUrl, participation.record.token),
+    stopOptionalLink: stopOptionalLink(site.baseUrl, participation.record.token),
+    fromName: sender.from.name,
+    fromEmail: sender.from.email,
+    replyTo: sender.replyTo,
+    tag: sender.tag,
   };
 }

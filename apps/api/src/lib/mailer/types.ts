@@ -26,6 +26,13 @@ export interface OutboundMessage {
    * already inline in `text`/`html`.
    */
   personalLink?: string;
+  /**
+   * `specs/behaviors/sites.md` § Mail: "every message carries the site's
+   * slug as a provider tag, so per-site delivery statistics exist without a
+   * per-site account." Postmark sends it as `Tag`; the SMTP and export
+   * adapters have nowhere to put it and ignore it.
+   */
+  tag?: string;
 }
 
 /** Thrown by an adapter for a delivery failure the dispatcher should retry. */

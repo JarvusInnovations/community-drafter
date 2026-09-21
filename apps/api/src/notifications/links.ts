@@ -1,10 +1,18 @@
-/** `PUBLIC_URL` + the participant route family (`specs/api/participant.md`, `specs/screens/preferences.md`). */
-export function personalLink(publicUrl: string | undefined, token: string): string {
-  return `${publicUrl ?? ""}/i/${token}`;
+/**
+ * The participant route family (`specs/api/participant.md`,
+ * `specs/screens/preferences.md`), built on the **document's site**
+ * (`specs/behaviors/sites.md` § The document's site is canonical) — never
+ * on the host a request happened to arrive at, and never on the
+ * deployment's own URL. `baseUrl` is the site's origin; the default site of
+ * a deployment with no `PUBLIC_URL` has none, and links stay relative
+ * exactly as they did before sites existed.
+ */
+export function personalLink(baseUrl: string | undefined, token: string): string {
+  return `${baseUrl ?? ""}/i/${token}`;
 }
 
-export function prefsLink(publicUrl: string | undefined, token: string): string {
-  return `${personalLink(publicUrl, token)}/prefs`;
+export function prefsLink(baseUrl: string | undefined, token: string): string {
+  return `${personalLink(baseUrl, token)}/prefs`;
 }
 
 /**
@@ -15,19 +23,19 @@ export function prefsLink(publicUrl: string | undefined, token: string): string 
  * screen fires the `POST prefs/stop-optional` itself on load, per the
  * spec's "a GET page that POSTs".
  */
-export function stopOptionalLink(publicUrl: string | undefined, token: string): string {
-  return `${prefsLink(publicUrl, token)}?stop-optional=1`;
+export function stopOptionalLink(baseUrl: string | undefined, token: string): string {
+  return `${prefsLink(baseUrl, token)}?stop-optional=1`;
 }
 
 export function compareLink(
-  publicUrl: string | undefined,
+  baseUrl: string | undefined,
   token: string,
   fromVersion: number,
   toVersion: number,
 ): string {
-  return `${personalLink(publicUrl, token)}/history/compare?from=${fromVersion}&to=${toVersion}`;
+  return `${personalLink(baseUrl, token)}/history/compare?from=${fromVersion}&to=${toVersion}`;
 }
 
-export function historyLink(publicUrl: string | undefined, token: string): string {
-  return `${personalLink(publicUrl, token)}/history`;
+export function historyLink(baseUrl: string | undefined, token: string): string {
+  return `${personalLink(baseUrl, token)}/history`;
 }

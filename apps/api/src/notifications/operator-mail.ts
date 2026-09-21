@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { firstName, renderEmail } from "../lib/mailer/shell.ts";
+import { resolveSender } from "./sender.ts";
 
 /**
  * `specs/behaviors/notifications.md` § Operator mail — the messages that go
@@ -21,17 +22,17 @@ export interface OperatorRecipient {
   name: string;
 }
 
-/** The instance's own address: `PUBLIC_URL` when configured, else this request's origin (local dev). */
-function instanceBaseUrl(fastify: FastifyInstance, request: FastifyRequest): string {
-  const configured = fastify.config.PUBLIC_URL;
-  if (configured) return configured.replace(/\/$/u, "");
+/**
+ * The resolved site's own address (`specs/behaviors/sites.md`): an operator
+ * message names the site the action happened on and links to its host,
+ * falling back to this request's origin when the default site has no
+ * `PUBLIC_URL` (local dev).
+ */
+function siteBaseUrl(request: FastifyRequest): string {
+  if (request.site.baseUrl) return request.site.baseUrl.replace(/\/$/u, "");
   const proto = (request.headers["x-forwarded-proto"] as string | undefined) ?? request.protocol;
   const host = request.headers.host ?? "localhost";
   return `${proto}://${host}`;
-}
-
-function instanceName(fastify: FastifyInstance): string {
-  return fastify.config.INSTANCE_NAME || "Community Drafter";
 }
 
 /** How the actor reads in a sentence: their name when the record has one, else the email that acted. */
@@ -42,6 +43,7 @@ function actorLabel(fastify: FastifyInstance, actorEmail: string): string {
 
 interface SendOptions {
   eventKey: string;
+  request: FastifyRequest;
   to: OperatorRecipient;
   subject: string;
   body: string[];
@@ -63,20 +65,23 @@ async function send(fastify: FastifyInstance, opts: SendOptions): Promise<boolea
     smallPrint: opts.smallPrint,
   });
 
+  const sender = resolveSender(fastify, undefined, opts.request.site);
+
   try {
     await fastify.mailer.send({
       to: { name: opts.to.name, email: opts.to.email },
-      from: {
-        name: instanceName(fastify),
-        email: fastify.config.INSTANCE_FROM_EMAIL ?? "no-reply@community-drafter.local",
-      },
+      from: sender.from,
+      replyTo: sender.replyTo,
+      tag: sender.tag,
       subject: opts.subject,
       text: rendered.text,
       html: rendered.html,
     });
+    fastify.siteObservations.recordSend(sender.tag, true);
     fastify.log.info({ event: opts.eventKey, operator: opts.to.email }, "operator mail: delivered");
     return true;
   } catch (err) {
+    fastify.siteObservations.recordSend(sender.tag, false);
     fastify.log.warn(
       {
         event: opts.eventKey,
@@ -101,11 +106,12 @@ export async function sendOperatorAdded(
 ): Promise<boolean> {
   if (opts.operator.email === opts.actorEmail) return false;
 
-  const name = instanceName(fastify);
-  const base = instanceBaseUrl(fastify, request);
+  const name = request.site.name;
+  const base = siteBaseUrl(request);
 
   return send(fastify, {
     eventKey: "operator-added",
+    request,
     to: opts.operator,
     subject: `You're an operator on ${name}`,
     body: [
@@ -136,11 +142,12 @@ export async function sendOperatorAddedToDocument(
 ): Promise<boolean> {
   if (opts.operator.email === opts.actorEmail) return false;
 
-  const name = instanceName(fastify);
-  const base = instanceBaseUrl(fastify, request);
+  const name = request.site.name;
+  const base = siteBaseUrl(request);
 
   return send(fastify, {
     eventKey: "operator-added-to-document",
+    request,
     to: opts.operator,
     subject: `${opts.documentTitle} — you were added as an operator`,
     body: [

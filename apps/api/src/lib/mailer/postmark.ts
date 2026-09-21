@@ -31,6 +31,7 @@ export class PostmarkMailer implements Mailer {
           Subject: message.subject,
           TextBody: message.text,
           HtmlBody: message.html,
+          Tag: message.tag,
           MessageStream: "outbound",
         }),
       });
