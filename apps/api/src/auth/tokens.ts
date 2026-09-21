@@ -2,12 +2,13 @@ import { randomBytes } from "node:crypto";
 
 import { SignJWT, jwtVerify } from "jose";
 
-import type { OperatorKind } from "@community-drafter/shared";
+import { DEFAULT_SITE_SLUG, type OperatorKind } from "@community-drafter/shared";
 
 /**
  * `specs/api/auth.md` § Token shape: "JWT, HS256 with `AUTH_SECRET`. Claims:
  * `sub` (operator email, lowercase), `kind`, `name`, `purpose`
- * (`session` | `cli` | `magic`), `sid` or `jti`, `iat`, `exp`." One signer/
+ * (`session` | `cli` | `magic`), `site` (the slug of the site it was minted
+ * on), `sid` or `jti`, `iat`, `exp`." One signer/
  * verifier for every operator token — sessions, CLI tokens and magic links
  * are all this same shape, differing only in `purpose` and lifetime.
  * `purpose` is enforced per use (`verifyOperatorToken`'s caller always names
@@ -42,6 +43,13 @@ export interface MintTokenInput {
   name: string;
   kind: OperatorKind;
   secret: string;
+  /**
+   * `specs/api/auth.md` § Token shape: the slug of the site this token was
+   * minted on — "a credential belongs to one hostname". Defaults to the
+   * deployment's own derived site, which is where every token minted before
+   * sites existed belongs.
+   */
+  site?: string;
   /**
    * Carried only on a `magic` token, so `GET /auth/callback?token=` (whose
    * URL has room for nothing but `token`) still knows where to redirect —
@@ -82,6 +90,7 @@ export async function mintOperatorToken(input: MintTokenInput): Promise<MintedTo
     kind: input.kind,
     name: input.name,
     purpose: input.purpose,
+    site: input.site ?? DEFAULT_SITE_SLUG,
     ...idClaim,
     ...returnClaim,
   })
@@ -99,6 +108,8 @@ export interface VerifiedOperatorToken {
   kind: OperatorKind;
   name: string;
   purpose: TokenPurpose;
+  /** The site the token was minted on; a token minted before the claim existed reads as the default site. */
+  site: string;
   sid?: string;
   jti?: string;
   returnPath?: string;
@@ -129,6 +140,7 @@ export async function verifyOperatorToken(
       kind: (payload.kind === "bot" ? "bot" : "person") as OperatorKind,
       name: typeof payload.name === "string" ? payload.name : payload.sub,
       purpose: expectedPurpose,
+      site: typeof payload.site === "string" ? payload.site : DEFAULT_SITE_SLUG,
       sid: typeof payload.sid === "string" ? payload.sid : undefined,
       jti: typeof payload.jti === "string" ? payload.jti : undefined,
       returnPath: typeof payload.return === "string" ? payload.return : undefined,

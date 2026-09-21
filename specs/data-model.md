@@ -23,7 +23,7 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-operator-add`, `site-operator-remove` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove` | every commit |
 | `Document` | slug | every commit about a document |
 | `Site` | slug | every commit about a site, and every commit about a document that belongs to one |
 | `Person` | slug | every commit about a person's action |
@@ -151,7 +151,7 @@ One record per hostname (`behaviors/sites.md`). The **default site is not a reco
 | `operators` | array of email | the site's operator group; never empty |
 | `created_by` | email | the operator who created the site |
 
-Who created or changed a site is the history of the record (`site-create`, `site-update`, `site-operator-add`, `site-operator-remove`, each with a `Site` trailer). Hostname routing, certificates and DNS are not fields and not records: they live in `tf/` and in the customer's DNS zone (`behaviors/sites.md` § What a site is not).
+Who created, changed or deleted a site is the history of the record (`site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove`, each with a `Site` trailer). Hostname routing, certificates and DNS are not fields and not records: they live in `tf/` and in the customer's DNS zone (`behaviors/sites.md` § What a site is not).
 
 ## `people`
 

@@ -538,6 +538,7 @@ describe("ReadModel — golden fixture", () => {
       people: 50,
       participations: 50,
       submissions: 20,
+      sites: 0,
     });
     expect(totalVersions).toBe(5);
 

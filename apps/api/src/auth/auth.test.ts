@@ -152,8 +152,8 @@ describe("GET /auth/callback", () => {
     await server.close();
   });
 
-  /** `specs/api/auth.md` § `GET /auth/session`: the frame's instance name rides on the session (#37). */
-  it("returns the configured INSTANCE_NAME as instance_name", async () => {
+  /** `specs/api/auth.md` § `GET /auth/session`: the frame's site rides on the session (#37). */
+  it("returns the resolved site, whose name is INSTANCE_NAME on a deployment with no sites", async () => {
     const { server, cleanup } = await buildTestServer({ env: { INSTANCE_NAME: "Test Instance" } });
     cleanups.push(cleanup);
 
@@ -163,7 +163,7 @@ describe("GET /auth/callback", () => {
       headers: adminHeaders(),
     });
     expect(session.statusCode).toBe(200);
-    expect(session.json().instance_name).toBe("Test Instance");
+    expect(session.json().site).toMatchObject({ slug: "default", name: "Test Instance" });
 
     await server.close();
   });
@@ -177,7 +177,7 @@ describe("GET /auth/callback", () => {
       url: "/auth/session",
       headers: adminHeaders(),
     });
-    expect(session.json().instance_name).toBe("Community Drafter");
+    expect(session.json().site.name).toBe("Community Drafter");
 
     await server.close();
   });

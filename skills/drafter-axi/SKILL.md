@@ -100,6 +100,48 @@ LLM disposition pass; its output is a dispositions JSON file
 two-command round trip with no manual step in between. Every mutation prints the resulting
 record's key fields and the commit subject, so you can cite exactly what changed.
 
+## Sites
+
+One deployment answers on many hostnames. A **site** is one hostname and the identity carried on
+it: a name, a sender, an optional logo and accent, and the group of operators who work there.
+Every document belongs to exactly one site, and every page, link and message that document shows a
+participant carries that site's identity and no other — the name in the top bar, the From line,
+the Reply-To, and the hostname in every link. A document that names no site belongs to the
+deployment's own default site, which is what every document created before sites existed reads as.
+
+Onboarding a hostname is four steps, in order, and only the last one is data:
+
+1. **Verify the domain to the project** — the customer adds the verification record the cloud
+   provider prints, or the platform team verifies the domain itself. Nothing can be mapped before
+   this.
+2. **Map the hostname** — the platform team adds it to the deployment's list of site hostnames and
+   applies (infrastructure, not this CLI).
+3. **Point DNS at the service** — the customer adds a `CNAME` to `sites.signatories.org`. The
+   certificate provisions on its own once the record resolves.
+4. **Create the site record** — `scripts/drafter-axi sites create …`, which prints every DNS record
+   the customer still has to add: the CNAME above, and, when `--sender-email` is given, the mail
+   provider's DKIM and Return-Path records (take those two values from the Postmark console).
+
+**Creating the record routes nothing.** A site record is an identity for a hostname someone else
+has already routed; nothing in this CLI or the API creates, changes or checks a DNS record, a
+domain mapping or a certificate. `sites list` and `sites show` report whether a hostname has
+actually answered a request here and whether the mail provider has accepted the site's sender —
+observations, never promises.
+
+Mail follows the site: a site with a verified `--sender-email` sends **From** it; a site without
+one sends from the platform's own verified address under the site's name. A sender the provider
+has not accepted yet **fails per recipient** rather than quietly going out under someone else's
+address, so leave `--sender-email` off until verification is done.
+
+Creating a site, changing its identity and deleting it are superadmin actions. Managing a site's
+operator group is not — any operator of the site may add or remove members of it, and
+`sites operators remove` drops the email from that site only, leaving the record and every other
+membership intact.
+
+Assign documents with `docs create <slug> --site <site> …` or `docs update <slug> --site <site>`.
+A credential belongs to one hostname, so someone who works on two sites signs in twice and keeps
+one profile per site (`--profile`).
+
 ## Session hook
 
 `scripts/drafter-axi hook install` (run once, from a repo that has installed this skill) writes a
@@ -115,29 +157,38 @@ every-session use instead.
 
 ### Session
 
-- `scripts/drafter-axi login <email> [--url <instance>]` — Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.
+- `scripts/drafter-axi login <email> [--url <instance>]` — Device-code sign-in: the URL's hostname picks the site, and the resulting token is good on that host only. Emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.
 - `scripts/drafter-axi logout` — Forget the stored token for this profile.
-- `scripts/drafter-axi whoami` — Show the signed-in operator and token expiry.
+- `scripts/drafter-axi whoami` — Show the signed-in operator, the site this credential belongs to, and the token expiry.
+
+### Sites
+
+- `scripts/drafter-axi sites list` — The caller's sites: hostname, name, the From address mail will actually use, operator and document counts, and whether the hostname and the sender are verified yet.
+- `scripts/drafter-axi sites show <slug>` — One site whole, with the DNS records it still needs.
+- `scripts/drafter-axi sites create <slug> --hostname <host> --name "<text>" --reply-to <email> [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]` — Create a site (superadmin). Prints the record, then every DNS record the customer must add — the CNAME for the hostname and, with --sender-email, the mail provider's DKIM and Return-Path records — and says plainly that creating the record routes nothing.
+- `scripts/drafter-axi sites update <slug> [--name "<text>"] [--reply-to <email>] [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]` — Change a site's identity (superadmin); --hostname is deliberately absent — a site has exactly one hostname, and a new one is a new site.
+- `scripts/drafter-axi sites remove <slug>` — Delete a site (superadmin); refused while any document names it, naming the documents.
+- `scripts/drafter-axi sites operators <slug> | sites operators add <slug> <email> | sites operators remove <slug> <email>` — The site's operator group; any operator of the site may change it, and remove drops the email from this site only.
 
 ### Operators
 
-- `scripts/drafter-axi operators list` — Every operator in the directory.
+- `scripts/drafter-axi operators list` — This site's operator group — not every operator on the instance.
 - `scripts/drafter-axi operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]` — Create an operator.
 - `scripts/drafter-axi operators update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]` — Update or deactivate an operator; --superadmin is grantable only by another superadmin.
-- `scripts/drafter-axi operators remove <email>` — Remove an operator.
+- `scripts/drafter-axi operators remove <email>` — Delete an operator record outright (superadmin): removes them from every site and document. To take someone off one site, use `sites operators remove`.
 
 ### Documents
 
-- `scripts/drafter-axi docs create <slug> --title "<text>" --audience public|closed --sender-name "<text>" --reply-to <email> [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft; the caller becomes its first operator. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft.
-- `scripts/drafter-axi docs show <slug>` — Dashboard numbers, versions, and schedule; prints the audience, who the statement is addressed to, and public_url when the document is publicly readable.
-- `scripts/drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "<name>"]...` — Change the audience and who the statement is addressed to, and nothing else. --addressed-to replaces the recipients.
+- `scripts/drafter-axi docs create <slug> --title "<text>" --audience public|closed [--site <slug>] [--sender-name "<text>"] [--reply-to <email>] [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]` — Create a document in draft; the caller becomes its first operator. --site names the site it belongs to (default: the site this profile is signed in to), which decides the hostname its links and mail are built on; --sender-name and --reply-to fall back to the site's. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft.
+- `scripts/drafter-axi docs show <slug>` — Dashboard numbers, versions, and schedule; prints the site and the canonical host its links are built on, the audience, who the statement is addressed to, and public_url when the document is publicly readable.
+- `scripts/drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]` — Change the audience, who the statement is addressed to, and the site, and nothing else. --site moves the document to another site you operate: the slug, tokens and history do not change, the hostname its participants are sent to does. --addressed-to replaces the recipients.
 - `scripts/drafter-axi docs open <slug> --comments-close <iso> --signing-closes <iso>` — Open commenting and signing, and send invitations.
 - `scripts/drafter-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` — Push a deadline later (never earlier).
 - `scripts/drafter-axi docs close <slug>` — Close signing now.
 - `scripts/drafter-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>` — Reopen a closed document.
 - `scripts/drafter-axi docs withdraw <slug> --reason "<text>" [--public]` — Withdraw the document.
 - `scripts/drafter-axi docs operators <slug>` — List a document's operators.
-- `scripts/drafter-axi docs operators add <slug> <email>` — Add an active operator to a document.
+- `scripts/drafter-axi docs operators add <slug> <email>` — Add an operator to a document, drawing only from the document's site's operator group.
 - `scripts/drafter-axi docs operators remove <slug> <email>` — Remove an operator from a document (refused for the last one).
 
 ### Versions

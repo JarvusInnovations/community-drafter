@@ -174,6 +174,7 @@ export class NotificationDispatcher {
       text: rendered.text,
       html: rendered.html,
       personalLink: ctx.personalLink,
+      tag: ctx.tag,
     };
   }
 
@@ -233,6 +234,9 @@ export class NotificationDispatcher {
           const rendered = target.render(ctx);
           const message = this.toMessage(ctx, rendered);
           const result = await this.attemptSend(message);
+          // `specs/api/admin.md` § Sites: `sender_verified` is an
+          // observation, and this is where one is made.
+          this.fastify.siteObservations.recordSend(ctx.tag, result.ok);
 
           if (result.ok) {
             this.clearFailure(document, eventKey, target.person);

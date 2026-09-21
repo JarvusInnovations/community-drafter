@@ -5,6 +5,7 @@ import type {
   OperatorRecord,
   ParticipationRecord,
   PersonRecord,
+  SiteRecord,
   SubmissionRecord,
   Trailers,
 } from "@community-drafter/shared";
@@ -63,6 +64,15 @@ const SUBMISSION_ACTIONS = new Set<Action>(["comment", "submit"]);
 
 /** Actions that write the `operators` sheet. */
 const OPERATOR_ACTIONS = new Set<Action>(["operator-add", "operator-update", "operator-remove"]);
+
+/** Actions that write the `sites` sheet (`specs/behaviors/sites.md`). */
+const SITE_ACTIONS = new Set<Action>([
+  "site-create",
+  "site-update",
+  "site-remove",
+  "site-operator-add",
+  "site-operator-remove",
+]);
 
 /** `specs/screens/admin-dashboard.md` § Recent activity: "the last 50 commits on this document". */
 const ACTIVITY_LIMIT = 50;
@@ -183,6 +193,8 @@ export class ReadModel {
   private readonly operators = new Map<string, OperatorRecord>();
   private readonly operatorsByEmail = new Map<string, string>();
   private readonly people = new Map<string, PersonRecord>();
+  private readonly sites = new Map<string, SiteRecord>();
+  private readonly sitesByHostname = new Map<string, string>();
   private readonly participations = new Map<string, ParticipationEntry>();
   private readonly participationsByToken = new Map<string, string>();
   private readonly submissions = new Map<string, SubmissionEntry>();
@@ -198,6 +210,7 @@ export class ReadModel {
 
   async build(): Promise<void> {
     await this.refreshOperators();
+    await this.refreshSites();
     await this.refreshPeople();
     await this.refreshLog();
 
@@ -239,6 +252,21 @@ export class ReadModel {
     }
   }
 
+  /**
+   * `specs/behaviors/sites.md`: sites are indexed by slug and by hostname,
+   * the two keys resolution uses (a request's host, a document's `site`).
+   * Hostnames are lowercased on the way in; matching is exact.
+   */
+  async refreshSites(): Promise<void> {
+    const sites = await this.store.sites.queryAll();
+    this.sites.clear();
+    this.sitesByHostname.clear();
+    for (const site of sites) {
+      this.sites.set(site.slug, site);
+      this.sitesByHostname.set(site.hostname.toLowerCase(), site.slug);
+    }
+  }
+
   async refreshDocument(slug: string): Promise<void> {
     await this.refreshLog();
     await this.reloadDocument(slug);
@@ -273,6 +301,17 @@ export class ReadModel {
 
     if (OPERATOR_ACTIONS.has(action)) {
       await this.refreshOperators();
+    }
+
+    // A site commit may create, change or delete a record, and
+    // `operator-remove` drops the email from every site's group in the same
+    // commit — both are cheap whole-sheet reloads (there are as many sites
+    // as hostnames, not as many as documents).
+    // A commit that carries a `Site` trailer may have joined an operator to
+    // a group in the same commit as the record it created
+    // (`specs/api/admin.md` § Operators).
+    if (SITE_ACTIONS.has(action) || action === "operator-remove" || trailers.Site) {
+      await this.refreshSites();
     }
 
     // `doc-operator-add`/`doc-operator-remove` name their document via the
@@ -557,6 +596,20 @@ export class ReadModel {
     return id ? this.operators.get(id) : undefined;
   }
 
+  getSite(slug: string): SiteRecord | undefined {
+    return this.sites.get(slug);
+  }
+
+  /** Exact, case-insensitive hostname match — no wildcards, no suffixes (`specs/behaviors/sites.md`). */
+  getSiteByHostname(hostname: string): SiteRecord | undefined {
+    const slug = this.sitesByHostname.get(hostname.toLowerCase());
+    return slug ? this.sites.get(slug) : undefined;
+  }
+
+  listSites(): SiteRecord[] {
+    return [...this.sites.values()];
+  }
+
   listOperators(): OperatorRecord[] {
     return [...this.operators.values()];
   }
@@ -599,6 +652,7 @@ export class ReadModel {
     people: number;
     participations: number;
     submissions: number;
+    sites: number;
   } {
     return {
       documents: this.documents.size,
@@ -606,6 +660,7 @@ export class ReadModel {
       people: this.people.size,
       participations: this.participations.size,
       submissions: this.submissions.size,
+      sites: this.sites.size,
     };
   }
 }

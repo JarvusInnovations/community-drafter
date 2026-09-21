@@ -15,6 +15,16 @@ export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
 export type Capacity = "personal" | "official";
 export type BlockStatus = "same" | "changed" | "added" | "removed";
 
+/**
+ * `specs/screens/public-and-embed.md` § Site identity: the document's site
+ * — its logo when set, otherwise its name, and the accent it overrides.
+ */
+export interface PublicSiteInfo {
+  name: string;
+  logo_url?: string;
+  accent?: string;
+}
+
 export interface PublicDocumentInfo {
   slug: string;
   title: string;
@@ -71,6 +81,7 @@ export interface SignatorySummary {
 }
 
 export interface PublicBundle {
+  site: PublicSiteInfo;
   document: PublicDocumentInfo;
   version: PublicVersionInfo;
   versions: PublicVersionListItem[];

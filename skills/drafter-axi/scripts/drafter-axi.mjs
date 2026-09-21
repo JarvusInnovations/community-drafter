@@ -1273,6 +1273,7 @@ var DOCS_FLAGS = {
   create: {
     positionals: 1,
     value: [
+      "--site",
       "--title",
       "--sender-name",
       "--reply-to",
@@ -1291,7 +1292,7 @@ var DOCS_FLAGS = {
   show: { positionals: 1 },
   update: {
     positionals: 1,
-    value: ["--audience"],
+    value: ["--audience", "--site"],
     multi: ["--addressed-to"]
   },
   open: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
@@ -1304,7 +1305,7 @@ var DOCS_FLAGS = {
 var DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --audience public|closed
-       --sender-name <text> --reply-to <email>
+       [--site <slug>] [--sender-name <text>] [--reply-to <email>]
        [--addressed-to "<name>"]... [--capacities personal,official]
        [--show-signatories list|count|none]
        [--revocation-window-hours <n>] [--tags a,b]
@@ -1323,8 +1324,15 @@ anyone with the link may read the WORKING draft; the two are independent, so a
 letter to a named body can be drafted in the open and a public statement can be
 drafted invitee-only.
 show <slug>
-update <slug> [--audience public|closed] [--addressed-to "<name>"]...
+update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]
        (settings only; --addressed-to replaces the recipients)
+
+--site names the site the document belongs to \u2014 the hostname every personal
+link, public link and message for it is built on. It defaults to the site
+this profile is signed in to, and \`update --site\` moves the document to
+another site you operate: the slug, tokens and history do not change, the
+hostname its participants are sent to does. --sender-name and --reply-to may
+be omitted, in which case the site's own are used.
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
@@ -1338,12 +1346,16 @@ operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
 
-Every mutation prints the document's key fields and the commit subject. When the
-document's --public is not none, create/show/open also print public_url \u2014 the
-<instance>/d/<slug> address anyone with the link can read.`;
+Every mutation prints the document's key fields and the commit subject, plus
+the site and the canonical host its links are built on. When the document's
+--public is not none, create/show/open also print public_url \u2014 the
+https://<site hostname>/d/<slug> address anyone with the link can read.`;
 function publicUrl(doc, instanceUrl) {
   if (!doc.public_access || doc.public_access === "none") return void 0;
-  return `${instanceUrl}/d/${doc.slug}`;
+  return `${canonicalHost(doc, instanceUrl)}/d/${doc.slug}`;
+}
+function canonicalHost(doc, instanceUrl) {
+  return doc.site_url || instanceUrl;
 }
 function detailObject(doc, instanceUrl) {
   return compact({
@@ -1351,6 +1363,12 @@ function detailObject(doc, instanceUrl) {
     title: doc.title,
     state: doc.state,
     phase: doc.phase,
+    // `specs/api/admin-cli.md` § Output rules: every document view prints
+    // its site and the canonical host its links are built on, because an
+    // operator handing out a link needs to read the address their
+    // participants will actually receive.
+    site: doc.site ?? "default",
+    site_url: canonicalHost(doc, instanceUrl),
     created_by: doc.created_by,
     operators: doc.operators,
     sender_name: doc.sender_name,
@@ -1391,16 +1409,12 @@ async function docsCommand(args) {
       const body = {
         slug,
         title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
-        sender_name: requireStr(
-          parsed,
-          "--sender-name",
-          'drafter-axi docs create <slug> --sender-name "..." ...'
-        ),
-        reply_to: requireStr(
-          parsed,
-          "--reply-to",
-          "drafter-axi docs create <slug> --reply-to <email> ..."
-        ),
+        // `specs/behaviors/sites.md`: the document is created on the site
+        // this profile is signed in to unless it names another the caller
+        // operates; the site supplies the sender the document omits.
+        site: str(parsed, "--site"),
+        sender_name: str(parsed, "--sender-name"),
+        reply_to: str(parsed, "--reply-to"),
         capacities: capacities.length > 0 ? capacities : void 0,
         // `specs/data-model.md` § Audience: `--audience` is required and is
         // stored as given. `--public` is the separate drafting-time read
@@ -1458,16 +1472,26 @@ async function docsCommand(args) {
       );
       const audience = str(parsed, "--audience");
       const addressedTo = list(parsed, "--addressed-to");
-      if (audience === void 0 && addressedTo === void 0) {
+      const site = str(parsed, "--site");
+      if (audience === void 0 && addressedTo === void 0 && site === void 0) {
         throw new AxiError("nothing to update", "USAGE", [
-          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."]`'
+          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`'
         ]);
       }
       const doc = await client.patch(
         `/documents/${encodeURIComponent(slug)}`,
-        compact({ audience, addressed_to: addressedTo })
+        compact({ audience, addressed_to: addressedTo, site })
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
+      return render(
+        parsed,
+        doc,
+        () => joinBlocks(
+          renderObject(detailObject(doc, instanceUrl)),
+          site === void 0 ? "" : renderHelp([
+            `${slug} now belongs to ${doc.site ?? "default"} \u2014 from the next message and the next redirect its participants are sent to ${canonicalHost(doc, instanceUrl)}`
+          ])
+        )
+      );
     }
     case "open": {
       const slug = requirePositional(
@@ -1786,6 +1810,10 @@ async function homeCommand(args) {
   const identity = renderObject({
     signed_in: `${who.name} <${who.email}>`,
     kind: who.kind,
+    // `specs/api/admin-cli.md` § Session hook: the identity line names the
+    // site the profile is signed in to, since the same command against two
+    // profiles is two different tenants.
+    site: who.site ? `${who.site.name} (${who.site.slug})` : "default",
     instance: config.url,
     profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
     token_expires: who.expires_at,
@@ -2146,9 +2174,14 @@ add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text
 update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
 remove <email>
 
-The global operator directory (\`specs/behaviors/operators.md\`) \u2014 every
-active operator may create documents and, once added to one, act on it. A
-superadmin sees and may act on every document; only a superadmin can grant
+This **site's** operator group (\`specs/behaviors/sites.md\`), not every
+operator on the instance: the directory, and who may be added to one of this
+site's documents. \`add\` creates the record if the email is new and joins it
+to this site in the same commit; \`remove\` deletes the record outright and is
+superadmin-only \u2014 to take someone off one site, use
+\`drafter-axi sites operators remove <site> <email>\`.
+
+A superadmin sees and may act on every document; only a superadmin can grant
 or revoke the flag, and never on themself.
 Every mutation prints the resulting record and the commit subject.`;
 function operatorSchema() {
@@ -2772,6 +2805,233 @@ async function signaturesCommand(args) {
   }
 }
 
+// src/cli/commands/sites.ts
+var SITES_FLAGS = {
+  list: { positionals: 0 },
+  show: { positionals: 1 },
+  create: {
+    positionals: 1,
+    value: [
+      "--hostname",
+      "--name",
+      "--reply-to",
+      "--sender-name",
+      "--sender-email",
+      "--logo-url",
+      "--accent"
+    ]
+  },
+  update: {
+    positionals: 1,
+    value: ["--name", "--reply-to", "--sender-name", "--sender-email", "--logo-url", "--accent"]
+  },
+  remove: { positionals: 1 },
+  operators: { positionals: 3 }
+};
+var SITES_HELP = `usage: drafter-axi sites <list|show|create|update|remove|operators> ...
+
+list
+show <slug>
+create <slug> --hostname <host> --name "<text>" --reply-to <email>
+       [--sender-name "<text>"] [--sender-email <email>]
+       [--logo-url https://\u2026] [--accent '#0f62fe']       (superadmin)
+update <slug> [--name "<text>"] [--reply-to <email>] [--sender-name "<text>"]
+       [--sender-email <email>] [--logo-url https://\u2026] [--accent '#0f62fe']  (superadmin)
+remove <slug>                                             (superadmin)
+operators <slug>
+operators add <slug> <email>
+operators remove <slug> <email>
+
+A site is one hostname and the identity carried on it: a name, a sender, an
+optional logo and accent, and the group of operators who work there. Every
+document belongs to exactly one site, and every page, link and message that
+document shows carries that site's identity and no other. A document that
+names no site belongs to this deployment's own default site.
+
+--hostname is deliberately absent from \`update\`: a site has exactly one
+hostname, and a new one is a new site, because DNS, a certificate and every
+link already sent are attached to the old one.
+
+Creating the record routes nothing. The hostname must also be verified to
+the project and mapped before it reaches the service; \`create\` prints every
+DNS record the customer still has to add.`;
+var ROUTES_NOTHING = "Creating this record routes nothing: the hostname must also be verified to the project and mapped before it reaches the service.";
+function siteObject(site) {
+  return compact({
+    slug: site.slug,
+    hostname: site.hostname,
+    name: site.name,
+    sender_name: site.sender_name,
+    sender_email: site.sender_email,
+    reply_to: site.reply_to,
+    logo_url: site.logo_url,
+    accent: site.accent,
+    from_line: site.from_line,
+    hostname_verified: site.hostname_verified,
+    sender_verified: site.sender_verified === null ? "not observed yet" : site.sender_verified,
+    operators: site.operators,
+    documents: site.documents,
+    commit: site.commit
+  });
+}
+function dnsBlock(records) {
+  if (records.length === 0) return "";
+  return renderList("dns_records", records, [
+    computed("type", (r) => r.type),
+    computed("name", (r) => r.name),
+    computed("value", (r) => r.value),
+    computed("purpose", (r) => r.purpose)
+  ]);
+}
+async function sitesCommand(args) {
+  const { sub, parsed } = parseSubcommand("sites", args, SITES_FLAGS);
+  const client = clientFrom(parsed);
+  const cli = "drafter-axi";
+  switch (sub) {
+    case "list": {
+      const sites = await client.get("/sites");
+      return render(
+        parsed,
+        sites,
+        () => joinBlocks(
+          sites.length === 0 ? renderObject({ sites: "no sites found" }) : renderList("sites", sites, [
+            computed("slug", (s) => s.slug),
+            computed("hostname", (s) => s.hostname ?? ""),
+            computed("name", (s) => s.name),
+            computed("from", (s) => s.from_line),
+            computed("hostname_verified", (s) => s.hostname_verified),
+            computed(
+              "sender_verified",
+              (s) => s.sender_verified === null ? "not observed yet" : s.sender_verified
+            ),
+            computed("operators", (s) => s.operators.length),
+            computed("documents", (s) => s.documents)
+          ]),
+          renderHelp([`Run \`${cli} sites show <slug>\` for one site and the DNS it still needs`])
+        )
+      );
+    }
+    case "show": {
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites show <slug>");
+      const site = await client.get(`/sites/${encodeURIComponent(slug)}`);
+      const missing = site.hostname_verified ? [] : site.dns;
+      return render(
+        parsed,
+        site,
+        () => joinBlocks(
+          renderObject(siteObject(site)),
+          dnsBlock(missing),
+          renderHelp(
+            missing.length > 0 ? [ROUTES_NOTHING, `Run \`${cli} sites operators ${slug}\` for its operator group`] : [`Run \`${cli} sites operators ${slug}\` for its operator group`]
+          )
+        )
+      );
+    }
+    case "create": {
+      const usage = 'drafter-axi sites create <slug> --hostname <host> --name "..." --reply-to <email>';
+      const slug = requirePositional(parsed, 0, "slug", usage);
+      const body = compact({
+        slug,
+        hostname: requireStr(parsed, "--hostname", usage),
+        name: requireStr(parsed, "--name", usage),
+        reply_to: requireStr(parsed, "--reply-to", usage),
+        sender_name: str(parsed, "--sender-name"),
+        sender_email: str(parsed, "--sender-email"),
+        logo_url: str(parsed, "--logo-url"),
+        accent: str(parsed, "--accent")
+      });
+      const site = await client.post("/sites", body);
+      return render(
+        parsed,
+        site,
+        () => joinBlocks(
+          renderObject(siteObject(site)),
+          dnsBlock(site.dns),
+          renderHelp([
+            ROUTES_NOTHING,
+            site.sender_email ? "Take the DKIM and Return-Path values from the Postmark console (Sender Signatures \u2192 the domain); until that domain is verified, this site's mail fails per recipient rather than going out under the platform's address." : `This site's mail goes out from the platform address under the site's name until \`${cli} sites update ${slug} --sender-email \u2026\` names a verified sender`,
+            `Run \`${cli} docs create <slug> --site ${slug} \u2026\` to start a document on it`
+          ])
+        )
+      );
+    }
+    case "update": {
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites update <slug> ...");
+      const body = compact({
+        name: str(parsed, "--name"),
+        reply_to: str(parsed, "--reply-to"),
+        sender_name: str(parsed, "--sender-name"),
+        sender_email: str(parsed, "--sender-email"),
+        logo_url: str(parsed, "--logo-url"),
+        accent: str(parsed, "--accent")
+      });
+      const site = await client.patch(`/sites/${encodeURIComponent(slug)}`, body);
+      return render(parsed, site, () => renderObject(siteObject(site)));
+    }
+    case "remove": {
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites remove <slug>");
+      const result = await client.delete(
+        `/sites/${encodeURIComponent(slug)}`
+      );
+      return render(
+        parsed,
+        result,
+        () => joinBlocks(
+          renderObject(result),
+          renderHelp([
+            `Removed ${slug}. Its domain mapping is separate infrastructure and is removed in tf/.`
+          ])
+        )
+      );
+    }
+    case "operators": {
+      const first = parsed.positional[0];
+      if (first === "add" || first === "remove") {
+        const usage = `drafter-axi sites operators ${first} <slug> <email>`;
+        const slug2 = requirePositional(parsed, 1, "slug", usage);
+        const email = requirePositional(parsed, 2, "email", usage);
+        if (first === "add") {
+          const result2 = await client.post(
+            `/sites/${encodeURIComponent(slug2)}/operators`,
+            { email }
+          );
+          return render(parsed, result2, () => renderObject(compact(result2)));
+        }
+        const result = await client.delete(
+          `/sites/${encodeURIComponent(slug2)}/operators/${encodeURIComponent(email)}`
+        );
+        return render(
+          parsed,
+          result,
+          () => joinBlocks(
+            renderObject(result),
+            renderHelp([
+              `Removed ${email} from ${slug2} only \u2014 their operator record and any other site they belong to are untouched.`
+            ])
+          )
+        );
+      }
+      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites operators <slug>");
+      const operators = await client.get(
+        `/sites/${encodeURIComponent(slug)}/operators`
+      );
+      return render(
+        parsed,
+        operators,
+        () => operators.length === 0 ? renderObject({ operators: "no operators found" }) : renderList("operators", operators, [
+          computed("email", (o) => o.email),
+          computed("name", (o) => o.name),
+          computed("kind", (o) => o.kind),
+          computed("active", (o) => o.active),
+          computed("superadmin", (o) => o.superadmin === true)
+        ])
+      );
+    }
+    default:
+      return sub;
+  }
+}
+
 // src/cli/commands/submissions.ts
 var SUBMISSIONS_FLAGS = {
   list: {
@@ -3062,16 +3322,51 @@ var COMMAND_GROUPS = [
     commands: [
       {
         usage: "login <email> [--url <instance>]",
-        summary: "Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile."
+        summary: "Device-code sign-in: the URL's hostname picks the site, and the resulting token is good on that host only. Emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile."
       },
       { usage: "logout", summary: "Forget the stored token for this profile." },
-      { usage: "whoami", summary: "Show the signed-in operator and token expiry." }
+      {
+        usage: "whoami",
+        summary: "Show the signed-in operator, the site this credential belongs to, and the token expiry."
+      }
+    ]
+  },
+  {
+    group: "Sites",
+    commands: [
+      {
+        usage: "sites list",
+        summary: "The caller's sites: hostname, name, the From address mail will actually use, operator and document counts, and whether the hostname and the sender are verified yet."
+      },
+      {
+        usage: "sites show <slug>",
+        summary: "One site whole, with the DNS records it still needs."
+      },
+      {
+        usage: 'sites create <slug> --hostname <host> --name "<text>" --reply-to <email> [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]',
+        summary: "Create a site (superadmin). Prints the record, then every DNS record the customer must add \u2014 the CNAME for the hostname and, with --sender-email, the mail provider's DKIM and Return-Path records \u2014 and says plainly that creating the record routes nothing."
+      },
+      {
+        usage: 'sites update <slug> [--name "<text>"] [--reply-to <email>] [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]',
+        summary: "Change a site's identity (superadmin); --hostname is deliberately absent \u2014 a site has exactly one hostname, and a new one is a new site."
+      },
+      {
+        usage: "sites remove <slug>",
+        summary: "Delete a site (superadmin); refused while any document names it, naming the documents."
+      },
+      {
+        usage: "sites operators <slug> | sites operators add <slug> <email> | sites operators remove <slug> <email>",
+        summary: "The site's operator group; any operator of the site may change it, and remove drops the email from this site only."
+      }
     ]
   },
   {
     group: "Operators",
     commands: [
-      { usage: "operators list", summary: "Every operator in the directory." },
+      {
+        usage: "operators list",
+        summary: "This site's operator group \u2014 not every operator on the instance."
+      },
       {
         usage: 'operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]',
         summary: "Create an operator."
@@ -3080,23 +3375,26 @@ var COMMAND_GROUPS = [
         usage: 'operators update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]',
         summary: "Update or deactivate an operator; --superadmin is grantable only by another superadmin."
       },
-      { usage: "operators remove <email>", summary: "Remove an operator." }
+      {
+        usage: "operators remove <email>",
+        summary: "Delete an operator record outright (superadmin): removes them from every site and document. To take someone off one site, use `sites operators remove`."
+      }
     ]
   },
   {
     group: "Documents",
     commands: [
       {
-        usage: 'docs create <slug> --title "<text>" --audience public|closed --sender-name "<text>" --reply-to <email> [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
-        summary: "Create a document in draft; the caller becomes its first operator. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft."
+        usage: 'docs create <slug> --title "<text>" --audience public|closed [--site <slug>] [--sender-name "<text>"] [--reply-to <email>] [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+        summary: "Create a document in draft; the caller becomes its first operator. --site names the site it belongs to (default: the site this profile is signed in to), which decides the hostname its links and mail are built on; --sender-name and --reply-to fall back to the site's. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft."
       },
       {
         usage: "docs show <slug>",
-        summary: "Dashboard numbers, versions, and schedule; prints the audience, who the statement is addressed to, and public_url when the document is publicly readable."
+        summary: "Dashboard numbers, versions, and schedule; prints the site and the canonical host its links are built on, the audience, who the statement is addressed to, and public_url when the document is publicly readable."
       },
       {
-        usage: 'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]...',
-        summary: "Change the audience and who the statement is addressed to, and nothing else. --addressed-to replaces the recipients."
+        usage: 'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]',
+        summary: "Change the audience, who the statement is addressed to, and the site, and nothing else. --site moves the document to another site you operate: the slug, tokens and history do not change, the hostname its participants are sent to does. --addressed-to replaces the recipients."
       },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",
@@ -3118,7 +3416,7 @@ var COMMAND_GROUPS = [
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
         usage: "docs operators add <slug> <email>",
-        summary: "Add an active operator to a document."
+        summary: "Add an operator to a document, drawing only from the document's site's operator group."
       },
       {
         usage: "docs operators remove <slug> <email>",
@@ -3276,12 +3574,13 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "329ab0e" : "dev";
+var VERSION = true ? "1ee23c7" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
   whoami: WHOAMI_HELP,
   operators: OPERATORS_HELP,
+  sites: SITES_HELP,
   docs: DOCS_HELP,
   versions: VERSIONS_HELP,
   people: PEOPLE_HELP,
@@ -3302,6 +3601,7 @@ var COMMANDS = {
   logout: logoutCommand,
   whoami: whoamiCommand,
   operators: operatorsCommand,
+  sites: sitesCommand,
   docs: docsCommand,
   versions: versionsCommand,
   people: peopleCommand,

@@ -10,11 +10,11 @@ export const copy = {
   tableScrollRegion: "Table — scrolls sideways",
 
   // `specs/screens/admin-dashboard.md` § Design "Frame": the top bar shows
-  // the configured instance name, read from `GET /auth/session`'s
-  // `instance_name`. This literal is only the fallback for a session that
-  // predates that field — the same one the backend uses when
-  // `INSTANCE_NAME` is unset (`apps/api/src/auth/routes.ts`).
-  instanceName: "Community Drafter",
+  // the resolved site's name, read from `GET /auth/session`'s `site`. This
+  // literal is only the fallback for a session that predates that field —
+  // the same one the backend uses when `INSTANCE_NAME` is unset
+  // (`apps/api/src/sites/site.ts`).
+  siteName: "Community Drafter",
 
   signIn: {
     heading: "Sign in",
@@ -41,7 +41,38 @@ export const copy = {
 
   nav: {
     operators: "Operators",
+    sites: "Sites",
     signOut: "Sign out",
+  },
+
+  /**
+   * `/admin/sites` — the superadmin Sites page
+   * (`specs/screens/admin-dashboard.md` § Sites). It reports what is true
+   * and what is missing; nothing on it changes DNS
+   * (`specs/behaviors/sites.md` § Principles, "A site record never moves
+   * DNS").
+   */
+  sites: {
+    heading: "Sites",
+    intro:
+      "One hostname each, with the identity its documents carry. Creating and changing a site is CLI-only:",
+    createCommand:
+      'drafter-axi sites create <slug> --hostname <host> --name "…" --reply-to <email>',
+    empty: "No sites yet — every document belongs to this deployment's own site.",
+    defaultPill: "this deployment",
+    hostnameVerified: "routing here",
+    hostnameUnverified: "not verified yet",
+    senderVerified: "accepted by the mail provider",
+    senderUnverified: "not verified yet",
+    senderPlatform: "the platform address",
+    dnsHeading: (hostname: string) => `DNS still needed for ${hostname}`,
+    columns: {
+      site: "Site",
+      hostname: "Hostname",
+      from: "Mail from",
+      operators: "Operators",
+      documents: "Documents",
+    },
   },
 
   operators: {
@@ -79,7 +110,9 @@ export const copy = {
   documentList: {
     heading: "Documents",
     empty: "No documents yet.",
-    superadminNote: "You're a superadmin, so this list shows every document on this instance.",
+    superadminNote:
+      "You're a superadmin on this deployment's own site, so this list shows every document on every site.",
+    siteColumn: "Site",
     newDocumentHint: "New documents are created from the CLI (you become its first operator):",
     newDocumentCommand: 'drafter-axi docs create <slug> --title "…" --sender-name … --reply-to …',
   },
@@ -93,6 +126,9 @@ export const copy = {
      * and which says only who may read the draft today
      * (`specs/data-model.md` § Audience).
      */
+    siteLabel: "Site",
+    siteLine: (site: string | undefined, url: string | undefined) =>
+      `${site ?? "default"}${url ? ` · links are built on ${url}` : ""}`,
     audienceLabel: "Audience",
     audiencePublic: "Published for anyone to read",
     audienceClosed: "Delivered, not published",

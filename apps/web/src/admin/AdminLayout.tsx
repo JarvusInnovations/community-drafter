@@ -73,12 +73,22 @@ export function AdminLayout(): JSX.Element {
               end
               className="min-w-0 max-w-full truncate text-sm font-extrabold tracking-tight text-foreground"
             >
-              {contextValue.session.instance_name || copy.instanceName}
+              {contextValue.session.site?.name || copy.siteName}
             </NavLink>
             <div className="flex min-w-0 max-w-full items-center gap-4 text-sm">
               <NavLink to="/admin/operators" className="flex-none font-medium text-primary">
                 {copy.nav.operators}
               </NavLink>
+              {/*
+               * `specs/screens/admin-dashboard.md` § Design "Frame": "and
+               * 'Sites' for a superadmin on the default host".
+               */}
+              {contextValue.session.superadmin &&
+              (contextValue.session.site?.slug ?? "default") === "default" ? (
+                <NavLink to="/admin/sites" className="flex-none font-medium text-primary">
+                  {copy.nav.sites}
+                </NavLink>
+              ) : null}
               <span
                 className="min-w-0 truncate text-muted-foreground"
                 title={contextValue.session.email}

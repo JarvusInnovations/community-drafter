@@ -1,7 +1,8 @@
 ---
-status: planned
+status: done
 depends: []
 issues: [50]
+pr: 100
 specs:
   - specs/behaviors/sites.md
   - specs/data-model.md
@@ -56,15 +57,15 @@ A hostname does not reach this service until `site-hostnames` lands, so everythi
 
 ## Validation
 
-- [ ] With no `sites` records, every existing test passes unchanged and a document's links, mail and top bar are byte-identical to before: the default site is genuinely today's behavior.
-- [ ] A document on a site with hostname H: its personal link, public link, every link in every message, and the `docs show` output all name H, whichever host the request or the send was made from.
-- [ ] `GET /d/<slug>` and `GET /i/<token>` on the wrong host 302 to H with path and query intact; an unknown slug and an unknown token return the same 404 on every host, with no way to tell a wrong host from a wrong document.
-- [ ] A site with a verified `sender_email` sends From it; a site without one sends From the platform address with the site's name as display name; a site whose `sender_email` the provider rejects produces named per-recipient failures, no `notified` entries and no `sent_at`, and the next send reaches those recipients once verification lands.
-- [ ] Two operators on two different sites: each sees only their own site's directory and documents; `docs operators add` refuses the other site's email naming the site; `DELETE /operators/:email` is 403 for a non-superadmin; removing an operator from one site leaves their other membership intact. #50 is closed by this PR.
-- [ ] A CLI token minted on one site's host is 401 on another's; a session cookie set on one host is not sent to another; a magic link requested on a site's host arrives naming that site and lands on that host.
-- [ ] A site with `logo_url` and `accent` shows both on the participant and public surfaces at 390 px and 1280 px (screenshots on the PR); messages from that site carry no logo.
-- [ ] `sites create --sender-email …` prints one block containing the hostname CNAME and both Postmark records, and states that the record routes nothing.
-- [ ] A superadmin's Sites page lists every site with its effective From line and honest verification states.
+- [x] With no `sites` records, every existing test passes unchanged and a document's links, mail and top bar are byte-identical to before: the default site is genuinely today's behavior. The two pre-existing tests that changed are the two that asserted the *name* of the field the site replaced (`instance_name` on the session, and the admin frame reading it).
+- [x] A document on a site with hostname H: its personal link, public link, every link in every message, and the `docs show` output all name H, whichever host the request or the send was made from — the mail and links-export cases are exercised from an admin request made on the *default* host.
+- [x] `GET /d/<slug>` and `GET /i/<token>` on the wrong host 302 to H with path and query intact; an unknown slug and an unknown token return the same 404 on every host, with no way to tell a wrong host from a wrong document. Checked in tests and again by hand with `curl -H Host:` against a local instance.
+- [x] A site with a verified `sender_email` sends From it; a site without one sends From the platform address with the site's name as display name; a site whose `sender_email` the provider rejects produces named per-recipient failures, no `notified` entries and no `sent_at`. The "next send reaches them once verification lands" half rides the existing unsent path, which `people send` already covers; it is not separately re-tested here.
+- [x] Two operators on two different sites: each sees only their own site's directory and documents; `docs operators add` refuses the other site's email naming the site; `DELETE /operators/:email` is 403 for a non-superadmin; removing an operator from one site leaves their record and other memberships intact. #50 is closed by this PR.
+- [x] A CLI token minted on one site's host is 401 on another's; a magic link requested on a site's host arrives naming that site and lands on that host. The cookie half is the browser's own rule — the cookie carries no `Domain`, which is unchanged and is why the `site` claim exists for bearer tokens at all; it is asserted by construction, not by a test.
+- [x] A site with `logo_url` and `accent` shows both on the participant and public surfaces at 390 px and 1280 px (screenshots on PR #100); messages carry no logo on any site — the mail shell has no image slot to put one in.
+- [x] `sites create --sender-email …` prints one block containing the hostname CNAME and both Postmark records, and states that the record routes nothing (output quoted on PR #100).
+- [x] A superadmin's Sites page lists every site with its effective From line and honest verification states, plus the DNS a hostname that has never answered a request still needs.
 
 ## Risks / unknowns
 
@@ -76,8 +77,16 @@ A hostname does not reach this service until `site-hostnames` lands, so everythi
 
 ## Notes
 
-(At closeout.)
+- **The default site's operator group is derived, and that is the whole migration.** `siteOperatorGroup` computes "every active operator in no other site's group, plus every superadmin" on read. Nothing writes to it, which is why an instance with no `sites` records has exactly today's directory and adding someone to their first site is the moment they leave the default one.
+- **Two observations, not two promises.** `hostname_verified` and `sender_verified` are recorded in memory from what the process actually saw — a request that arrived on the hostname, a message the provider accepted — rather than from a DNS lookup or a provider API call. A restart forgets them and they re-accrue. `null` means "not observed yet"; the spec now says so.
+- **One commit joins a new operator to a group.** `POST /operators` writes the record and the site's `operators` list in the same transaction under `Action: operator-add` with a `Site` trailer, rather than the two `Action` values the spec first sketched — a commit has one `Action`.
+- **The canonical-host redirect uses the same resolution the routes do.** `/d/…` goes through `findPublicDocument` and `/i/…` through the gateway's own token validity rules, so a private slug, a revoked token and an unknown one all 404 identically on every host instead of redirecting and disclosing that something exists.
+- **A token minted before the `site` claim existed reads as `default`.** That is what keeps every outstanding CLI token working against the deployment's own host through this change.
+- **`.gitsheets/sites.toml` was committed unchanged**; `.gitsheets/documents.toml` gained the optional `site` property. Production picks both up at boot through `syncSheetConfigs`.
 
 ## Follow-ups
 
-(At closeout.)
+- **Deferred to plan:** the Cloud Run domain mappings, the `tf/` `site_hostnames` variable and the operator runbook — [`site-hostnames`](site-hostnames.md), which depends on this one. Until it lands no customer hostname reaches the service, and a site record is inert by design.
+- **Issue:** automating the two Postmark sender records through its Account API, so `sites create --sender-email` prints real values instead of "get this from the console". Out of scope here and called out as a follow-up in `docs/operations.md` § Onboarding a site.
+- **Issue:** the admin Sites page is read-only — creating and editing a site is CLI-only in phase 1, which `specs/screens/admin-dashboard.md` states. A form is a later pass if the platform team ever wants one.
+- **None:** sharing a person record across documents (#51) and the platform's own name and domain were out of scope and stay out.

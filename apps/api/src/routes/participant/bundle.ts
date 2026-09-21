@@ -7,6 +7,7 @@ import { buildSignatureView } from "../../lib/signature-view.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
 import { buildSubmissionView } from "../../lib/submission-view.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
+import { siteForDocument, siteIdentity } from "../../sites/site.ts";
 import type { Phase } from "../../phase/phase.ts";
 import type { DocumentEntry, ParticipationEntry } from "../../storage/read-model.ts";
 import { loadParticipantContext } from "./context.ts";
@@ -50,7 +51,9 @@ export function buildParticipantBundle(
   );
 
   return {
-    instance: { name: fastify.config.INSTANCE_NAME ?? "Community Drafter" },
+    // `specs/api/participant.md`: the **document's** site — name, and logo
+    // and accent where set — replaces the earlier `instance: { name }`.
+    site: siteIdentity(siteForDocument(fastify, document.record)),
     person: { id: person?.id ?? participation.record.person, name: person?.name ?? "" },
     document: {
       slug: document.record.slug,

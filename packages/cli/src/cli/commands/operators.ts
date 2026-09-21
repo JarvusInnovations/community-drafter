@@ -22,9 +22,14 @@ add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text
 update <email> [--name "<text>"] [--active true|false] [--superadmin true|false] [--title "<text>"] [--org "<text>"] [--notes "<text>"]
 remove <email>
 
-The global operator directory (\`specs/behaviors/operators.md\`) — every
-active operator may create documents and, once added to one, act on it. A
-superadmin sees and may act on every document; only a superadmin can grant
+This **site's** operator group (\`specs/behaviors/sites.md\`), not every
+operator on the instance: the directory, and who may be added to one of this
+site's documents. \`add\` creates the record if the email is new and joins it
+to this site in the same commit; \`remove\` deletes the record outright and is
+superadmin-only — to take someone off one site, use
+\`drafter-axi sites operators remove <site> <email>\`.
+
+A superadmin sees and may act on every document; only a superadmin can grant
 or revoke the flag, and never on themself.
 Every mutation prints the resulting record and the commit subject.`;
 

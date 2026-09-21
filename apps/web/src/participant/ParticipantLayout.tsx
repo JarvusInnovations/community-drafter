@@ -3,7 +3,8 @@ import { Outlet, useParams } from "react-router";
 
 import { ApiError, getBundle } from "./api.ts";
 import { BundleContext, type BundleContextValue } from "./BundleContext.tsx";
-import { InstanceBar } from "./components/InstanceBar.tsx";
+import { SiteBar } from "./components/SiteBar.tsx";
+import { SiteTheme } from "./components/SiteTheme.tsx";
 import { copy } from "./copy.ts";
 import { NotFoundScreen } from "./NotFoundScreen.tsx";
 import { type Bundle } from "./types.ts";
@@ -95,8 +96,10 @@ export function ParticipantLayout(): JSX.Element | null {
 
   return (
     <BundleContext.Provider value={contextValue}>
-      <InstanceBar name={state.bundle.instance.name} document={state.bundle.document} />
-      <Outlet />
+      <SiteTheme site={state.bundle.site}>
+        <SiteBar site={state.bundle.site} document={state.bundle.document} />
+        <Outlet />
+      </SiteTheme>
     </BundleContext.Provider>
   );
 }

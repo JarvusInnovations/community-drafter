@@ -5,6 +5,7 @@ import { getPublicBundle } from "./api.ts";
 import { copy } from "./copy.ts";
 import { type PublicBundle } from "./types.ts";
 import { DocumentBody } from "../participant/components/DocumentBody.tsx";
+import { SiteTheme } from "../participant/components/SiteTheme.tsx";
 import { formatAbsolute } from "../participant/format.ts";
 
 type LoadState =
@@ -101,26 +102,31 @@ export function EmbedScreen(): JSX.Element | null {
 
   const { bundle } = state;
 
+  // The embed carries the document's site accent and nothing else of the
+  // site's chrome — the host page owns the frame
+  // (`specs/screens/public-and-embed.md` § Display Rules "Embed").
   return (
-    <div ref={ref} className="p-4">
-      <h1 className="text-xl font-bold text-foreground">{bundle.document.title}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {copy.versionLabel.line(
-          bundle.version.number,
-          formatAbsolute(bundle.version.published_at),
-          bundle.version.summary,
-        )}{" "}
-        ·{" "}
-        <a href={`/d/${slug}/history`} target="_blank" rel="noreferrer" className="underline">
-          {copy.versionLabel.seeWhatChanged}
-        </a>
-      </p>
-      <DocumentBody html={bundle.version.html} />
-      <footer className="mt-4 border-t border-border pt-2 text-sm">
-        <a href={`/d/${slug}`} target="_blank" rel="noreferrer" className="underline">
-          {copy.embed.readFullPage}
-        </a>
-      </footer>
-    </div>
+    <SiteTheme site={bundle.site}>
+      <div ref={ref} className="p-4">
+        <h1 className="text-xl font-bold text-foreground">{bundle.document.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {copy.versionLabel.line(
+            bundle.version.number,
+            formatAbsolute(bundle.version.published_at),
+            bundle.version.summary,
+          )}{" "}
+          ·{" "}
+          <a href={`/d/${slug}/history`} target="_blank" rel="noreferrer" className="underline">
+            {copy.versionLabel.seeWhatChanged}
+          </a>
+        </p>
+        <DocumentBody html={bundle.version.html} />
+        <footer className="mt-4 border-t border-border pt-2 text-sm">
+          <a href={`/d/${slug}`} target="_blank" rel="noreferrer" className="underline">
+            {copy.embed.readFullPage}
+          </a>
+        </footer>
+      </div>
+    </SiteTheme>
   );
 }

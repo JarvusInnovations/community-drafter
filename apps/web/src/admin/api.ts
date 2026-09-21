@@ -6,6 +6,7 @@ import {
   type NotificationsHealth,
   type OperatorRecord,
   type SessionInfo,
+  type SiteRow,
   type SubmissionView,
   type VersionDetail,
   type VersionListItem,
@@ -105,9 +106,18 @@ export function approveDevice(userCode: string): Promise<{ ok: boolean }> {
   });
 }
 
-/** `specs/api/admin.md` § Operators — the global directory (`/admin/operators`). */
+/**
+ * `specs/api/admin.md` § Operators — the **resolved site's** operator group
+ * (`specs/behaviors/sites.md` § Operators and tenancy), not every operator
+ * on the instance.
+ */
 export function listOperators(): Promise<OperatorRecord[]> {
   return request<OperatorRecord[]>(`${BASE}/operators`);
+}
+
+/** `specs/api/admin.md` § Sites — the caller's sites (every site for a superadmin). */
+export function listSites(): Promise<SiteRow[]> {
+  return request<SiteRow[]>(`${BASE}/sites`);
 }
 
 export interface CreateOperatorInput {

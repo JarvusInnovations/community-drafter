@@ -2,7 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SHEET_NAMES = ["documents", "operators", "people", "participations", "submissions"] as const;
+const SHEET_NAMES = [
+  "documents",
+  "operators",
+  "people",
+  "participations",
+  "submissions",
+  "sites",
+] as const;
 
 /**
  * `specs/architecture.md` repo layout: ".gitsheets/ sheet configs, copied
@@ -48,8 +55,8 @@ async function runGit(args: string[], cwd: string): Promise<string> {
 /**
  * First-boot helper (`specs/api/admin.md`: `POST /init-data-repo`; route
  * wiring lands in `api-core`). Given an empty data repo, writes and commits
- * the four sheet configs in one commit. Refuses if any of the four already
- * exists, so it can never clobber a live sheet's config.
+ * every sheet config in one commit. Refuses if any of them already exists,
+ * so it can never clobber a live sheet's config.
  */
 export async function initDataRepo(opts: InitDataRepoOptions): Promise<InitDataRepoResult> {
   const {
@@ -84,7 +91,7 @@ export async function initDataRepo(opts: InitDataRepoOptions): Promise<InitDataR
       `user.email=${author.email}`,
       "commit",
       "-m",
-      "chore(gitsheets): initialize documents, operators, people, participations, submissions sheets",
+      `chore(gitsheets): initialize ${SHEET_NAMES.join(", ")} sheets`,
     ],
     dataDir,
   );

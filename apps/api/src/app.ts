@@ -13,6 +13,7 @@ import requestContextPlugin from "./lib/request-context.ts";
 import notificationsPlugin, { type NotificationsPluginOptions } from "./notifications/plugin.ts";
 import envPlugin from "./plugins/env.ts";
 import renderingPlugin from "./rendering/cache.ts";
+import sitesPlugin from "./sites/plugin.ts";
 import adminRoutes from "./routes/admin/index.ts";
 import healthRoutes from "./routes/health.ts";
 import participantRoutes from "./routes/participant/index.ts";
@@ -71,6 +72,13 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
 
   // 3. Storage: the data repo, read model, tracker, push daemon.
   await fastify.register(storagePlugin, opts.storage ?? {});
+
+  // 3a. Site resolution (`specs/behaviors/sites.md`). Needs the read model
+  //     (hostname → site) and the config (the derived default site), and
+  //     must land before the gateway so every downstream hook, route and
+  //     error path reads `request.site` — and before any handler, so the
+  //     canonical-host redirect for `/d/*` and `/i/*` runs first.
+  await fastify.register(sitesPlugin);
 
   // 3b. The mailer + dispatcher + digest/closing-soon schedulers
   //     (`notifications` plan). Needs storage + events + config; every

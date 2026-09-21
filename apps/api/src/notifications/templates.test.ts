@@ -21,7 +21,7 @@ const OTHER_PARTICIPANT_SECRETS = ["other-person", "other@example.org", "their p
 
 function buildContext(): RecipientContext {
   return {
-    instanceName: "Save the Academy Coalition",
+    siteName: "Save the Academy Coalition",
     documentTitle: "Coalition Charter",
     personName: "Jane Doe",
     firstName: "Jane",
@@ -34,6 +34,7 @@ function buildContext(): RecipientContext {
     fromName: "Coalition Team",
     fromEmail: "team@example.org",
     replyTo: "team@example.org",
+    tag: "default",
   };
 }
 

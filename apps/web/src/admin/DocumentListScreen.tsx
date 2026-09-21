@@ -47,7 +47,7 @@ export function DocumentListScreen(): JSX.Element {
       <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
         {copy.documentList.heading}
       </h1>
-      {session?.superadmin ? (
+      {session?.superadmin && (session.site?.slug ?? "default") === "default" ? (
         <p className="mt-1 text-sm text-muted-foreground">{copy.documentList.superadminNote}</p>
       ) : null}
 
@@ -78,6 +78,7 @@ export function DocumentListScreen(): JSX.Element {
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-3">Title</th>
+                <th className="px-4 py-3">{copy.documentList.siteColumn}</th>
                 <th className="px-4 py-3">State / phase</th>
                 <th className="px-4 py-3">Next deadline</th>
                 <th className="px-4 py-3">Invited</th>
@@ -93,6 +94,7 @@ export function DocumentListScreen(): JSX.Element {
                       {doc.title}
                     </Link>
                   </td>
+                  <td className="px-4 py-3 text-muted-foreground">{doc.site ?? "default"}</td>
                   <td className="px-4 py-3 text-foreground">
                     {doc.state} / {doc.phase}
                   </td>
