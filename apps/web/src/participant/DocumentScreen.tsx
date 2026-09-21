@@ -5,7 +5,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle.ts";
 /** `/i/:token` — the current version, per `specs/screens/document.md`. */
 export function DocumentScreen(): JSX.Element {
   const { bundle, token, refetch } = useParticipantBundle();
-  useDocumentTitle(bundle.document.title, bundle.instance.name);
+  useDocumentTitle(bundle.document.title, bundle.site.name);
   return (
     <DocumentView
       bundle={bundle}

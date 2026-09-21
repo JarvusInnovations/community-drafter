@@ -45,7 +45,7 @@ export function DocumentLayout(): JSX.Element {
   const { session } = useAdminSession();
   useDocumentTitle(
     state.status === "ready" ? state.document.title : undefined,
-    session.instance_name || copy.instanceName,
+    session.site?.name || copy.siteName,
   );
 
   const contextValue: DocumentContextValue | undefined = useMemo(
