@@ -90,7 +90,12 @@ export interface DocumentVersion {
 
 export interface ActivityEntry {
   commit: string;
-  action: Action;
+  /**
+   * The commit's `Action`, except for the one entry kind that is not a
+   * commit of its own: `opened`, expanded from a `track` commit's `Opened`
+   * trailer (`specs/api/admin.md` § Activity).
+   */
+  action: Action | "opened";
   actor: string;
   at: string;
   subject: string;
@@ -170,6 +175,34 @@ function toActivityEntry(entry: CommitLogEntry): ActivityEntry {
     subject: entry.subject,
     trailers: entry.trailers,
   };
+}
+
+/** The `Opened` trailer's person list (`specs/data-model.md`). */
+function openedPeople(entry: CommitLogEntry): string[] {
+  return (entry.trailers.Opened ?? "")
+    .split(",")
+    .map((person) => person.trim())
+    .filter((person) => person.length > 0);
+}
+
+/**
+ * `specs/screens/admin-dashboard.md` § Recent activity: a person's first
+ * visit is an entry. One `track` commit records a whole flush, so it
+ * expands into one `opened` entry per person its `Opened` trailer names —
+ * and a `track` commit that recorded no first open produces nothing at
+ * all, because a return visit is not news and a feed of them would bury
+ * everything else.
+ */
+function expandActivity(entry: CommitLogEntry): ActivityEntry[] {
+  const base = toActivityEntry(entry);
+  if (base.action !== "track") return [base];
+
+  return openedPeople(entry).map((person) => ({
+    ...base,
+    action: "opened" as const,
+    subject: `opened: ${person} on ${entry.trailers.Document ?? ""}`.trimEnd(),
+    trailers: { ...entry.trailers, Person: person },
+  }));
 }
 
 /**
@@ -336,7 +369,16 @@ export class ReadModel {
     // commit without a per-record `Person` trailer, so the targeted
     // single-record reload below can't find them — refresh the whole
     // document's participations instead.
-    if ((action === "send" || action === "open" || action === "link-export") && document) {
+    if (
+      (action === "send" ||
+        action === "open" ||
+        action === "link-export" ||
+        // A `track` flush patches every participation it saw in one commit,
+        // naming only the *first* opens in `Opened` — the rest have no
+        // trailer to key a targeted reload off either.
+        action === "track") &&
+      document
+    ) {
       await this.reloadParticipationsForDocument(document);
     }
 
@@ -434,7 +476,7 @@ export class ReadModel {
     }
 
     // `relevant` is oldest-first (from `fullLog`); activity displays newest-first, capped.
-    const activity = relevant.map(toActivityEntry).reverse().slice(0, ACTIVITY_LIMIT);
+    const activity = relevant.flatMap(expandActivity).reverse().slice(0, ACTIVITY_LIMIT);
 
     this.documents.set(slug, { record: hydrated, versions, activity });
   }
@@ -584,6 +626,25 @@ export class ReadModel {
 
   listDocuments(): DocumentEntry[] {
     return [...this.documents.values()];
+  }
+
+  /**
+   * Every activity entry for one document since `sinceIso`, oldest first
+   * and uncapped — `DocumentEntry.activity` is the dashboard's last-50
+   * view, and the operator digest needs a window instead
+   * (`specs/behaviors/notifications.md` § Operator digest). Served from the
+   * same in-memory log, so it costs a filter and no git.
+   */
+  listActivitySince(slug: string, sinceIso: string): ActivityEntry[] {
+    // `%cI` carries the committer's own offset, so these are compared as
+    // instants rather than as strings.
+    const since = new Date(sinceIso).getTime();
+    return this.fullLog
+      .filter(
+        (entry) =>
+          entry.trailers.Document === slug && new Date(entry.committerDate).getTime() >= since,
+      )
+      .flatMap(expandActivity);
   }
 
   getPerson(id: string): PersonRecord | undefined {

@@ -44,6 +44,11 @@ const adminNotificationsRoute: FastifyPluginAsync = async (fastify) => {
 
       return {
         sent,
+        // `specs/api/admin.md` § Notifications: the team's own mail is the
+        // one delivery figure `notified` cannot show, because an operator
+        // message writes nothing to any participation
+        // (`specs/behaviors/notifications.md` § Operator digest).
+        operator_digest_sent: document.record.operator_notified?.digest,
         pending: 0,
         failed: fastify.notifications.failedCount(document.record.slug),
         failures: fastify.notifications.failureList(document.record.slug),

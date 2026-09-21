@@ -52,6 +52,13 @@ export interface CommitInput {
    * old and new times, and the commit is the only place they are recorded.
    */
   deadlines?: DeadlineChange[];
+  /**
+   * `specs/data-model.md` → `Opened` trailer: the people whose first open a
+   * `track` commit recorded. The activity feed expands it into one `opened`
+   * entry per person, which is the whole reason a write-behind counter
+   * commit carries a trailer at all.
+   */
+  opened?: string[];
   reason?: string;
   requestId?: string;
 }
@@ -81,6 +88,9 @@ function buildTrailers(action: Action, input: CommitInput): Trailers {
   if (input.deadlines !== undefined) {
     const deadlines = formatDeadlinesTrailer(input.deadlines);
     if (deadlines !== undefined) trailers.Deadlines = deadlines;
+  }
+  if (input.opened !== undefined && input.opened.length > 0) {
+    trailers.Opened = input.opened.join(", ");
   }
   if (input.reason !== undefined) trailers.Reason = input.reason;
   if (input.requestId !== undefined) trailers["Request-Id"] = input.requestId;

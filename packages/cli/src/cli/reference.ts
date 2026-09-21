@@ -240,7 +240,10 @@ export const COMMAND_GROUPS: CommandGroup[] = [
   {
     group: "Notifications",
     commands: [
-      { usage: "notifications list <slug>", summary: "Sent, pending, and failed counts." },
+      {
+        usage: "notifications list <slug>",
+        summary: "Sent, pending and failed counts, and the last operator digest.",
+      },
       {
         usage: "notifications retry <slug> [--event <name>] [--person <id>]",
         summary: "Re-dispatch anything not yet notified.",

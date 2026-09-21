@@ -20,6 +20,16 @@ interface PendingOpen {
 const TRACKER_ACTOR: Actor = { kind: "system" };
 
 /**
+ * Whether this participation has never been opened before, asked of the
+ * read model rather than of the transaction because the `Opened` trailer
+ * has to be built before the commit is opened. The tracker is the only
+ * writer of `first_opened_at`, and the flush below still refuses to
+ * overwrite one that is already set, so the trailer cannot outlive the
+ * fact it names.
+ */
+export type IsFirstOpenFn = (document: string, person: string) => boolean;
+
+/**
  * `specs/architecture.md` § Storage: "Batched commits (write-behind, at most
  * every 60 seconds and on shutdown) only for open/seen tracking on
  * participations (`Action: track`). A crash loses at most one interval of
@@ -34,6 +44,7 @@ export class OpenTracker {
   constructor(
     private readonly commit: CommitFn,
     private readonly intervalMs = 60_000,
+    private readonly isFirstOpen: IsFirstOpenFn = () => false,
   ) {}
 
   /** Record one open/seen event. Never touches disk or git. */
@@ -75,7 +86,12 @@ export class OpenTracker {
     }
   }
 
-  /** Flush pending deltas as one `Action: track` commit. No-op if nothing is pending. */
+  /**
+   * Flush pending deltas as one `Action: track` commit **per document**. A
+   * commit belongs to one document like every other (`specs/data-model.md`),
+   * which is what lets the first opens it recorded reach that document's
+   * activity feed through its `Opened` trailer. No-op if nothing is pending.
+   */
   async flush(): Promise<CommitResult<void> | null> {
     // Serialize concurrent flush calls (timer tick racing a shutdown flush).
     if (this.flushing) return this.flushing;
@@ -84,16 +100,40 @@ export class OpenTracker {
     const batch = [...this.pending.values()];
     this.pending.clear();
 
-    this.flushing = this.doFlush(batch).finally(() => {
+    this.flushing = this.doFlushAll(batch).finally(() => {
       this.flushing = undefined;
     });
     return this.flushing;
   }
 
-  private async doFlush(batch: PendingOpen[]): Promise<CommitResult<void>> {
-    const subject = `track: opens for ${batch.length} participation${batch.length === 1 ? "" : "s"}`;
+  private async doFlushAll(batch: PendingOpen[]): Promise<CommitResult<void> | null> {
+    const byDocument = new Map<string, PendingOpen[]>();
+    for (const delta of batch) {
+      const list = byDocument.get(delta.document) ?? [];
+      list.push(delta);
+      byDocument.set(delta.document, list);
+    }
 
-    return this.commit("track", { actor: TRACKER_ACTOR, subject }, async (tx) => {
+    let last: CommitResult<void> | null = null;
+    for (const [document, deltas] of byDocument) {
+      last = await this.doFlush(document, deltas);
+    }
+    return last;
+  }
+
+  private async doFlush(document: string, batch: PendingOpen[]): Promise<CommitResult<void>> {
+    // `specs/data-model.md` → `Opened`: only the people this commit is
+    // recording a *first* open for. A return visit bumps `opens` and says
+    // nothing in the feed.
+    const opened = batch
+      .filter((delta) => this.isFirstOpen(delta.document, delta.person))
+      .map((delta) => delta.person);
+    const suffix = opened.length > 0 ? ` (${opened.length} first)` : "";
+    const subject = `track: opens on ${document} for ${batch.length} participation${
+      batch.length === 1 ? "" : "s"
+    }${suffix}`;
+
+    return this.commit("track", { actor: TRACKER_ACTOR, subject, document, opened }, async (tx) => {
       for (const delta of batch) {
         const current = await tx.participations.queryFirst({
           document: delta.document,

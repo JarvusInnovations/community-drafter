@@ -79,6 +79,15 @@ export const DocumentRecordSchema = z.object({
   // them from the caller.
   created_by: z.email().optional(),
   operators: z.array(z.email()).optional(),
+  /**
+   * `specs/behaviors/notifications.md` § Operator digest: the operator
+   * messages this document has already produced — `digest` = the last date
+   * (`YYYY-MM-DD`, instance time zone) a digest was delivered,
+   * `first_signature` / `first_comment` = when those once-per-document
+   * notices went out. Optional for the same reason every other added field
+   * is: a record written before it existed still has to parse.
+   */
+  operator_notified: z.record(z.string(), z.string()).optional(),
   sender_name: z.string().optional(),
   reply_to: z.string().optional(),
   withdraw_reason: z.string().optional(),

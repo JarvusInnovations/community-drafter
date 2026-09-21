@@ -228,7 +228,7 @@ every-session use instead.
 
 ### Notifications
 
-- `scripts/signatories-axi notifications list <slug>` — Sent, pending, and failed counts.
+- `scripts/signatories-axi notifications list <slug>` — Sent, pending and failed counts, and the last operator digest.
 - `scripts/signatories-axi notifications retry <slug> [--event <name>] [--person <id>]` — Re-dispatch anything not yet notified.
 
 ### Instance

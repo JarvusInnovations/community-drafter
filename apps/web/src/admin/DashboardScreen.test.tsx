@@ -69,12 +69,12 @@ async function noopRefetch(): Promise<void> {}
 const AT_V3: DocumentContextValue = { document: documentAt(3), refetch: noopRefetch };
 const AT_V1: DocumentContextValue = { document: documentAt(1), refetch: noopRefetch };
 
-function mockFetch(rows: InvitationRow[]): void {
+function mockFetch(rows: InvitationRow[], notifications?: Record<string, unknown>): void {
   globalThis.fetch = ((url: string) => {
     const body = url.includes("/invitations")
       ? JSON.stringify(rows)
       : url.includes("/notifications")
-        ? JSON.stringify({ sent: {}, pending: 0, failed: 0 })
+        ? JSON.stringify({ sent: {}, pending: 0, failed: 0, ...notifications })
         : JSON.stringify([]);
     return Promise.resolve(
       new Response(body, { status: 200, headers: { "content-type": "application/json" } }),
@@ -174,5 +174,28 @@ describe("DashboardScreen — the audience line", () => {
     const line = screen.getByText("Audience:").parentElement;
     expect(line?.textContent).toContain("Published for anyone to read");
     expect(line?.textContent).not.toContain("addressed to");
+  });
+});
+
+/**
+ * `specs/screens/admin-dashboard.md` § Notification health — issue #74:
+ * the operators' own mail is the one delivery figure `notified` cannot
+ * show, because an operator message writes nothing to any participation.
+ */
+describe("DashboardScreen — the last operator digest", () => {
+  it("names the day the last operator digest went out", async () => {
+    mockFetch([], { operator_digest_sent: "2026-09-20" });
+    renderDashboard(AT_V3);
+
+    const line = await screen.findByText(/Last operator digest/u);
+    expect(line.textContent).toContain("Sep 20");
+  });
+
+  it("says so plainly when none has gone out", async () => {
+    mockFetch([]);
+    renderDashboard(AT_V3);
+
+    const line = await screen.findByText(/Last operator digest/u);
+    expect(line.textContent).toContain("none yet");
   });
 });

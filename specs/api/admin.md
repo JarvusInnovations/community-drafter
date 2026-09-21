@@ -57,12 +57,12 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## Notifications
 
-- `GET /documents/:slug/notifications` → per event: sent count (from `notified`), pending and failed (from the dispatcher's memory), plus `failures: [{ event, person, error, at }]` so the operator can see who did not get what and why.
+- `GET /documents/:slug/notifications` → per event: sent count (from `notified`), pending and failed (from the dispatcher's memory), plus `failures: [{ event, person, error, at }]` so the operator can see who did not get what and why. Plus `operator_digest_sent`: the date (`YYYY-MM-DD`) the last operator digest was delivered for this document, absent when none has been (`behaviors/notifications.md` § Operator digest).
 - `POST /documents/:slug/notifications/retry` `{ event?, person? }` → re-derives and re-dispatches anything not in `notified`.
 
 ## Activity
 
-- `GET /documents/:slug/activity?limit=50&person=` → the document's commits, newest first, as `{ commit, date, subject, action, person, version, judgement, reason, actor }` parsed from trailers, plus `deadlines` — `[{ deadline, from?, to }]` from the `Deadlines` trailer — on an `extend` or `reopen`. This is the event log; there is no other.
+- `GET /documents/:slug/activity?limit=50&person=` → the document's commits, newest first, as `{ commit, date, subject, action, person, version, judgement, reason, actor }` parsed from trailers, plus `deadlines` — `[{ deadline, from?, to }]` from the `Deadlines` trailer — on an `extend` or `reopen`. A `track` commit's `Opened` trailer expands into one entry per person with `action: "opened"` and no commit of its own; a `track` commit naming nobody is omitted. This is the event log; there is no other.
 
 ## Operators
 

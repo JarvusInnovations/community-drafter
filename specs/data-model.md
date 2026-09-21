@@ -37,10 +37,11 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Disposed` | comma-separated `<submission>:<comment>` refs | `publish` |
 | `Signature` | `sign` \| `resign` \| `revoke` | `submit` when the same commit also writes the participation's `signature` table |
 | `Deadlines` | comma-separated `<field> <from> -> <to>`, ISO 8601 UTC, `(unset)` where there was no previous value | `extend`, `reopen` |
+| `Opened` | comma-separated person slugs | `track`, naming the people whose **first** open this commit recorded; a `track` commit that only bumped `last_seen_at` and `opens` carries none |
 | `Reason` | text | `revoke`, `withdraw`, `admin-revoke`, and `submit` with `decline` |
 | `Request-Id` | id | every commit from a request |
 
-Subjects look like `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (jane-doe-k7q2)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
+A `track` commit is per document, like every other commit, so the opens it records belong to one document's history. Subjects look like `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (jane-doe-k7q2)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
 
 The dashboard's recent activity, a person's history, the version list and "how was this statement approved" are all `git log` queries filtered by trailer. Nothing duplicates them into records.
 
@@ -63,6 +64,7 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `site` | slug? | the site this document belongs to (`behaviors/sites.md`); absent = the default site, which is what every document written before the field existed reads as. It is the hostname every personal link, public link and message for this document is built on |
 | `created_by` | email | the operator who created the document; always also in `operators` |
 | `operators` | array of email | current operators of this document; never empty |
+| `operator_notified` | table? of event → value | the operator messages this document has already produced (`behaviors/notifications.md` § Operator digest): `digest` is the last date an operator digest was delivered (`YYYY-MM-DD` in the instance time zone), `first_signature` and `first_comment` the timestamps those once-per-document notices went out. Written only after delivery, and never about a participant; absent on a document no operator message has been sent for |
 | `sender_name`, `reply_to` | string | |
 | `withdraw_reason`, `withdraw_public` | string?, boolean | |
 | `tags` | array of string | |
@@ -180,7 +182,7 @@ One record per person per document, created by an invitation. Current state only
 | `link_revoked` | boolean | link no longer resolves (a reissue mints a new `token`) |
 | `expires_at` | timestamp? | |
 | `sent_at` | timestamp? | invitation message accepted by the mailer or exported; written in the same commit as `notified.invitation`, never before delivery |
-| `first_opened_at`, `last_seen_at`, `opens` | | batched writes (`Action: track`) |
+| `first_opened_at`, `last_seen_at`, `opens` | | batched writes (`Action: track`, one commit per document per flush, whose `Opened` trailer names the people whose first open it recorded — that trailer is where the dashboard's `opened` activity entries come from) |
 | `notify` | table | `channel`, `every_revision`, `daily_digest`, `phase_changes`, `my_comments_addressed`, `reminders` |
 | `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified."reminder-2"`; `notified.reminder = 2` is the reminder count beside those per-reminder timestamps. A timestamp here means the message was delivered, so the newest of them is when this document last reached the person (`notified."links-exported"` is an operator's CSV export, not a message) |
 | `signature` | table? | absent = never signed; see below |

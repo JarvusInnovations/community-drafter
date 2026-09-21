@@ -30,7 +30,16 @@ export async function notificationsCommand(args: string[]): Promise<string> {
       );
       return render(parsed, summary, () =>
         joinBlocks(
-          renderObject({ sent: summary.sent, pending: summary.pending, failed: summary.failed }),
+          renderObject({
+            sent: summary.sent,
+            pending: summary.pending,
+            failed: summary.failed,
+            // `specs/api/admin-cli.md`: `list` also says when the last
+            // operator digest went out, or that none has — it is the one
+            // delivery `sent` cannot show, because operator mail writes
+            // nothing to a participation.
+            operator_digest_sent: summary.operator_digest_sent ?? "none yet",
+          }),
           summary.failures && summary.failures.length > 0
             ? renderList("failures", summary.failures, [
                 computed<NonNullable<NotificationsSummary["failures"]>[number]>(

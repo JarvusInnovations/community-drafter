@@ -61,6 +61,24 @@ export function formatDateOnly(iso: string | undefined): string {
   return (isCurrentYear(date) ? DATE_ONLY_FORMAT : DATE_ONLY_WITH_YEAR_FORMAT).format(date);
 }
 
+/**
+ * "Sep 21" from a calendar day (`YYYY-MM-DD`) rather than an instant. A day
+ * stamp has no time and no zone — parsing it as an instant would show the
+ * day before for every reader west of UTC — so it is built as a local date
+ * and formatted in place.
+ */
+export function formatDayStamp(day: string | undefined): string {
+  if (!day) {
+    return "";
+  }
+  const [year, month, date] = day.split("-").map(Number);
+  if (!year || !month || !date) {
+    return day;
+  }
+  const parsed = new Date(year, month - 1, date);
+  return (isCurrentYear(parsed) ? DATE_ONLY_FORMAT : DATE_ONLY_WITH_YEAR_FORMAT).format(parsed);
+}
+
 export interface Countdown {
   /** "in 2 days 4 hours" / "in 45 minutes" / "in less than a minute" / "" once passed. */
   label: string;

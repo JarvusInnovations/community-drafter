@@ -282,7 +282,12 @@ describe("failed sends and retry", () => {
     });
     expect(retry.json().retried).toBe(1);
     expect(retry.json().sent).toBe(1);
-    expect(fakeMailer.sent.length).toBe(1);
+    // The confirmation the retry delivered, plus the operators'
+    // first-signature notice (`specs/behaviors/notifications.md`
+    // § Operator digest), which is operator mail and was never in the
+    // dispatcher's failure bucket to retry.
+    expect(fakeMailer.sent.filter((m) => m.to.email === "jane@example.org").length).toBe(1);
+    expect(fakeMailer.sent.length).toBe(2);
 
     const statusAfter = await server.inject({
       method: "GET",
