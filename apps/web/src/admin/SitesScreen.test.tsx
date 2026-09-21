@@ -21,11 +21,11 @@ function jsonResponse(status: number, body: unknown): Response {
 const DEFAULT_SITE: SiteRow = {
   slug: "default",
   hostname: "drafter.example.org",
-  name: "Community Drafter",
+  name: "Signatories",
   reply_to: "team@example.org",
   operators: ["ops@example.org"],
   documents: 2,
-  from_line: "Community Drafter <team@example.org>",
+  from_line: "Signatories <team@example.org>",
   hostname_verified: true,
   sender_verified: null,
   dns: [],

@@ -108,7 +108,7 @@ describe("AdminLayout — session guard", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Test Instance" })).toBeTruthy();
     });
-    expect(screen.queryByText("Community Drafter")).toBeNull();
+    expect(screen.queryByText("Signatories")).toBeNull();
 
     cleanup();
 
@@ -124,7 +124,7 @@ describe("AdminLayout — session guard", () => {
     renderAt("/admin");
 
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: "Community Drafter" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Signatories" })).toBeTruthy();
     });
   });
 });

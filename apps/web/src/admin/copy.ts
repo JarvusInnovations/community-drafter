@@ -14,7 +14,7 @@ export const copy = {
   // literal is only the fallback for a session that predates that field —
   // the same one the backend uses when `INSTANCE_NAME` is unset
   // (`apps/api/src/sites/site.ts`).
-  siteName: "Community Drafter",
+  siteName: "Signatories",
 
   signIn: {
     heading: "Sign in",

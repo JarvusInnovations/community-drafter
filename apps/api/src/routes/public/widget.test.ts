@@ -16,7 +16,7 @@ afterEach(() => {
 
 function buildFixtureDist(widgetSource: string): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "cd-widget-dist-"));
-  writeFileSync(join(root, "index.html"), "<!doctype html><title>Community Drafter</title>");
+  writeFileSync(join(root, "index.html"), "<!doctype html><title>Signatories</title>");
   writeFileSync(join(root, "widget.js"), widgetSource);
   return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }

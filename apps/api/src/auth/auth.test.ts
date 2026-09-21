@@ -168,7 +168,7 @@ describe("GET /auth/callback", () => {
     await server.close();
   });
 
-  it("falls back to Community Drafter when INSTANCE_NAME is unset", async () => {
+  it("falls back to Signatories when INSTANCE_NAME is unset", async () => {
     const { server, cleanup } = await buildTestServer({ env: { INSTANCE_NAME: undefined } });
     cleanups.push(cleanup);
 
@@ -177,7 +177,7 @@ describe("GET /auth/callback", () => {
       url: "/auth/session",
       headers: adminHeaders(),
     });
-    expect(session.json().site.name).toBe("Community Drafter");
+    expect(session.json().site.name).toBe("Signatories");
 
     await server.close();
   });
@@ -596,11 +596,11 @@ describe("operator-magic-link email", () => {
       payload: { email: TEST_ACTOR.email, return: "/admin" },
     });
     const sent = mailer.sent[0]!;
-    expect(sent.subject).toBe("Sign in to Community Drafter");
+    expect(sent.subject).toBe("Sign in to Signatories");
     expect(sent.text).toContain("on the web");
     expect(sent.text).toMatch(/\/auth\/callback\?code=[A-Za-z0-9]{24}\b/u);
     expect(sent.text).not.toContain("eyJ");
-    expect(sent.html).toContain("Sign in to Community Drafter");
+    expect(sent.html).toContain("Sign in to Signatories");
     expect(sent.text).toContain("If you didn't request this");
     await server.close();
   });

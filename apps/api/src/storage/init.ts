@@ -62,7 +62,7 @@ export async function initDataRepo(opts: InitDataRepoOptions): Promise<InitDataR
   const {
     dataDir,
     sourceConfigDir = DEFAULT_SOURCE_CONFIG_DIR,
-    author = { name: "community-drafter", email: "bootstrap@community-drafter.local" },
+    author = { name: "signatories", email: "bootstrap@signatories.local" },
   } = opts;
 
   const targetConfigDir = join(dataDir, ".gitsheets");
@@ -119,7 +119,7 @@ export async function syncSheetConfigs(opts: SyncSheetConfigsOptions): Promise<s
   const {
     dataDir,
     sourceConfigDir = DEFAULT_SOURCE_CONFIG_DIR,
-    author = { name: "community-drafter", email: "bootstrap@community-drafter.local" },
+    author = { name: "signatories", email: "bootstrap@signatories.local" },
   } = opts;
   if (!existsSync(sourceConfigDir)) {
     // A build that ships without its `.gitsheets/` (or a misconfigured source)

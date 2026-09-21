@@ -196,7 +196,7 @@ describe("host → site resolution and the canonical-host redirect", () => {
     });
     expect(bundle.statusCode).toBe(200);
     expect(bundle.json().site).toEqual({
-      name: "Community Drafter",
+      name: "Signatories",
       logo_url: undefined,
       accent: undefined,
     });
