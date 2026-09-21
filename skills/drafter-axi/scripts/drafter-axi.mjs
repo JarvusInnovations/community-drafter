@@ -2247,9 +2247,10 @@ var PEOPLE_FLAGS = {
   remove: { positionals: 2 },
   remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
-  "reissue-link": { positionals: 2 }
+  "reissue-link": { positionals: 2 },
+  expire: { positionals: 2, value: ["--expires-at"] }
 };
-var PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link> ...
+var PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
@@ -2289,7 +2290,12 @@ remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
        counting recently-messaged and reminders-off invitees separately.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
-       Prints the new link once.`;
+       Prints the new link once.
+expire <slug> <person> --expires-at <when>
+       Set when this person's link stops working. <when> is ISO 8601 with a zone
+       (2026-10-01T17:00:00-04:00, 2026-10-01T21:00:00Z) or a zone-less time
+       (2026-10-01T17:00) read in this machine's local zone; either way the
+       command prints the instant it resolved to.`;
 function parseImportRows(text) {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
@@ -2651,6 +2657,31 @@ async function peopleCommand(args) {
           renderObject(result),
           renderHelp([
             "This link is shown once \u2014 it is not retrievable again except via `people links`"
+          ])
+        )
+      );
+    }
+    case "expire": {
+      const usage = "drafter-axi people expire <slug> <person> --expires-at <when>";
+      const slug = requirePositional(parsed, 0, "slug", usage);
+      const person = requirePositional(parsed, 1, "person", usage);
+      const expiresAt = parseDeadline(
+        requireStr(parsed, "--expires-at", usage),
+        "--expires-at",
+        usage
+      );
+      const result = await client.post(
+        `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/expire`,
+        { expires_at: expiresAt.iso }
+      );
+      return render(
+        parsed,
+        result,
+        () => joinBlocks(
+          renderObject({ person, ...result }),
+          renderHelp([
+            expiresAt.note,
+            `The link stops working then; \`drafter-axi people reissue-link ${slug} ${person}\` issues a fresh one`
           ])
         )
       );
@@ -3141,6 +3172,10 @@ var COMMAND_GROUPS = [
       {
         usage: "people reissue-link <slug> <person>",
         summary: "Reissue one person's link (prints it once)."
+      },
+      {
+        usage: "people expire <slug> <person> --expires-at <when>",
+        summary: "Set when one person's link stops working; <when> takes the same grammar as docs open (ISO 8601 with a zone, or a zone-less time read locally) and the resolved instant is printed back."
       }
     ]
   },
@@ -3241,7 +3276,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "c3a3cd4" : "dev";
+var VERSION = true ? "329ab0e" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
