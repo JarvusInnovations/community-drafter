@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 depends: []
 specs:
   - specs/api/admin-cli.md
@@ -8,6 +8,7 @@ specs:
   - specs/data-model.md
   - specs/screens/admin-dashboard.md
 issues: [74]
+pr: 105
 ---
 
 # Plan: operator-digest
@@ -70,20 +71,21 @@ one), per-operator digest preferences, and any change to the participant digest.
 
 ## Validation
 
-- [ ] A first open shows up in the document's activity as an `opened` entry naming the
+- [x] A first open shows up in the document's activity as an `opened` entry naming the
       person; a second visit by the same person adds no entry.
-- [ ] A busy day's digest names invitations delivered, first opens, reviews, signatures
+- [x] A busy day's digest names invitations delivered, first opens, reviews, signatures
       added and removed, declines and deadline moves, each with its count.
-- [ ] A quiet day sends nothing and records nothing.
-- [ ] The first signature produces exactly one notice; a second signature produces none.
-- [ ] A delivery failure is logged and does not throw, and does not enter the dispatcher's
+- [x] A quiet day sends nothing and records nothing.
+- [x] The first signature produces exactly one notice; a second signature produces none.
+- [x] A delivery failure is logged and does not throw, and does not enter the dispatcher's
       participation failure list.
-- [ ] Each message is sent with the document's site's From line, Reply-To and tag, and
+- [x] Each message is sent with the document's site's From line, Reply-To and tag, and
       links to that site's host.
-- [ ] No operator message carries an email address, comment text or a token.
-- [ ] `notifications list` and the dashboard show the last operator digest date.
-- [ ] Gates in every touched package: lint, format:check, typecheck, test; web build and
-      bundle size; CLI bundle rebuilt and the drift gate clean.
+- [x] No operator message carries an email address, comment text or a token.
+- [x] `notifications list` and the dashboard show the last operator digest date.
+- [x] Gates in every touched package: lint, format:check, typecheck, test (api 241, web
+      105, cli 51, shared 35); web build 106.69 KB gzip of a 120 KB budget; CLI bundle
+      rebuilt and the drift gate clean.
 
 ## Risks / unknowns
 
@@ -96,8 +98,32 @@ one), per-operator digest preferences, and any change to the participant digest.
 
 ## Notes
 
-(closeout)
+- **`Opened` rather than a per-person `Person` trailer.** A `track` flush covers many
+  people at once, and the commit wrapper's trailers are single-valued, so the first opens
+  ride as one comma-separated list — the same shape the deadline trailer already uses.
+  Grouping the flush by document is what lets those opens reach a document's feed at all.
+- **The tracker asks the read model whether an open is a first one**, because the trailer
+  has to exist before the transaction opens. It is the only writer of `first_opened_at`,
+  and the transaction still refuses to overwrite one that is set, so the trailer cannot
+  outlive the fact.
+- **The digest window mixes two sources on purpose**: `sent_at` and `first_opened_at` are
+  written only on the event they name, so the records answer "invitations delivered" and
+  "first opens" directly; everything else exists only in the history and is read from
+  `git log`. Written down in the spec so the next reader does not "fix" the inconsistency.
+- **The recipients are the document's operators, not the site's group.** A site with
+  thirty documents would otherwise mail every one of its operators thirty times a day.
+- Two existing expectations moved: a signature now also produces the operators' notice,
+  which is one more message and one more commit.
+- Rebased twice — the second time onto the `@community-drafter/*` → `@signatories/*`
+  rename (PR #104), which also moved the skill to `skills/signatories-axi/`.
 
 ## Follow-ups
 
-(closeout)
+- **Versions published are not in the digest.** A publish is something that happened on
+  the document, but the operator who published it already knows, and the spec's list came
+  from what the sim operators said they were missing. If a second operator ever reports
+  missing a colleague's publish, that is the line to add. *Tracked as: none — raise an
+  issue if it comes up.*
+- **No per-operator digest preference.** Operator mail is deliberately not
+  preference-gated; if a digest ever becomes unwanted, the honest lever is removing
+  yourself from the document, not a toggle. *Deferred: revisit only with a real report.*
