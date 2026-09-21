@@ -53,7 +53,7 @@ The instance URL and the credential live in `~/.config/signatories/<profile>.tom
 | `signatures revoke <slug> <person> --reason "…"` | admin revocation |
 | `submissions list <slug> [--pending] [--version n] [--person p] [--include-drafts]` | whole submissions, each with its comments; drafts only on request and always labeled |
 | `feedback export <slug> [--format json\|md] [--out …]` | the LLM-round bundle |
-| `notifications list <slug> --status failed` / `notifications retry <slug>` | health |
+| `notifications list <slug> --status failed` / `notifications retry <slug>` | health; `list` also prints when the last operator digest went out for this document, or that none has (`behaviors/notifications.md` § Operator digest) |
 | `init-data-repo` | first-boot helper |
 
 ## Output rules

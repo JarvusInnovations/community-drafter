@@ -31,6 +31,9 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (the one message that belongs to the **resolved** site rather than to a document's site, because it is not about a document; not a participation message: no `notified` mark, no preference link; subject "Sign in to *Site name*"; body: greeting by name, one sentence naming the site's URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Site name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
 | `operator-added` | an operator record is created (`behaviors/operators.md` § Operators) | that operator | yes (operator message, see § Operator mail below; an operator message belongs to the **resolved** site, like `operator-magic-link`, because it is about a site's directory rather than a document; subject "You're an operator on *Site name*"; body: greeting by name, one sentence naming the site and the operator who created the account, a button labeled "Sign in to *Site name*" addressing that site's `/admin`, and the plain sentence that signing in is an emailed link rather than a password. No document, no token) |
 | `operator-added-to-document` | an operator is added to a document | that operator | yes (operator message, see § Operator mail below; subject "[Title] — you were added as an operator"; body: greeting by name, one sentence naming the document, who added them and the site, and a button labeled "Open the dashboard" addressing that site's `/admin/d/<slug>`. No participant data) |
+| `operator-digest-<date>` | the daily job, only when something happened on the document in the last 24 hours | the document's active operators | yes (operator message, see § Operator mail and § Operator digest below) |
+| `operator-first-signature` | the first signature written on a document | the document's active operators | yes (operator message; once per document, § Operator digest) |
+| `operator-first-comment` | the first review carrying a comment submitted on a document | the document's active operators | yes (operator message; once per document, § Operator digest) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
 | `digest-<date>` | daily job, only if anything changed that day | invitees with `daily_digest` | subscription |
 | `signing-opened` | phase becomes signing (the clock) | all invitees with `phase_changes` who have opened the link, plus every current signer regardless | subscription (signers: forced on) |
@@ -45,15 +48,41 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 
 ## Operator mail
 
-`operator-magic-link`, `operator-added` and `operator-added-to-document` go to an **operator**, not to a participant, and the rules for participant mail do not reach them:
+Every message addressed to an **operator** rather than to a participant — `operator-magic-link`, `operator-added`, `operator-added-to-document`, and the three of § Operator digest below — is governed by these rules, and the rules for participant mail do not reach them:
 
-- **Never preference-gated.** An operator has no participation and no preferences; being given access is not something to opt out of. There is no preference link and no "stop optional messages" footer.
-- **Nothing is written to the record.** No `participations.notified` key, no `sent_at`, no commit. These messages are not counted in any document's funnel, and an operator's mailbox never affects what the record says.
-- **Never sent to the operator who caused it.** An operator who creates their own record, or adds themselves to a document they already run, is not mailed about their own action.
+- **Never preference-gated.** An operator has no participation and no preferences; being given access, or being told what is happening on a document you run, is not something to opt out of. There is no preference link and no "stop optional messages" footer.
+- **Nothing is written to a participation.** No `participations.notified` key, no `sent_at`, no commit against a person. These messages are not counted in any document's funnel, and an operator's mailbox never affects what the record says about a participant. The one thing an operator message records is `documents.operator_notified` (§ Operator digest), which exists so a daily message is not sent twice and a once-per-document message is not sent again; it names no person.
+- **Never sent to the operator who caused it.** An operator who creates their own record, or adds themselves to a document they already run, is not mailed about their own action. An event with no operator behind it — a participant signing, the digest clock — has nobody to leave out.
 - **Delivery is recorded in the log and nowhere else.** Each send is logged with the event key, the operator's email and, when the mailer refuses it, the error. It does not enter the failure list that `notifications list` and the dashboard show: that list is the participation dispatcher's, and a retry there re-renders from a participation record an operator does not have — an operator message parked in it could never be retried or cleared.
 - **`operator-added` and `operator-added-to-document` are sent after their commit**, and a mailer that refuses one is logged rather than allowed to fail the request: the record or the document membership stands either way, and reporting a failure for a change that happened would be the worse lie. The person may simply have to be told out of band, which is the situation these messages exist to end. (`operator-magic-link` commits nothing, so a refused send is an ordinary request failure and is reported as one.)
 
-Both `operator-added` messages render through the same shell as every other message from the instance (§ Content rules, "Shape"): a greeting by name, one or two plain sentences, exactly one button with the same URL in plain text beneath it, and the small print. They carry no participant's name, email or content, and no personal-link token.
+Every operator message renders through the same shell as every other message from the instance (§ Content rules, "Shape"): a greeting by name, one or two plain sentences, exactly one button with the same URL in plain text beneath it, and the small print. The two `operator-added` messages carry no participant's name, email or content at all; the digest and the two first-response notices carry display names and counts and nothing else (§ Operator digest). No operator message ever carries a personal-link token.
+
+## Operator digest
+
+The messages above tell an operator something about their own **access**. These three tell them what is happening on a document they **run** — because otherwise the dashboard is the only signal there is, and a team that has to open the dashboard to learn that four people signed learns it late, or not at all.
+
+- **`operator-digest-<date>`** — once a day, at the instance's digest hour (§ Sending), one message per open document to each of that document's active operators, reporting the previous 24 hours. **Nothing is sent when nothing happened.** A digest that arrives every morning saying nothing happened is a message an operator stops opening, and it is the one that has to be read on the day it isn't empty.
+- **`operator-first-signature`** and **`operator-first-comment`** — sent the moment the first signature is written and the first review carrying a comment is submitted, once each per document, whatever the digest reports later the same day. The first response is the thing a team is actually waiting for after it sends a document out, and a day is a long time to wonder whether the link even works.
+
+**Who gets them.** The **document's** operators (`documents.operators`), active ones only — not the site's operator group. The site's group decides who *may* be given a document, not who is running this one (`behaviors/sites.md` § Operators and tenancy); mailing it would send every operator of a site one message per document per day.
+
+**What the digest says.** One line per kind of thing that happened in the window; a kind with nothing in it has no line at all:
+
+- invitations delivered (count)
+- first opens (count)
+- reviews submitted (count, and who, by display name)
+- signatures added and signatures removed (counts, and who, by display name)
+- declines (count)
+- deadlines moved (one line each, naming the time it moved from and the time it moved to)
+
+Then the document's current signatory counts and its clock, and exactly one button — "Open the dashboard" — on the document's site host.
+
+**Where those facts come from.** Invitations delivered and first opens are counted from the participation records' `sent_at` and `first_opened_at`, each of which is written only when the thing it names actually happened, so the record and the history say the same thing and the record is cheaper to ask. Everything else is read from `git log` over the document's commits in the window, because that is the only place those times exist (`data-model.md` § Commits are the events).
+
+**What no operator message carries.** No email address, no comment text, no individual review's judgement, no personal-link token, and nothing from `people` beyond the display name the dashboard already shows. An operator digest names a person the way the signatory list names them, or not at all.
+
+**What is recorded.** `documents.operator_notified` (`data-model.md` § `documents`): `digest` holds the last date a digest was delivered for this document, `first_signature` and `first_comment` when those two went out. Each is written in one `Action: send` commit on the document, **after** at least one operator message was accepted — a run whose sends all failed is not recorded as sent, and the next run tries again (§ Principles, "A sent count is a delivery count"). It lives on the document because an operator has no per-document record to hold it.
 
 ## Defaults
 
@@ -71,6 +100,7 @@ Set when the participation is created, editable by the participant at any time:
 ## Content rules
 
 - Every message names the document, states the current phase and its next deadline in the recipient's time zone when known (else the document's), and links to the personal link — on the document's site hostname, whichever host the send was triggered from.
+- An **operator** message names the document and links to its dashboard on the document's site host instead of to a personal link, because an operator has none (§ Operator digest).
 - Revision messages include the version number, the summary line, and a "see what changed" link to the diff.
 - `schedule-changed` says what changed: one line per deadline that moved, with its old and new time ("Comments close moved from Thu, Sep 24 · 5:00 PM EDT to Sat, Sep 26 · 5:00 PM EDT"), before the current clock. A reopening that sets a deadline which had none states the new time alone.
 - The digest lists versions published, disposition outcomes for the recipient's comments, and current signatory counts, for the previous 24 hours.
@@ -96,7 +126,7 @@ Set when the participation is created, editable by the participant at any time:
 - **Recorded on success — invitations included.** Nothing enters `notified` until the mailer has accepted the message, and an invitation's `sent_at` is written in the *same* commit as `notified.invitation`. A recipient the mailer rejected is therefore still unsent: the funnel does not count them, the failures list names them with the reason, and the next `send` picks them up with no operator intervention. For an `export` mailer the row is the delivery, so writing it counts as accepted.
 - **Every send action reports what it did**, never what it attempted: how many messages were delivered, how many failed, and for each failure the person and the error. `sent_at` and the funnel's "sent" mean delivered.
 - **Reminders keep a minimum interval.** A reminder is not sent to anyone this document has messaged within `min_age_hours` (default 48). "Messaged" is any recorded send to that person on this document — invitation, revision alert, phase change, digest, or an earlier reminder; a link export is not a message. People skipped for recency are counted and reported separately from those skipped by the `reminders` preference, so a run that sends nothing says why. An operator who must nudge sooner passes a shorter interval; `0` disables the guard.
-- The digest job runs once daily at a configured hour in the instance time zone.
+- The digest job runs once daily at a configured hour in the instance time zone, and the participant digest and the operator digest (§ Operator digest) both run on it.
 
 ## Principles
 
