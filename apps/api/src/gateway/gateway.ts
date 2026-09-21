@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastif
 import fp from "fastify-plugin";
 
 import { ApiError, forbidden, LINK_NOT_FOUND, notFoundDocument } from "../errors.ts";
+import { documentSiteSlug } from "../sites/site.ts";
 import type { Capability } from "./capability.ts";
 import { FixedWindowLimiter } from "./rate-limit.ts";
 
@@ -65,6 +66,20 @@ function loadActiveOperator(
 }
 
 /**
+ * `specs/api/auth.md` § Token shape: "A token whose `site` is not the
+ * request's resolved site is 401 `unauthenticated`, exactly as no
+ * credential at all." Checked here, once, rather than per route — the
+ * session cookie is host-only already and this is what gives a bearer
+ * token the same property (`specs/behaviors/sites.md` § Operators and
+ * tenancy, "Sessions are per host").
+ */
+function assertTokenSite(request: FastifyRequest, tokenSite: string): void {
+  if (tokenSite !== request.site.slug) {
+    throw new ApiError("unauthenticated", "This credential belongs to another site.");
+  }
+}
+
+/**
  * `specs/behaviors/operators.md` § Sessions + `specs/api/conventions.md`:
  * "Bearer and cookie are never mixed on one request; a present
  * `Authorization` header is decisive." A present header resolves via
@@ -82,6 +97,7 @@ async function resolveOperator(request: FastifyRequest, fastify: FastifyInstance
     if (!verified) {
       throw new ApiError("unauthenticated", "The bearer token is invalid or expired.");
     }
+    assertTokenSite(request, verified.site);
     const operator = loadActiveOperator(fastify, verified.sub);
     request.principal = {
       kind: "operator",
@@ -99,6 +115,7 @@ async function resolveOperator(request: FastifyRequest, fastify: FastifyInstance
   if (!verified) {
     throw new ApiError("unauthenticated", "An operator session or bearer token is required.");
   }
+  assertTokenSite(request, verified.site);
   if (WRITE_METHODS.has(request.method) && !hasCsrfHeader(request)) {
     throw new ApiError(
       "csrf_required",
@@ -137,6 +154,14 @@ function enforceDocumentScope(request: FastifyRequest, fastify: FastifyInstance)
   // scoping everywhere; an unknown slug is still a 404 for everyone.
   const entry = fastify.storage.readModel.getDocument(slug);
   if (!entry || (!principal.superadmin && !entry.record.operators?.includes(principal.email))) {
+    throw notFoundDocument(slug);
+  }
+  // `specs/api/admin.md`: "A document on another site is 404 `not_found`."
+  // The one exception is the superadmin on the default site's host, who
+  // sees every document on every site — the same scope `GET /documents`
+  // gives them, so the list and the dashboard agree.
+  const onThisSite = documentSiteSlug(entry.record) === request.site.slug;
+  if (!onThisSite && !(principal.superadmin && request.site.isDefault)) {
     throw notFoundDocument(slug);
   }
 }

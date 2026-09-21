@@ -45,7 +45,7 @@ export interface AuthDecoration {
   mint(
     purpose: TokenPurpose,
     operator: OperatorIdentity,
-    opts?: { returnPath?: string },
+    opts?: { returnPath?: string; site?: string },
   ): Promise<MintedToken>;
   verifyBearer(token: string): Promise<VerifiedOperatorToken | null>;
   verifyMagic(token: string): Promise<VerifiedOperatorToken | null>;
@@ -94,7 +94,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   async function mint(
     purpose: TokenPurpose,
     operator: OperatorIdentity,
-    opts?: { returnPath?: string },
+    opts?: { returnPath?: string; site?: string },
   ): Promise<MintedToken> {
     return mintOperatorToken({
       purpose,
@@ -103,6 +103,9 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       kind: operator.kind,
       secret: requireSecret(),
       returnPath: opts?.returnPath,
+      // `specs/behaviors/sites.md` § Operators and tenancy: "sessions are
+      // per host" — every token names the site it was minted on.
+      site: opts?.site,
     });
   }
 

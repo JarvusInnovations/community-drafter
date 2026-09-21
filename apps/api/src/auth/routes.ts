@@ -5,6 +5,8 @@ import { ApiError } from "../errors.ts";
 import { OPERATOR_ROUTE, PUBLIC_ROUTE } from "../gateway/gateway.ts";
 import { firstName, renderEmail } from "../lib/mailer/shell.ts";
 import { uniqueSlug } from "../lib/slug.ts";
+import { isSiteOperator } from "../sites/site.ts";
+import { resolveSender } from "../notifications/sender.ts";
 import { isSafeReturnPath } from "./cookie.ts";
 import { DEVICE_POLL_INTERVAL_SECONDS } from "./device.ts";
 
@@ -41,9 +43,14 @@ function htmlPage(title: string, body: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><h1>${escapeHtml(title)}</h1>${body}</body></html>`;
 }
 
-/** `${PUBLIC_URL}/auth/callback`, or derived from the request when unset (local dev). */
-function authBaseUrl(request: FastifyRequest, publicUrl: string | undefined): string {
-  if (publicUrl) return publicUrl.replace(/\/$/, "");
+/**
+ * The origin every link in this sign-in flow is built on: the **resolved
+ * site's** own (`specs/behaviors/sites.md` — "a magic link is built on the
+ * host the sign-in was requested on"), falling back to the request's own
+ * scheme and host when the default site has no `PUBLIC_URL` (local dev).
+ */
+function authBaseUrl(request: FastifyRequest): string {
+  if (request.site.baseUrl) return request.site.baseUrl.replace(/\/$/, "");
   const proto = (request.headers["x-forwarded-proto"] as string | undefined) ?? request.protocol;
   const host = request.headers.host ?? "localhost";
   return `${proto}://${host}`;
@@ -67,10 +74,6 @@ const invalidLinkPage = htmlPage(
  * document.
  */
 const authRoutes: FastifyPluginAsync = async (fastify) => {
-  function instanceName(): string {
-    return fastify.config.INSTANCE_NAME || "Community Drafter";
-  }
-
   /**
    * `specs/behaviors/notifications.md` § Messages: `operator-magic-link`
    * is "not a participation message: no `notified` mark, no preference
@@ -86,16 +89,20 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const minted = await fastify.auth.mint(
       "magic",
       { email: operator.email, name: operator.name, kind: operator.kind },
-      { returnPath },
+      { returnPath, site: request.site.slug },
     );
     // `specs/api/auth.md`: the token never appears in a URL or an email —
     // only a short code that maps to it in memory for the token's lifetime.
     const code = fastify.auth.magicCodes.put(minted.token, minted.expiresAt.getTime());
-    const base = authBaseUrl(request, fastify.config.PUBLIC_URL);
+    const base = authBaseUrl(request);
     const link = `${base}/auth/callback?code=${code}`;
-    const name = instanceName();
-    const host = base.replace(/^https?:\/\//u, "");
-    const fromEmail = fastify.config.INSTANCE_FROM_EMAIL ?? "no-reply@community-drafter.local";
+    // `specs/behaviors/notifications.md` § `operator-magic-link`: the one
+    // message that belongs to the **resolved** site rather than to a
+    // document's, because it is not about a document.
+    const site = request.site;
+    const name = site.name;
+    const host = base.replace(/^https?:\/\//u, "") || (site.hostname ?? "");
+    const sender = resolveSender(fastify, undefined, site);
 
     // `specs/behaviors/notifications.md` § `operator-magic-link`, rendered
     // through the same shell as every participant message (§ "Shape").
@@ -115,7 +122,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     await fastify.mailer.send({
       to: { name: operator.name, email: operator.email },
-      from: { name, email: fromEmail },
+      from: sender.from,
+      replyTo: sender.replyTo,
+      tag: sender.tag,
       subject: `Sign in to ${name}`,
       text: rendered.text,
       html: rendered.html,
@@ -153,8 +162,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const returnPath = safeReturnPath(request.body.return);
       checkRateLimit(email, request.ip);
 
+      // `specs/behaviors/operators.md` § Sign-in: the address is matched
+      // within the **resolved site's** group — an operator of another site
+      // gets the same "if that address belongs to an operator" response and
+      // no mail, because on this hostname they are not one.
       const operator = fastify.storage.readModel.getOperatorByEmail(email);
-      if (operator?.active) {
+      if (operator?.active && isSiteOperator(fastify, request.site.slug, operator.email)) {
         await sendMagicLink(operator, request, returnPath, { kind: "web" });
       }
 
@@ -205,11 +218,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         throw new Error("dev shortcut: operator record missing immediately after creation");
       }
 
-      const minted = await fastify.auth.mint("session", {
-        email: operator.email,
-        name: operator.name,
-        kind: operator.kind,
-      });
+      const minted = await fastify.auth.mint(
+        "session",
+        { email: operator.email, name: operator.name, kind: operator.kind },
+        { site: request.site.slug },
+      );
       reply.header("set-cookie", fastify.auth.sessionSetCookieHeader(minted.token));
       reply.redirect(safeReturnPath(request.query.return), 302);
     },
@@ -232,6 +245,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const verified = await fastify.auth.verifyMagic(token);
       if (!verified || !verified.jti) return fail();
+      // A magic link is built on the host the sign-in was requested on, so
+      // it is only good there (`specs/behaviors/sites.md`).
+      if (verified.site !== request.site.slug) return fail();
       if (fastify.auth.usedMagicJti.isUsed(verified.jti)) return fail();
 
       const operator = fastify.storage.readModel.getOperatorByEmail(verified.sub);
@@ -239,11 +255,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       fastify.auth.usedMagicJti.markUsed(verified.jti, verified.exp * 1000);
 
-      const minted = await fastify.auth.mint("session", {
-        email: operator.email,
-        name: operator.name,
-        kind: operator.kind,
-      });
+      const minted = await fastify.auth.mint(
+        "session",
+        { email: operator.email, name: operator.name, kind: operator.kind },
+        { site: request.site.slug },
+      );
       reply.header("set-cookie", fastify.auth.sessionSetCookieHeader(minted.token));
       reply.redirect(safeReturnPath(verified.returnPath), 302);
     },
@@ -261,10 +277,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       superadmin: principal.superadmin,
       expires_at: new Date(principal.exp * 1000).toISOString(),
       transport: principal.transport,
-      // `specs/api/auth.md`: the admin frame shows the instance name on
-      // every page and already resolves the session there, so the name
-      // rides along rather than costing a second round trip.
-      instance_name: instanceName(),
+      // `specs/api/auth.md`: the admin frame shows the resolved site on
+      // every page and already resolves the session there, so the site
+      // rides along rather than costing a second round trip. It replaces
+      // the earlier `instance_name` string.
+      site: {
+        slug: request.site.slug,
+        name: request.site.name,
+        hostname: request.site.hostname,
+        logo_url: request.site.logo_url,
+        accent: request.site.accent,
+      },
     };
   });
 
@@ -282,11 +305,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
     // The gateway already reloaded the live operator record to authenticate
     // this request (`operator_inactive` otherwise), so it's still active.
-    const minted = await fastify.auth.mint("cli", {
-      email: principal.email,
-      name: principal.name,
-      kind: principal.operatorKind,
-    });
+    const minted = await fastify.auth.mint(
+      "cli",
+      { email: principal.email, name: principal.name, kind: principal.operatorKind },
+      { site: request.site.slug },
+    );
     return {
       token: minted.token,
       expires_at: minted.expiresAt.toISOString(),
@@ -310,7 +333,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       const pending = fastify.auth.deviceCodes.create();
 
       const operator = fastify.storage.readModel.getOperatorByEmail(email);
-      if (operator?.active) {
+      if (operator?.active && isSiteOperator(fastify, request.site.slug, operator.email)) {
         await sendMagicLink(operator, request, `/auth/device?code=${pending.userCode}`, {
           kind: "device",
           userCode: pending.userCode,
@@ -364,11 +387,11 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       if (!operator || !operator.active)
         throw new ApiError("not_found", "Unknown or expired device code.");
 
-      const minted = await fastify.auth.mint("cli", {
-        email: operator.email,
-        name: operator.name,
-        kind: operator.kind,
-      });
+      const minted = await fastify.auth.mint(
+        "cli",
+        { email: operator.email, name: operator.name, kind: operator.kind },
+        { site: request.site.slug },
+      );
       return {
         token: minted.token,
         expires_at: minted.expiresAt.toISOString(),
