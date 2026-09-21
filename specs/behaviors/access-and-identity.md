@@ -35,6 +35,7 @@ A signed token adds nothing the record does not already provide.
 - URL shape: `<PUBLIC_URL>/d/<slug>` when `public_access` is `read` or `participate`; 404 otherwise.
 - Renders the current version, the clock, the version history and the signatory list (per `show_signatories`), with no sign or comment controls in phase 1. A "want to sign? ask the team for your link" line is shown, with the document's `reply_to`.
 - Embeddable variants live under `/d/<slug>/…` (see `screens/public-and-embed.md`). Personal links are never embeddable: framing a personal link on a public page would leak a credential.
+- A personal link is never previewable either: the HTML at `/i/<token>/…` carries the generic instance metadata a scraper may see, never the document's title (`screens/public-and-embed.md` § Share Preview). Pasting a personal link into a chat hands its preview to everyone in the room.
 - **[phase 2] participate.** The public page offers "Sign or comment": the visitor enters name and email, receives a magic link, and following it mints a `people` record (if new by email) and a participation with `source = public`, then redirects to that personal link. Magic links expire in 30 minutes and are single-use. Signatures from `public` invitations start with `display_approved = false` and appear in counts and lists only after an admin approves them.
 
 ## Admin access

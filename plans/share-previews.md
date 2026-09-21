@@ -6,6 +6,7 @@ specs:
   - specs/screens/marketing-site.md
   - specs/screens/public-and-embed.md
   - specs/screens/version-history.md
+  - specs/behaviors/access-and-identity.md
 ---
 
 # Plan: share-previews
@@ -27,6 +28,7 @@ Out: per-document rendered card images (a generic instance card is enough — a 
 - `specs/screens/public-and-embed.md` gains a § Share preview: what a public document page's HTML declares (title, one-line description from the current version's `summary`, else the first sentence of its body, else a generic line; `og:type=article`; canonical `<instance>/d/<slug>`; a generic instance card image), and the privacy rule for everything else — an unknown slug, `public_access = none`, `state = draft`, any `/i/:token/…` page and any `/admin` page get the generic instance tags only, plus `noindex` on the pages that are nobody's to index.
 - `specs/screens/public-and-embed.md` § Principles, Local: **A share preview never confirms a private document exists.** The most specific spec that owns share previews owns the rule; it is the same reasoning as the one shared `PUBLIC_NOT_FOUND` body, applied to the metadata a scraper reads without a human ever clicking.
 - `specs/screens/version-history.md` § Display Rules "Compare": a list item reads as a list item whatever its status — #83.
+- `specs/behaviors/access-and-identity.md` § Public links: the no-preview rule for personal links, one line pointing at the share-preview spec, beside the no-framing rule it mirrors.
 
 ## Approach
 
