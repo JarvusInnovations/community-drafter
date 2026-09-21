@@ -7,10 +7,10 @@ bootstrap_operator_email = "chris@jarv.us"
 # Postmark-verified sender on the platform domain (DKIM, Return-Path and DMARC in dns.tf).
 instance_from_email = "hello@signatories.app"
 
-# Raised for the simulated campaign run of 2026-09-20 (many operators signing in from one machine); return to 5 afterwards.
-auth_login_rate_limit = 500
+# Sign-in attempts per address per window; the simulated run of 2026-09-20 temporarily used 500.
+auth_login_rate_limit = 5
 
 # Customer site hostnames, one Cloud Run domain mapping each (docs/operations.md
 # step 7). Empty until the first customer is onboarded; pinned here so a bare
 # `tofu apply -concise` never drops a mapping that a -var once added.
-site_hostnames = ["demo.signatories.app"]
+site_hostnames = ["stac.signatories.app"]

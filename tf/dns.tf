@@ -80,11 +80,12 @@ resource "google_dns_record_set" "signatories_org_site_verification" {
   rrdatas      = ["\"google-site-verification=F2ZwTZ9xmDeJS_g6X9AaWyWb63Qdf2D727kYu50iuVw\""]
 }
 
-# The first whitelabel hostname, used to prove the alias end to end
-# (plans/site-hostnames.md): a customer hostname CNAMEs to
-# sites.signatories.org, never to Google's endpoint directly.
-resource "google_dns_record_set" "demo_site" {
-  name         = "demo.${google_dns_managed_zone.signatories_app.dns_name}"
+# The pilot coalition's whitelabel hostname under the platform domain (the
+# alias was proven end to end with demo.signatories.app on 2026-09-21): a
+# customer hostname CNAMEs to sites.signatories.org, never to Google's
+# endpoint directly.
+resource "google_dns_record_set" "stac_site" {
+  name         = "stac.${google_dns_managed_zone.signatories_app.dns_name}"
   managed_zone = google_dns_managed_zone.signatories_app.name
   type         = "CNAME"
   ttl          = 300
