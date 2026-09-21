@@ -103,6 +103,8 @@ export interface SeedDocumentOptions {
   /** Defaults to `[TEST_ACTOR.email]` — pass explicit operators for scoping tests. */
   operators?: string[];
   created_by?: string;
+  /** `specs/behaviors/sites.md`: the site this document belongs to; absent = the default site. */
+  site?: string;
 }
 
 export async function seedDocument(
@@ -111,10 +113,11 @@ export async function seedDocument(
 ): Promise<void> {
   await server.storage.commit(
     "create",
-    { actor: TEST_ACTOR, subject: `create: ${opts.slug}`, document: opts.slug },
+    { actor: TEST_ACTOR, subject: `create: ${opts.slug}`, document: opts.slug, site: opts.site },
     async (tx) => {
       await tx.documents.upsert({
         slug: opts.slug,
+        site: opts.site,
         title: opts.title ?? opts.slug,
         state: opts.state ?? "open",
         body: opts.body ?? "Hello world.",
@@ -133,6 +136,86 @@ export async function seedDocument(
       });
     },
   );
+}
+
+export interface SeedSiteOptions {
+  slug: string;
+  hostname: string;
+  name?: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to?: string;
+  logo_url?: string;
+  accent?: string;
+  /** Defaults to `[TEST_ACTOR.email]`; pass explicit members for tenancy tests. */
+  operators?: string[];
+}
+
+/** `specs/behaviors/sites.md`: one `sites` record — the identity a hostname carries. */
+export async function seedSite(server: FastifyInstance, opts: SeedSiteOptions): Promise<void> {
+  await server.storage.commit(
+    "site-create",
+    { actor: TEST_ACTOR, subject: `site-create: ${opts.slug}`, site: opts.slug },
+    async (tx) => {
+      await tx.sites.upsert({
+        slug: opts.slug,
+        hostname: opts.hostname,
+        name: opts.name ?? opts.slug,
+        sender_name: opts.sender_name,
+        sender_email: opts.sender_email,
+        reply_to: opts.reply_to ?? "team@example.org",
+        logo_url: opts.logo_url,
+        accent: opts.accent,
+        operators: opts.operators ?? [TEST_ACTOR.email],
+        created_by: opts.operators?.[0] ?? TEST_ACTOR.email,
+      });
+    },
+  );
+}
+
+export interface SeedOperatorOptions {
+  email: string;
+  name?: string;
+  superadmin?: boolean;
+  active?: boolean;
+}
+
+export async function seedOperator(
+  server: FastifyInstance,
+  opts: SeedOperatorOptions,
+): Promise<void> {
+  const id = opts.email.split("@")[0]!.replace(/[^a-z0-9-]/gu, "-");
+  await server.storage.commit(
+    "operator-add",
+    { actor: TEST_ACTOR, subject: `operator-add: ${opts.email}` },
+    async (tx) => {
+      await tx.operators.upsert({
+        id,
+        email: opts.email,
+        name: opts.name ?? opts.email,
+        kind: "person",
+        active: opts.active ?? true,
+        superadmin: opts.superadmin,
+      });
+    },
+  );
+}
+
+/** A bearer token for one operator, minted on one site's host (`specs/api/auth.md` § Token shape). */
+export async function bearerFor(
+  email: string,
+  site: string,
+  name = email,
+): Promise<Record<string, string>> {
+  const minted = await mintOperatorToken({
+    purpose: "cli",
+    email,
+    name,
+    kind: "person",
+    secret: TEST_AUTH_SECRET,
+    site,
+  });
+  return { authorization: `Bearer ${minted.token}` };
 }
 
 export interface SeedParticipantOptions {

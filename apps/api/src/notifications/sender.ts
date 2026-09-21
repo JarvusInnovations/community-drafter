@@ -38,8 +38,7 @@ export function resolveSender(
   document: { sender_name?: string; reply_to?: string } | undefined,
   site: ResolvedSite,
 ): ResolvedMailSender {
-  const email =
-    site.sender_email ?? fastify.config.INSTANCE_FROM_EMAIL ?? FALLBACK_FROM_EMAIL;
+  const email = site.sender_email ?? fastify.config.INSTANCE_FROM_EMAIL ?? FALLBACK_FROM_EMAIL;
   const name = document?.sender_name ?? site.sender_name ?? site.name;
   return {
     from: { name, email },

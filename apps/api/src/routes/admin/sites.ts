@@ -82,7 +82,9 @@ function siteView(fastify: FastifyInstance, site: ResolvedSite) {
     hostname_verified: fastify.siteObservations.hostSeen(site.hostname),
     sender_verified: fastify.siteObservations.senderAccepted(site.slug),
     /** What the customer still has to add; a record routes nothing on its own. */
-    dns: site.hostname ? dnsRecordsForSite({ hostname: site.hostname, sender_email: site.sender_email }) : [],
+    dns: site.hostname
+      ? dnsRecordsForSite({ hostname: site.hostname, sender_email: site.sender_email })
+      : [],
     default: site.isDefault,
   };
 }
@@ -138,15 +140,22 @@ const sitesRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/sites", { config: OPERATOR_ROUTE }, async (request) => {
     const { email, superadmin } = caller(request);
-    const sites = [defaultSite(fastify.config), ...fastify.storage.readModel.listSites().map(siteFromRecord)];
+    const sites = [
+      defaultSite(fastify.config),
+      ...fastify.storage.readModel.listSites().map(siteFromRecord),
+    ];
     return sites
       .filter((site) => superadmin || isSiteOperator(fastify, site.slug, email))
       .map((site) => siteView(fastify, site));
   });
 
-  fastify.get<{ Params: SlugParams }>("/sites/:slug", { config: OPERATOR_ROUTE }, async (request) => {
-    return siteView(fastify, visibleSite(request, request.params.slug));
-  });
+  fastify.get<{ Params: SlugParams }>(
+    "/sites/:slug",
+    { config: OPERATOR_ROUTE },
+    async (request) => {
+      return siteView(fastify, visibleSite(request, request.params.slug));
+    },
+  );
 
   fastify.post<{ Body: CreateSiteBody }>(
     "/sites",
@@ -195,10 +204,14 @@ const sitesRoute: FastifyPluginAsync = async (fastify) => {
       const claimed = fastify.storage.readModel.getSiteByHostname(hostname);
       const ownHostname = defaultSite(fastify.config).hostname;
       if (claimed || (ownHostname && ownHostname === hostname)) {
-        throw new ApiError("hostname_taken", `'${hostname}' is already claimed by this deployment.`, {
-          field: "hostname",
-          site: claimed?.slug ?? DEFAULT_SITE_SLUG,
-        });
+        throw new ApiError(
+          "hostname_taken",
+          `'${hostname}' is already claimed by this deployment.`,
+          {
+            field: "hostname",
+            site: claimed?.slug ?? DEFAULT_SITE_SLUG,
+          },
+        );
       }
 
       const actor = adminActor(request);
@@ -401,10 +414,7 @@ const sitesRoute: FastifyPluginAsync = async (fastify) => {
               active: true,
             });
           }
-          await tx.sites.patch(
-            { slug: record.slug },
-            { operators: [...record.operators, email] },
-          );
+          await tx.sites.patch({ slug: record.slug }, { operators: [...record.operators, email] });
         },
       );
 

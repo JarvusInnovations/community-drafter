@@ -28,16 +28,14 @@ function domainOf(email: string): string {
   return email.slice(email.lastIndexOf("@") + 1).toLowerCase();
 }
 
-export function dnsRecordsForSite(site: {
-  hostname: string;
-  sender_email?: string;
-}): DnsRecord[] {
+export function dnsRecordsForSite(site: { hostname: string; sender_email?: string }): DnsRecord[] {
   const records: DnsRecord[] = [
     {
       type: "CNAME",
       name: site.hostname,
       value: SITE_CNAME_TARGET,
-      purpose: "Point this hostname at the service (the certificate provisions on its own once it resolves)",
+      purpose:
+        "Point this hostname at the service (the certificate provisions on its own once it resolves)",
     },
   ];
 

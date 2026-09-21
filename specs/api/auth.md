@@ -37,7 +37,7 @@ Pending device codes, magic-link codes and used magic-link `jti`s are in memory;
 
 ## Token shape
 
-JWT, HS256 with `AUTH_SECRET`. Claims: `sub` (operator email, lowercase), `kind`, `name`, `purpose` (`session` | `cli` | `magic`), `site` (the slug of the site it was minted on), `sid` or `jti`, `iat`, `exp`. A token whose `site` is not the request's resolved site is 401 `unauthenticated`, exactly as no credential at all; the session cookie is host-only anyway, and the claim is what gives a bearer token the same property. `purpose` is enforced per endpoint (a magic token never authenticates a request; a session token never approves a device from the bearer transport). Tokens carry no permissions. Magic tokens are internal: the emailed link carries only the short code.
+JWT, HS256 with `AUTH_SECRET`. Claims: `sub` (operator email, lowercase), `kind`, `name`, `purpose` (`session` | `cli` | `magic`), `site` (the slug of the site it was minted on), `sid` or `jti`, `iat`, `exp`. A token whose `site` is not the request's resolved site is 401 `unauthenticated`, exactly as no credential at all; a token minted before the claim existed carries none and reads as `default`, which is where it was minted; the session cookie is host-only anyway, and the claim is what gives a bearer token the same property. `purpose` is enforced per endpoint (a magic token never authenticates a request; a session token never approves a device from the bearer transport). Tokens carry no permissions. Magic tokens are internal: the emailed link carries only the short code.
 
 ## Principles
 

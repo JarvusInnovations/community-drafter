@@ -65,17 +65,13 @@ function participantDocumentForPath(fastify: FastifyInstance, path: string) {
  *
  * `/admin/…` and `/auth/…` never redirect: they are per-host by design.
  */
-function canonicalRedirectTarget(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-): string | null {
+function canonicalRedirectTarget(fastify: FastifyInstance, request: FastifyRequest): string | null {
   const path = request.url.split("?")[0] ?? request.url;
   if (!path.startsWith("/d/") && !path.startsWith("/i/")) return null;
 
-  const document =
-    path.startsWith("/d/")
-      ? publicDocumentForPath(fastify, path)
-      : participantDocumentForPath(fastify, path);
+  const document = path.startsWith("/d/")
+    ? publicDocumentForPath(fastify, path)
+    : participantDocumentForPath(fastify, path);
   if (!document) return null;
 
   const site = siteForDocument(fastify, document.record);

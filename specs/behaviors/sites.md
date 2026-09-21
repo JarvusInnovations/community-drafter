@@ -29,7 +29,7 @@ One record per hostname in the `sites` sheet (`data-model.md`). Managed only thr
 | `operators` | array of email | the site's operator group; never empty |
 | `created_by` | email | the operator who created the site |
 
-Who created or changed a site, and when, is the history of the record (`Action: site-create`, `site-update`, `site-operator-add`, `site-operator-remove`, with a `Site` trailer).
+Who created, changed or deleted a site, and when, is the history of the record (`Action: site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove`, with a `Site` trailer).
 
 **A site has exactly one hostname.** A customer who owns two domains gets one site on the one they want their signers to read, and points the other wherever they like outside this service; nothing here mints a link on a second host, and nothing has to decide which of two names is the real one. Two sites may not claim the same hostname either, so hostname and site are a bijection and resolution never has an order to get wrong.
 
@@ -97,9 +97,9 @@ No surface carries the platform's name, domain, logo or a "powered by" line. The
 This section replaces the instance-wide operators directory and closes issue #50. An operator **record** stays one per email, instance-wide; the **group** is a list on the site, exactly as a document's operators are a list on the document.
 
 - **Creating a site, changing its identity and deleting it are superadmin actions**, because each is tied to infrastructure the platform team has to provision anyway (§ Onboarding a hostname). Managing a site's **operator group** is not: any operator of the site may add or remove members of it.
-- `sites.operators` is the site's operator group. One person may be in several groups; a superadmin is in every group.
+- `sites.operators` is the site's operator group. One person may be in several groups; a superadmin is in every group. The **default site's** group is derived, not stored, so nothing writes to it: an operator joins it by belonging to no other site's group, and leaves it by joining one.
 - The operators directory — `GET /operators`, `/admin/operators`, `operators list` — returns the resolved site's group and nothing else.
-- Creating an operator adds the email to the resolved site's group in the same commit, creating the record if the email is new (`Action: operator-add` plus `site-operator-add`).
+- Creating an operator adds the email to the resolved site's group in the same commit, creating the record if the email is new: one commit, `Action: operator-add`, whose `Site` trailer names the group joined.
 - An operator may update or deactivate only an operator in a group they share; any other email is 404, the same body as an unknown operator, so the directory cannot be used to enumerate across sites.
 - **Removing someone from a site is not deleting them.** `sites operators remove` drops the email from that site's group; the record, and their membership of other sites, is untouched. Deleting the record itself is a superadmin action, because the record is instance-wide.
 - A group is never emptied: a removal that would leave a site with no operators, or leave one of that site's documents with no operator, is refused.

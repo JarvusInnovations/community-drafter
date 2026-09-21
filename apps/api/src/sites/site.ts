@@ -102,7 +102,10 @@ export function normalizeHost(host: string | undefined): string {
  * the host, drop the port, match `sites.hostname` exactly, and fall back to
  * the default site. No wildcards, no suffix matching, no path prefixes.
  */
-export function resolveSiteForHost(fastify: FastifyInstance, host: string | undefined): ResolvedSite {
+export function resolveSiteForHost(
+  fastify: FastifyInstance,
+  host: string | undefined,
+): ResolvedSite {
   const hostname = normalizeHost(host);
   if (hostname) {
     const record = fastify.storage.readModel.getSiteByHostname(hostname);
@@ -174,7 +177,10 @@ export function sitesForOperator(
   email: string,
   superadmin: boolean,
 ): ResolvedSite[] {
-  const all = [defaultSite(fastify.config), ...fastify.storage.readModel.listSites().map(siteFromRecord)];
+  const all = [
+    defaultSite(fastify.config),
+    ...fastify.storage.readModel.listSites().map(siteFromRecord),
+  ];
   if (superadmin) return all;
   return all.filter((site) => isSiteOperator(fastify, site.slug, email));
 }
