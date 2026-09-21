@@ -1,0 +1,48 @@
+name: OpenTofu
+
+# The credential-free `tf/` gate (`specs/architecture.md` § Deployment;
+# `ci-quality-gates`): formatting and validation need no secrets, so they
+# run on every PR including forks and start instantly.
+#
+# The credentialed `tofu plan -concise` that belongs beside this (issue #8)
+# is not here yet: the state bucket `jarvus-tfstate` lives outside this
+# project and the CI service account cannot read it, so `tofu init` against
+# the real backend 403s. Tracked in issue #92, which also has to answer
+# which principal should hold that read.
+on:
+  pull_request:
+    paths:
+      - 'tf/**'
+      - '.tool-versions'
+      - '.github/workflows/tf-validate.yml'
+      - '.github/actions/setup-asdf/**'
+  push:
+    branches: [develop]
+    paths:
+      - 'tf/**'
+      - '.tool-versions'
+      - '.github/workflows/tf-validate.yml'
+      - '.github/actions/setup-asdf/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: fmt + validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-asdf
+      - name: Check formatting
+        working-directory: tf
+        run: tofu fmt -check -recursive
+      # `-backend=false` keeps this job off the state bucket entirely —
+      # nothing here needs a credential or the network beyond the provider
+      # download.
+      - name: Initialize without a backend
+        working-directory: tf
+        run: tofu init -backend=false -input=false
+      - name: Validate
+        working-directory: tf
+        run: tofu validate

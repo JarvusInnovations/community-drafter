@@ -1,4 +1,4 @@
-import type { Judgement } from "@community-drafter/shared";
+import type { DeadlineChange, Judgement } from "@community-drafter/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -20,12 +20,12 @@ import type { FastifyPluginAsync } from "fastify";
  * `fastify.notifications.deliver` and reading its summary, not announcing
  * an intention.
  */
-/** One deadline moved by an `extend` or `reopen`. */
-export interface DeadlineChange {
-  deadline: "comments_close_at" | "signing_closes_at";
-  from?: string;
-  to: string;
-}
+/**
+ * One deadline moved by an `extend` or `reopen`. Defined alongside the
+ * trailer set it is written as (`packages/shared`) and re-exported here,
+ * because the event and the commit carry the same shape.
+ */
+export type { DeadlineChange };
 
 export type DrafterEvent =
   | { type: "sign"; document: string; person: string; commit: string }

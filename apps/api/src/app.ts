@@ -39,6 +39,22 @@ declare module "fastify" {
   }
 }
 
+/**
+ * The `error` value `specs/api/conventions.md` § Responses gives each status,
+ * for an error the framework raised with a 4xx of its own rather than one a
+ * handler threw as an `ApiError`. Anything else in the 4xx range reads as
+ * `invalid_request` — the caller sent something the server would not take.
+ */
+const CLIENT_ERROR_CODES: Record<number, string> = {
+  400: "invalid_request",
+  401: "unauthenticated",
+  403: "forbidden",
+  404: "not_found",
+  413: "payload_too_large",
+  415: "unsupported_media_type",
+  429: "rate_limited",
+};
+
 export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   // 1. Register environment configuration FIRST
   await fastify.register(envPlugin);
@@ -109,8 +125,22 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
       });
       return;
     }
+    // An error Fastify raised before any handler ran — an unparseable or
+    // empty JSON body, a body over the limit, a content type nothing
+    // accepts — already knows it is the caller's mistake and carries the
+    // status to say so. Keep it (`specs/api/conventions.md` § Responses);
+    // `internal_error` is for 5xx and nothing else.
+    const status = err.statusCode ?? 500;
+    if (status >= 400 && status < 500) {
+      reply.status(status).send({
+        error: CLIENT_ERROR_CODES[status] ?? "invalid_request",
+        message: err.message,
+        details: err.code ? { code: err.code } : {},
+      });
+      return;
+    }
     request.log.error(err);
-    reply.status(err.statusCode ?? 500).send({
+    reply.status(status).send({
       error: "internal_error",
       message: "Something went wrong.",
       details: {},

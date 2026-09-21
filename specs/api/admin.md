@@ -58,7 +58,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## Activity
 
-- `GET /documents/:slug/activity?limit=50&person=` → the document's commits, newest first, as `{ commit, date, subject, action, person, version, judgement, reason, actor }` parsed from trailers. This is the event log; there is no other.
+- `GET /documents/:slug/activity?limit=50&person=` → the document's commits, newest first, as `{ commit, date, subject, action, person, version, judgement, reason, actor }` parsed from trailers, plus `deadlines` — `[{ deadline, from?, to }]` from the `Deadlines` trailer — on an `extend` or `reopen`. This is the event log; there is no other.
 
 ## Operators
 

@@ -34,6 +34,7 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Judgement` | `sign` \| `sign_conditional` \| `comment` \| `decline` | `submit` |
 | `Disposed` | comma-separated `<submission>:<comment>` refs | `publish` |
 | `Signature` | `sign` \| `resign` \| `revoke` | `submit` when the same commit also writes the participation's `signature` table |
+| `Deadlines` | comma-separated `<field> <from> -> <to>`, ISO 8601 UTC, `(unset)` where there was no previous value | `extend`, `reopen` |
 | `Reason` | text | `revoke`, `withdraw`, `admin-revoke`, and `submit` with `decline` |
 | `Request-Id` | id | every commit from a request |
 

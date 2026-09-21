@@ -119,6 +119,16 @@ export const copy = {
     recentActivity: "Recent activity",
     noActivity: "No activity yet.",
     /**
+     * `specs/screens/admin-dashboard.md` § Recent activity: an extension
+     * names each deadline it moved with its old and new time, so nobody has
+     * to go looking for what the deadline used to be.
+     */
+    deadlineNames: {
+      comments_close_at: "Comments close",
+      signing_closes_at: "Signing closes",
+    } as Record<string, string>,
+    deadlineUnset: "not set",
+    /**
      * `specs/behaviors/operators.md` § Superadmins: an actor who is not one
      * of this document's operators but holds the flag is labeled, so the
      * document's own operators can tell an instance administrator acting

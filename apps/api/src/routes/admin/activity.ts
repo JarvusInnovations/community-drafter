@@ -1,3 +1,4 @@
+import { parseDeadlinesTrailer } from "@community-drafter/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
@@ -49,6 +50,11 @@ const activityRoute: FastifyPluginAsync = async (fastify) => {
         version: entry.trailers.Version ? Number(entry.trailers.Version) : undefined,
         judgement: entry.trailers.Judgement,
         reason: entry.trailers.Reason,
+        // `specs/screens/admin-dashboard.md` § Recent activity: an extension
+        // shows the literal time each deadline moved from and to.
+        deadlines: entry.trailers.Deadlines
+          ? parseDeadlinesTrailer(entry.trailers.Deadlines)
+          : undefined,
         actor: entry.actor,
         actor_superadmin: isOutsideSuperadmin(entry.actor) || undefined,
       }));

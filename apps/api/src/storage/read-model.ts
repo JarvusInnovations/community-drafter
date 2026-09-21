@@ -342,14 +342,29 @@ export class ReadModel {
 
   private async computeDocumentEntry(slug: string, hydrated: DocumentRecord): Promise<void> {
     const relPath = `${SHEET_LOCATIONS.documents.root}/${slug}.${SHEET_LOCATIONS.documents.ext}`;
-    const relevant = this.fullLog.filter((entry) => entry.trailers.Document === slug);
+    // Two ways a commit belongs to this document: it names it in a `Document`
+    // trailer (every write this service makes, including the sign/comment
+    // commits that never touch the record file), or it changed the record
+    // file itself. The second is what catches a teammate's `gitsheets-axi` or
+    // hand edit, which carries none of this service's trailers —
+    // `specs/behaviors/versioning.md`: "the history is derived from every
+    // commit that changed the record's body, not only from the commits this
+    // service wrote".
+    const touchedRecord = (entry: CommitLogEntry): boolean => entry.paths.includes(relPath);
+    const relevant = this.fullLog.filter(
+      (entry) => entry.trailers.Document === slug || touchedRecord(entry),
+    );
 
     const versions: DocumentVersion[] = [];
     let previousBody: string | undefined;
 
     for (const entry of relevant) {
       const action = entry.trailers.Action as Action | undefined;
-      if (!action || !DOCUMENT_MUTATING_ACTIONS.has(action)) continue;
+      // An action that writes the record, or any commit that changed the
+      // record file whatever it claims to be. Everything else (a sign, a
+      // comment, a submission) cannot have changed the body, so it is skipped
+      // without paying for a `git show`.
+      if (!((action && DOCUMENT_MUTATING_ACTIONS.has(action)) || touchedRecord(entry))) continue;
 
       const body = await this.getBodyAtCommit(entry.hash, relPath);
       if (body === null) continue;

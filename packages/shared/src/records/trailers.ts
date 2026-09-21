@@ -67,6 +67,51 @@ export const SIGNATURE_TRAILERS = ["sign", "resign", "revoke"] as const;
 export type SignatureTrailer = (typeof SIGNATURE_TRAILERS)[number];
 
 /**
+ * One deadline moved by an `extend` or `reopen`: carried on the commit as
+ * the `Deadlines` trailer and on the `schedule-changed` event. `from` is
+ * absent when the document had no such deadline before.
+ */
+export interface DeadlineChange {
+  deadline: "comments_close_at" | "signing_closes_at";
+  from?: string;
+  to: string;
+}
+
+/** What `Deadlines` writes where a deadline had no previous value. */
+const DEADLINE_UNSET = "(unset)";
+
+/**
+ * `specs/data-model.md` → `Deadlines`: comma-separated `<field> <from> -> <to>`
+ * in ISO 8601 UTC. One line, no spaces inside a timestamp, so it survives git's
+ * trailer syntax unescaped. Returns `undefined` when nothing moved, so the
+ * caller leaves the trailer off entirely rather than writing an empty one.
+ */
+export function formatDeadlinesTrailer(changes: DeadlineChange[]): string | undefined {
+  if (changes.length === 0) return undefined;
+  return changes
+    .map((change) => `${change.deadline} ${change.from ?? DEADLINE_UNSET} -> ${change.to}`)
+    .join(", ");
+}
+
+/** The inverse of `formatDeadlinesTrailer`; an unreadable entry is dropped. */
+export function parseDeadlinesTrailer(value: string): DeadlineChange[] {
+  const changes: DeadlineChange[] = [];
+  for (const entry of value.split(",")) {
+    const match = /^(\S+)\s+(\S+)\s+->\s+(\S+)$/u.exec(entry.trim());
+    if (!match) continue;
+    const [, deadline, from, to] = match;
+    if (deadline !== "comments_close_at" && deadline !== "signing_closes_at") continue;
+    if (to === undefined) continue;
+    changes.push({
+      deadline,
+      ...(from !== undefined && from !== DEADLINE_UNSET ? { from } : {}),
+      to,
+    });
+  }
+  return changes;
+}
+
+/**
  * The full trailer set. All fields are optional here — which trailers apply
  * to a given commit depends on its `Action` (see the table in
  * `specs/data-model.md`); the storage layer's `commit()` wrapper is what
@@ -85,6 +130,7 @@ export interface Trailers {
   Judgement?: Judgement;
   Signature?: SignatureTrailer;
   Disposed?: string;
+  Deadlines?: string;
   Reason?: string;
   "Request-Id"?: string;
 }
