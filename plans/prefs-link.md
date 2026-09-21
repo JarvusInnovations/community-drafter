@@ -1,10 +1,11 @@
 ---
-status: in-progress
+status: done
 depends: []
 specs:
   - specs/behaviors/notifications.md
   - specs/screens/preferences.md
 issues: [81]
+pr: 109
 ---
 
 # Plan: prefs-link
@@ -58,16 +59,17 @@ screen itself, the stop-optional endpoint, and the set of preferences.
 
 ## Validation
 
-- [ ] `specs/behaviors/notifications.md` states the footer rule for every
+- [x] `specs/behaviors/notifications.md` states the footer rule for every
       participant message and keeps operator messages excluded.
-- [ ] All five transactional participant templates render both footer links, in
+- [x] All five transactional participant templates render both footer links, in
       the text part and the HTML part, with the personal-link token in the URL.
-- [ ] Operator messages still render no preference link (the existing
+- [x] Operator messages still render no preference link (the existing
       `operators.test.ts` assertion holds).
-- [ ] `renderEmail` shell tests unchanged and passing.
-- [ ] `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test` green
-      in `apps/api`.
-- [ ] Issue #81 closed by the PR.
+- [x] `renderEmail` shell tests unchanged and passing.
+- [x] `bun run lint`, `bun run format:check`, `bun run typecheck` and `bun test`
+      green in `apps/api` (270 pass, 0 fail, 42 files); CI Lint and Tests green
+      on the PR.
+- [x] Issue #81 closed by the PR.
 
 ## Risks / unknowns
 
@@ -80,4 +82,24 @@ screen itself, the stop-optional endpoint, and the set of preferences.
 
 ## Notes
 
+- **The catalogue column, not just the footer bullet.** The plan named the
+  footer rule; what actually made this a judgement call in #81 was that
+  "transactional" in § Messages was doing two jobs at once — *sent
+  unconditionally* and, by inference, *arrives without the controls*. The
+  spec now says the first out loud and denies the second, so the next reader
+  of the catalogue does not have to re-derive the question.
+- **`shell.ts` needed nothing.** It already rendered `footerLinks` for
+  whoever passed them, and `RecipientContext` already carried both URLs — the
+  whole behavior change is which helper passes them. Only the doc comments
+  moved.
+- **The two template helpers were kept rather than collapsed.** After the
+  change `transactional()` and `subscription()` render identically, so one
+  function would do. They stay separate because the call sites are the only
+  place in the code that says which kind each message is; the gate that acts
+  on the distinction lives in `lib/notify.ts` and is untouched.
+- **The export mailer writes `name,email,subject,link`**, so the footer never
+  reaches the CSV and no `MAILER=export` deployment changes.
+
 ## Follow-ups
+
+- None.
