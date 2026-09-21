@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: [13, 11, 77]
+pr: 91
 specs:
   - specs/api/admin-cli.md
   - specs/data-model.md
@@ -80,20 +81,20 @@ dashboard surface for operator mail; a message on `operator-remove` / `doc-opera
 
 ## Validation
 
-- [ ] `drafter-axi people expire <slug> <person> --expires-at <iso>` sets `expires_at` on the
+- [x] `drafter-axi people expire <slug> <person> --expires-at <iso>` sets `expires_at` on the
       participation and prints what it resolved to; a zone-less time is read in the machine's
       local zone and echoed; a missing `--expires-at` is a usage error naming the flag.
-- [ ] `specs/data-model.md`'s `Action` row and `ACTIONS` in
+- [x] `specs/data-model.md`'s `Action` row and `ACTIONS` in
       `packages/shared/src/records/trailers.ts` are the same list, in the same order, with no
       "fold this in later" comment left behind.
-- [ ] `POST /operators` emails the new operator once: the instance name, who created the
+- [x] `POST /operators` emails the new operator once: the instance name, who created the
       account, `<instance>/admin`, and the "sign-in is a link, not a password" line. No token,
       no participant data, no `notified` write.
-- [ ] `POST /documents/:slug/operators` emails the added operator once, naming the document,
+- [x] `POST /documents/:slug/operators` emails the added operator once, naming the document,
       who added them, and `<instance>/admin/d/<slug>`.
-- [ ] Neither message is sent when the operator being added is the operator doing the adding.
-- [ ] `skills/drafter-axi/` is rebuilt and the bundle drift gate passes.
-- [ ] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test`.
+- [x] Neither message is sent when the operator being added is the operator doing the adding.
+- [x] `skills/drafter-axi/` is rebuilt and the bundle drift gate passes.
+- [x] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test`.
 
 ## Risks / unknowns
 
@@ -109,4 +110,33 @@ dashboard surface for operator mail; a message on `operator-remove` / `doc-opera
 
 ## Notes
 
+- **#11 needed no spec change.** `specs/data-model.md`'s `Action` row already listed
+  `link-export`, `link-expire`, `uninvite` and the five operator actions — a later spec PR had
+  folded them in — so the row and `ACTIONS` were already the same list in the same order,
+  checked value by value. What survived was the `api-core` comment in `trailers.ts` still
+  promising to do it; that comment is gone and the array's doc comment now names the spec row
+  as canonical.
+- **Operator mail records only a log line**, not the dispatcher's failure list the plan first
+  reached for. `NotificationDispatcher.retry` re-renders a failed send from a participation
+  record; an operator has none, so a retry would resolve nothing, count the target as skipped,
+  and leave the entry in the bucket — a permanently stuck failure inflating the dashboard's
+  count. The rule is written into `specs/behaviors/notifications.md` § Operator mail rather
+  than left implicit, and that section covers `operator-magic-link` too, which shipped with
+  those rules unstated.
+- **`operator-magic-link` is the exception to the committed-before-sent rule.** It commits
+  nothing, so a mailer that refuses it is an ordinary request failure and is reported as one;
+  only the two `operator-added` messages swallow a refusal, because their commit has landed.
+- **A test was counting the new message.** `POST /auth/login > does not email an inactive
+  operator` built its inactive operator through `POST /operators`, which now mails them; the
+  fake mailer is reset after that setup so the test still asks only about the sign-in path.
+- **The full `apps/api` suite is contention-sensitive on a shared machine.** One run with
+  several other worktrees testing concurrently reported 11 failures and 6 errors, mostly
+  gitsheets write errors; run alone it is 203 pass / 0 fail. Re-run before believing a red API
+  suite here.
+
 ## Follow-ups
+
+- **None.** The three issues are closed by PR #91. No message was added for
+  `operator-remove` / `doc-operator-remove` — that was out of scope by choice, not deferred
+  work; if losing access should be announced, that is a new decision for the notifications
+  spec.
