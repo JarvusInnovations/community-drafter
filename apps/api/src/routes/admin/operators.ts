@@ -4,6 +4,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts";
 import { uniqueSlug } from "../../lib/slug.ts";
+import {
+  sendOperatorAdded,
+  sendOperatorAddedToDocument,
+} from "../../notifications/operator-mail.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -106,10 +110,11 @@ const operatorsRoute: FastifyPluginAsync = async (fastify) => {
         existingIds.has(candidate),
       );
 
+      const actor = adminActor(request);
       const result = await fastify.storage.commit(
         "operator-add",
         {
-          actor: adminActor(request),
+          actor,
           subject: `operator-add: ${email}`,
           requestId: request.requestId,
         },
@@ -126,6 +131,14 @@ const operatorsRoute: FastifyPluginAsync = async (fastify) => {
           });
         },
       );
+
+      // `specs/behaviors/notifications.md` § Messages → `operator-added`:
+      // the record is the fact and it is already written; the message is
+      // what turns access into something the person can actually use.
+      await sendOperatorAdded(fastify, request, {
+        operator: { email, name: body.name },
+        actorEmail: actor.kind === "operator" ? actor.email : "",
+      });
 
       reply.status(201);
       return {
@@ -275,10 +288,11 @@ const operatorsRoute: FastifyPluginAsync = async (fastify) => {
         return { ...operatorView(candidate), added: false };
       }
 
+      const actor = adminActor(request);
       const result = await fastify.storage.commit(
         "doc-operator-add",
         {
-          actor: adminActor(request),
+          actor,
           subject: `doc-operator-add: ${email} on ${slug}`,
           document: slug,
           requestId: request.requestId,
@@ -287,6 +301,16 @@ const operatorsRoute: FastifyPluginAsync = async (fastify) => {
           await tx.documents.patch({ slug }, { operators: [...current, email] });
         },
       );
+
+      // `specs/behaviors/notifications.md` § Messages →
+      // `operator-added-to-document`: membership with no address to use it
+      // at is membership the person has to be told about out of band.
+      await sendOperatorAddedToDocument(fastify, request, {
+        operator: { email, name: candidate.name },
+        actorEmail: actor.kind === "operator" ? actor.email : "",
+        documentSlug: slug,
+        documentTitle: entry.record.title,
+      });
 
       return { ...operatorView(candidate), added: true, commit: result.commitHash };
     },
