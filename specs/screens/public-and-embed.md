@@ -33,7 +33,7 @@ Document (title, phase, deadlines, `show_signatories`, `reply_to`), the document
 
 **Widget**: renders into `<div data-drafter-doc="<slug>"></div>` the counts sentence and, optionally by attribute, the list; polls every 5 minutes; degrades to nothing if the JSON is unavailable. Under 3 KB.
 
-**Browser tab**: every public page's document title names the document and then the instance — "Charter of the Save the Academy Coalition · Save the Academy Coalition Drafter" — so a shared link is identifiable in a tab strip, a bookmark and a history entry. The participant and admin document screens do the same with their own document.
+**Browser tab**: every page that shows one document names it in the browser's title — "Charter of the Save the Academy Coalition" — rather than leaving the build's generic name there, so a shared link is identifiable in a tab strip, a bookmark and a history entry. Where the surface already knows the instance name (the participant and admin screens, which read it from their own payloads) it follows the document, after a middle dot; the public view does not carry it and says the document alone.
 
 **Personal links are never frameable** and never referenced from any public surface.
 
