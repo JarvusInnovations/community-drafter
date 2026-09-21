@@ -63,7 +63,7 @@ This repo uses spec-driven development: change the spec, then the code, and reco
 Install the admin skill into the repo your team (or its agent) works from:
 
 ```bash
-npx skills add JarvusInnovations/community-drafter --skill signatories-axi
+npx skills add JarvusInnovations/signatories --skill signatories-axi
 ```
 
 Then, with `SIGNATORIES_URL` and `SIGNATORIES_TOKEN` set:

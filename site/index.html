@@ -48,7 +48,7 @@
     <p class="sub">Everyone you invite gets a personal link. They open it, read it, and sign in one screen. Comments, revisions and the right to remove their name sit behind that first click, never in front of it.</p>
     <p class="cta">
       <a class="btn primary" href="#how">See how it works</a>
-      <a class="btn" href="https://github.com/JarvusInnovations/community-drafter">View on GitHub</a>
+      <a class="btn" href="https://github.com/JarvusInnovations/signatories">View on GitHub</a>
       <a class="btn" href="#getting-in">I run documents</a>
     </p>
   </div>
@@ -162,7 +162,7 @@
 <section class="wrap teams">
   <h2 class="section-title">Running one</h2>
   <p>Two surfaces, one account. The <strong>web console</strong> at <code>&lt;your-instance&gt;/admin</code> is where you read a document — progress, people, submissions, versions, view-as. The <strong>admin skill</strong> is where you write: a command-line tool that installs into the repository your team, or your team's agent, already works from. Import invitees from your own contact list, publish, open, export the feedback bundle for a revision round, and publish again.</p>
-<pre><code>npx skills add JarvusInnovations/community-drafter --skill signatories-axi
+<pre><code>npx skills add JarvusInnovations/signatories --skill signatories-axi
 
 signatories-axi docs create our-letter --title "…" --sender-name "…" --reply-to …
 signatories-axi versions publish our-letter --file draft.md --summary "Initial draft"
@@ -173,13 +173,13 @@ signatories-axi feedback export our-letter --format md
 signatories-axi versions publish our-letter --file v2.md --summary "…" --dispositions d.json</code></pre>
   <p>The installed skill is not on your <code>PATH</code>: run it as <code>scripts/signatories-axi …</code> from the skill's own directory.</p>
   <p>One instance serves any number of organizations and documents. There is no public homepage inside the product: a document is reachable only through the links made for it, plus an optional anyone-with-the-link read view and an embeddable signatory count for your own site.</p>
-  <p class="cta"><a class="btn primary" href="https://github.com/JarvusInnovations/community-drafter">Read the code and the specs</a></p>
+  <p class="cta"><a class="btn primary" href="https://github.com/JarvusInnovations/signatories">Read the code and the specs</a></p>
 </section>
 
 </main>
 
 <footer class="wrap">
-  <p><a href="https://github.com/JarvusInnovations/community-drafter">JarvusInnovations/community-drafter</a> · built by <a href="https://jarv.us">Jarvus Innovations</a>. The pilot deployment serves a civic coalition; the tool itself is generic. Screenshots show a demo document with fictional participants.</p>
+  <p><a href="https://github.com/JarvusInnovations/signatories">JarvusInnovations/signatories</a> · built by <a href="https://jarv.us">Jarvus Innovations</a>. The pilot deployment serves a civic coalition; the tool itself is generic. Screenshots show a demo document with fictional participants.</p>
 </footer>
 
 </body>
