@@ -20,6 +20,22 @@ export type NotifyPrefs = z.infer<typeof NotifyPrefsSchema>;
 export const NotifiedSchema = z.record(z.string(), z.union([z.string(), z.number()]));
 export type Notified = z.infer<typeof NotifiedSchema>;
 
+/**
+ * `specs/data-model.md` → `participations`: what **this document** prefills on
+ * the sign card for this person, overriding the person's site-level defaults
+ * field by field. Named for what it prefills — the `signature` table's own
+ * fields — so `prefill.title` is the default for `signature.title` and stands
+ * in for the person's `role`. Absent on every record written before it
+ * existed, which resolves to the person's defaults alone.
+ */
+export const PrefillSchema = z.object({
+  name: z.string().optional(),
+  org: z.string().optional(),
+  title: z.string().optional(),
+  descriptor: z.string().optional(),
+});
+export type Prefill = z.infer<typeof PrefillSchema>;
+
 export const SignatureSchema = z.object({
   capacity: CapacitySchema,
   display_name: z.string(),
@@ -51,6 +67,7 @@ export const ParticipationRecordSchema = z.object({
   token: z.string().min(16),
   source: ParticipationSourceSchema,
   suggested_capacity: CapacitySchema.optional(),
+  prefill: PrefillSchema.optional(),
   // Defaults (`false` / `0`) live in `.gitsheets/participations.toml`'s
   // JSON Schema; see the note on `documents.ts`'s equivalent fields.
   link_revoked: z.boolean().optional(),
