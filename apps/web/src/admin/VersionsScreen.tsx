@@ -88,8 +88,7 @@ export function VersionsScreen(): JSX.Element {
                   <Pill tone="ok">{copy.versions.current}</Pill>
                 ) : null}
                 <span className="text-muted-foreground">
-                  {formatAbsolute(v.published_at)} ·{" "}
-                  {copy.versions.dispositions(v.dispositions)}
+                  {formatAbsolute(v.published_at)} · {copy.versions.dispositions(v.dispositions)}
                   {v.final ? " · final" : ""}
                 </span>
               </div>

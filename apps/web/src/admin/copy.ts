@@ -146,7 +146,8 @@ export const copy = {
      * with standing from a write that should not have been possible.
      */
     superadminActor: "superadmin",
-    notOpenedYet: "This document has not been opened, so it has no deadlines to extend. Open it from the CLI:",
+    notOpenedYet:
+      "This document has not been opened, so it has no deadlines to extend. Open it from the CLI:",
     openCommand: (slug: string) =>
       `drafter-axi docs open ${slug} --comments-close "…" --signing-closes "…"`,
     notificationHealth: "Notification health",

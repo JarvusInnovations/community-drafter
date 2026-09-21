@@ -116,6 +116,7 @@ export function SignForm({
             <label className={cn(CAPACITY_OPTION, readOnly ? "cursor-default" : "cursor-pointer")}>
               <input
                 type="radio"
+                id={`${formId}-capacity-personal`}
                 name={`${formId}-capacity`}
                 className="sr-only"
                 checked={capacity === "personal"}
@@ -127,6 +128,7 @@ export function SignForm({
             <label className={cn(CAPACITY_OPTION, readOnly ? "cursor-default" : "cursor-pointer")}>
               <input
                 type="radio"
+                id={`${formId}-capacity-official`}
                 name={`${formId}-capacity`}
                 className="sr-only"
                 checked={capacity === "official"}
@@ -143,6 +145,9 @@ export function SignForm({
         {copy.signForm.nameLabel}
         <input
           type="text"
+          id={`${formId}-display-name`}
+          name="display_name"
+          autoComplete="name"
           required
           value={displayName}
           disabled={readOnly}
@@ -157,6 +162,9 @@ export function SignForm({
             {copy.signForm.orgLabel}
             <input
               type="text"
+              id={`${formId}-org`}
+              name="org"
+              autoComplete="organization"
               required
               value={org}
               disabled={readOnly}
@@ -168,6 +176,9 @@ export function SignForm({
             {copy.signForm.titleLabel}
             <input
               type="text"
+              id={`${formId}-title`}
+              name="title"
+              autoComplete="organization-title"
               required
               value={title}
               disabled={readOnly}
@@ -179,6 +190,8 @@ export function SignForm({
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
+              id={`${formId}-authorized`}
+              name="authorized"
               checked={authorized}
               disabled={readOnly}
               onChange={(event) => setAuthorized(event.target.checked)}
@@ -192,6 +205,8 @@ export function SignForm({
           {copy.signForm.descriptorLabel}
           <input
             type="text"
+            id={`${formId}-descriptor`}
+            name="descriptor"
             value={descriptor}
             disabled={readOnly}
             onChange={(event) => setDescriptor(event.target.value)}
