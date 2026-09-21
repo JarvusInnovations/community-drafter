@@ -174,14 +174,15 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       {
         usage:
-          "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]",
+          "people import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--update] [--dry-run]",
         summary:
-          "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags, and --dry-run shows what each row would do first. Run `people import --help` for the full field list.",
+          "Import invitees from NDJSON or a JSON array (a gitsheets people export works directly); rows carry email and name plus optional org, role, phone, descriptor, external_id, suggested_capacity and tags. People are matched by email within this document's site, each row's values become this document's own sign-card prefill, and an existing person keeps the fields they already have unless --update is passed. --dry-run shows what each row would change and what it would keep first. Run `people import --help` for the full field list.",
       },
       {
         usage:
           "people list <slug> [--status <status>] [--source <source>] [-q <text>] [--contacts]",
-        summary: "Participation statuses — never tokens; emails only with --contacts.",
+        summary:
+          "Participation statuses — never tokens; emails only with --contacts. name and org are what this document prefills, not the raw contact record.",
       },
       {
         usage: "people links <slug> [--person a,b] [--out <file.csv>]",

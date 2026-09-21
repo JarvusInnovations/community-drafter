@@ -110,7 +110,15 @@ export interface NotifyPrefs {
 
 export interface InvitationRow {
   person: string;
+  /**
+   * `specs/screens/admin-dashboard.md` § People: the name and organization
+   * **this document** prefills for that person — the participation's own
+   * prefill where it has one, else the person's site-level default — so the
+   * table and "view as" agree.
+   */
   name: string;
+  org: string;
+  prefill: { name?: string; org?: string; role?: string; descriptor?: string };
   email: string;
   status: ParticipationStatus;
   source?: string;
