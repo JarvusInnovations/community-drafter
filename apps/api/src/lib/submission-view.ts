@@ -1,4 +1,4 @@
-import type { Anchor, Disposition, Judgement } from "@community-drafter/shared";
+import type { Anchor, Disposition, Judgement } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 import type { SubmissionEntry } from "../storage/read-model.ts";

@@ -1,8 +1,8 @@
-import { type Block, type BlockTag, normalizeText } from "@community-drafter/shared/browser";
+import { type Block, type BlockTag, normalizeText } from "@signatories/shared/browser";
 
 /**
  * Reconstructs `Block[]`-shaped data from the *live rendered DOM* so
- * `computeAnchor`/`placeAnchor` (`@community-drafter/shared/browser`, which
+ * `computeAnchor`/`placeAnchor` (`@signatories/shared/browser`, which
  * both expect `Block[]`) can run entirely client-side. The server-only
  * render pipeline (`packages/shared/src/render/block-ids.ts`) already baked
  * `data-block` ids into `version.html` before it ever reached the browser

@@ -1,5 +1,5 @@
-import type { Capacity, Judgement, Signature, SignatureTrailer } from "@community-drafter/shared";
-import { JUDGEMENTS } from "@community-drafter/shared";
+import type { Capacity, Judgement, Signature, SignatureTrailer } from "@signatories/shared";
+import { JUDGEMENTS } from "@signatories/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";

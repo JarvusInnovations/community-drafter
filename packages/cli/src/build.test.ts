@@ -9,7 +9,7 @@ import { buildSkillDoc } from "./build/skill-doc.ts";
  * `skills/drafter-axi/SKILL.md` is stale relative to `src/cli/` — i.e.
  * someone changed the CLI source without rebuilding (`bun run build` in
  * this package) and committing the result. Wired into this package's own
- * `test` script, so `bun run --filter='@community-drafter/cli' test`
+ * `test` script, so `bun run --filter='@signatories/cli' test`
  * (the existing test.yml matrix) runs it on every PR with no separate
  * workflow needed.
  */

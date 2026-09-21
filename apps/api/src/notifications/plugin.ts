@@ -1,4 +1,4 @@
-import type { Signature } from "@community-drafter/shared";
+import type { Signature } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 

@@ -5,7 +5,7 @@ import {
   type Judgement,
   type SignatureTrailer,
   type Trailers,
-} from "@community-drafter/shared";
+} from "@signatories/shared";
 import type { StoreTx } from "gitsheets";
 
 import { actorIdentity, actorTrailerValue, type Actor } from "./actor.ts";

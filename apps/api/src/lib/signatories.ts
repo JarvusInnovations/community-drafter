@@ -1,4 +1,4 @@
-import type { ShowSignatories } from "@community-drafter/shared";
+import type { ShowSignatories } from "@signatories/shared";
 
 import type { ParticipationEntry, SignatureEvent } from "../storage/read-model.ts";
 

@@ -1,4 +1,4 @@
-import type { Action } from "@community-drafter/shared";
+import type { Action } from "@signatories/shared";
 
 import type { Actor } from "./actor.ts";
 import type { CommitInput, CommitResult, DataStoreTx } from "./commit.ts";

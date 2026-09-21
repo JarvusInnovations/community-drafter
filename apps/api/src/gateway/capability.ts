@@ -1,4 +1,4 @@
-import type { OperatorKind } from "@community-drafter/shared";
+import type { OperatorKind } from "@signatories/shared";
 
 /**
  * `specs/api/conventions.md`: "every route declares `participant`,

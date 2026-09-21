@@ -3,4 +3,4 @@
  * API), built into `skills/drafter-axi/` per the `axi-skills` skill. Empty
  * scaffold — populated once the admin API surface exists to drive.
  */
-export const CLI_PACKAGE_NAME = "@community-drafter/cli";
+export const CLI_PACKAGE_NAME = "@signatories/cli";

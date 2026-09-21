@@ -1,4 +1,4 @@
-import { type Anchor } from "@community-drafter/shared/browser";
+import { type Anchor } from "@signatories/shared/browser";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {

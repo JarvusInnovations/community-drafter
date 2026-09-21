@@ -1,4 +1,4 @@
-import type { Anchor } from "@community-drafter/shared/browser";
+import type { Anchor } from "@signatories/shared/browser";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { applyHighlights, clearHighlights } from "./highlights.ts";

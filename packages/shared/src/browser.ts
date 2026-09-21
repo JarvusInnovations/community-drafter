@@ -1,5 +1,5 @@
 /**
- * Browser-safe entry point (`@community-drafter/shared/browser`): comment
+ * Browser-safe entry point (`@signatories/shared/browser`): comment
  * anchoring and the version diff, with no dependency on `unified`/remark/
  * rehype or any Node-only module. Keep this file's import graph limited to
  * `anchor/*` and `diff/*` — the render pipeline in `render/` is server-only

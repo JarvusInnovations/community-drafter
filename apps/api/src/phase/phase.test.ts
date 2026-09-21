@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { DocumentRecord } from "@community-drafter/shared";
+import type { DocumentRecord } from "@signatories/shared";
 
 import { ApiError } from "../errors.ts";
 import { assertPhase, derivePhase } from "./phase.ts";

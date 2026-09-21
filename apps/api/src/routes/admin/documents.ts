@@ -4,7 +4,7 @@ import {
   type Capacity,
   type PublicAccess,
   type ShowSignatories,
-} from "@community-drafter/shared";
+} from "@signatories/shared";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";

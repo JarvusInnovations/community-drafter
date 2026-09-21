@@ -1,5 +1,5 @@
 {
-  "name": "@community-drafter/api",
+  "name": "@signatories/api",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@community-drafter/shared": "workspace:*",
+    "@signatories/shared": "workspace:*",
     "@fastify/env": "^7.0.0",
     "@fastify/static": "^10.1.4",
     "fastify": "^5.12.5",

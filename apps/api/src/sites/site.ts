@@ -1,4 +1,4 @@
-import { DEFAULT_SITE_SLUG, type SiteRecord } from "@community-drafter/shared";
+import { DEFAULT_SITE_SLUG, type SiteRecord } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 /**

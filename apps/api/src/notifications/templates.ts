@@ -1,4 +1,4 @@
-import type { Judgement } from "@community-drafter/shared";
+import type { Judgement } from "@signatories/shared";
 
 import { type EmailLink, renderEmail } from "../lib/mailer/shell.ts";
 import type { RecipientContext, TemplateResult } from "./types.ts";

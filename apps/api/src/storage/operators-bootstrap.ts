@@ -1,4 +1,4 @@
-import type { Action } from "@community-drafter/shared";
+import type { Action } from "@signatories/shared";
 
 import type { CommitInput, CommitResult, DataStoreTx } from "./commit.ts";
 import type { ReadModel } from "./read-model.ts";

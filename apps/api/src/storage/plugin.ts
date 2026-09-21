@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { Action, Trailers } from "@community-drafter/shared";
+import type { Action, Trailers } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import type { PushDaemon, Repository } from "gitsheets";

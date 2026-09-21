@@ -8,7 +8,7 @@ import type {
   SiteRecord,
   SubmissionRecord,
   Trailers,
-} from "@community-drafter/shared";
+} from "@signatories/shared";
 
 import {
   type CommitLogEntry,

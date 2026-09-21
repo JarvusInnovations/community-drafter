@@ -2,7 +2,7 @@ import {
   type Anchor,
   placeAnchor,
   rangeFromAnchorPlacement,
-} from "@community-drafter/shared/browser";
+} from "@signatories/shared/browser";
 
 import { blocksFromDom } from "./blocks.ts";
 
