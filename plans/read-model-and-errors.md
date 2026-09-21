@@ -79,6 +79,8 @@ service account of its own for the plan job (deferred, see Follow-ups).
      `apply`, never `-out`, never an uploaded plan file. Skipped on fork PRs, which cannot
      mint an OIDC token. Variables come from the committed `tf/terraform.tfvars` (the same
      `image_tag` a release passes explicitly), so the plan reads against the deployed tag.
+     **Amended mid-plan:** CI has no read access to `jarvus-tfstate`, so this half was
+     withdrawn — see Notes and issue #92.
 
 ## Validation
 
@@ -96,10 +98,15 @@ service account of its own for the plan job (deferred, see Follow-ups).
       branch is unchanged and still logs; no test drives it.
 - [x] `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test` pass for
       every package the change touches — api 203, web 101, shared 35, cli 44, no failures.
-- [x] The two `tf/` workflows parse (`actionlint` 1.7.12, clean over the whole workflow
-      directory) and are scoped to `paths: [tf/**]`; neither runs `apply`. `tofu fmt
+- [x] The `tf/` workflow parses (`actionlint` 1.7.12, clean over the whole workflow
+      directory) and is scoped to `paths: [tf/**]`; it does not run `apply`. `tofu fmt
       -check -recursive`, `init -backend=false` and `validate` were also run locally
-      against `tf/` and pass.
+      against `tf/` and pass, and the job is green on PR #90. Only `tf-validate.yml`
+      shipped: the criterion said "two workflows", and the plan half was withdrawn after
+      it failed in CI — see Notes.
+- [ ] A `tofu plan -concise` runs on PRs that touch `tf/`. **Blocked**, not built: the CI
+      service account cannot read the state bucket (issue #92). Left unchecked rather than
+      reworded.
 
 ## Risks / unknowns
 
@@ -137,19 +144,28 @@ service account of its own for the plan job (deferred, see Follow-ups).
   `specs/data-model.md`'s example subject always said it was. The dialog's success banner
   echoes the subject, so an operator sees the times twice over, in the banner and in the
   feed.
-- **The plan job runs under the deploy service account**, because that is the only
-  principal the WIF provider trusts. `plan` cannot write, and `-lock=false` keeps it from
-  taking the lock a deploy needs, but a reader-only principal would express the intent
-  structurally rather than by convention (Follow-ups).
+- **The `tofu plan` gate does not exist yet, and the reason is worth knowing.** It was
+  written, pushed, and failed on PR #90 at `tofu init`: `community-drafter-ci@…` has no
+  `storage.objects.list` on `jarvus-tfstate`, a bucket outside this project that this
+  repo's `tf/` does not manage. The workflow was withdrawn rather than left failing red on
+  every infrastructure PR. **The same 403 sits in front of `publish.yml`'s deploy job**,
+  which runs `tofu init` under that same account — and that workflow has never run, so
+  nobody has hit it; every deploy so far has been a manual `tofu apply` from a workstation.
+  Issue #92 carries both, along with the argument for a reader principal rather than the
+  deploy account.
+- **`specs/architecture.md` records the gap** rather than claiming the plan gate exists:
+  the credential-free half is required now, the plan half "runs as soon as CI holds a
+  principal that can read the state bucket".
 - **415 is mapped but not exercised.** An admin route inherits a `text/plain` parser from a
   sibling plugin, so the obvious 415 case parses instead of failing; the mapping stands for
   a request that does reach Fastify's media-type check.
 
 ## Follow-ups
 
-- Issue [#92](https://github.com/JarvusInnovations/community-drafter/issues/92) — give the
-  `tofu plan` gate its own reader principal (a viewer-role service account and a WIF
-  binding for it) instead of borrowing the deploy account.
-- **Tracked as:** the two `tf/` workflows cannot be exercised before they merge — the first
-  PR that touches `tf/` after this one is the real first run. Watch that run rather than
-  assuming the gate is live.
+- Issue [#92](https://github.com/JarvusInnovations/community-drafter/issues/92) — grant a
+  CI principal read on `jarvus-tfstate` (preferably a reader service account of its own,
+  not the deploy account), restore `tf-plan.yml` from this PR's history, and confirm the
+  release deploy job can `init` at all. Carries the withdrawn half of #8.
+- **Tracked as:** `tf-validate.yml` ran green on PR #90 because the PR edits the workflow
+  itself; the first PR that actually changes `tf/**` is the real first exercise of the path
+  filter. Watch that run rather than assuming the gate is live.

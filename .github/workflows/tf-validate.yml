@@ -1,9 +1,14 @@
 name: OpenTofu
 
-# Credential-free half of the `tf/` gate (`specs/architecture.md`
-# § Deployment; `ci-quality-gates`): formatting and validation need no
-# secrets, so they run on every PR including forks and start instantly.
-# The credentialed `tofu plan` lives in tf-plan.yml, deliberately apart.
+# The credential-free `tf/` gate (`specs/architecture.md` § Deployment;
+# `ci-quality-gates`): formatting and validation need no secrets, so they
+# run on every PR including forks and start instantly.
+#
+# The credentialed `tofu plan -concise` that belongs beside this (issue #8)
+# is not here yet: the state bucket `jarvus-tfstate` lives outside this
+# project and the CI service account cannot read it, so `tofu init` against
+# the real backend 403s. Tracked in issue #92, which also has to answer
+# which principal should hold that read.
 on:
   pull_request:
     paths:
