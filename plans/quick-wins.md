@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: [94, 98, 99]
+pr: 103
 specs:
   - specs/screens/public-and-embed.md
   - specs/api/conventions.md
@@ -81,20 +82,20 @@ Approach).
 
 ## Validation
 
-- [ ] `og:description` on a public document page is the first sentence of the current
+- [x] `og:description` on a public document page is the first sentence of the current
       version's text even when that version has a `summary`; a version whose body
       yields no prose falls back to the summary, and an empty summary to the generic
       line — covered by tests in `apps/api/src/routes/static.test.ts`.
-- [ ] `GET /admin/api/documents/x/schedul` returns 404 with `{ error: "not_found" }`
+- [x] `GET /admin/api/documents/x/schedul` returns 404 with `{ error: "not_found" }`
       for a JSON client, and does not return the SPA shell with 200; the same holds
       for an unknown `/i/<token>/api/*` and `/d/<slug>/api/*` path, while every real
       admin/participant/public API route and every SPA route still answers as before.
-- [ ] `apps/api` gates green: `bun run lint`, `bun run format:check`,
+- [x] `apps/api` gates green: `bun run lint`, `bun run format:check`,
       `bun run typecheck`, `bun test`.
-- [ ] `tofu fmt -check`, `tofu validate` and `tofu plan -concise -input=false` run
+- [x] `tofu fmt -check`, `tofu validate` and `tofu plan -concise -input=false` run
       clean from `tf/`, and the plan's adds are exactly the new service account, its
       WIF binding and its viewer role bindings.
-- [ ] The owner's steps for #99 (bucket binding + `tofu apply`) are written down in
+- [x] The owner's steps for #99 (bucket binding + `tofu apply`) are written down in
       `docs/operations.md` and repeated in the PR body.
 
 ## Risks / unknowns
@@ -111,4 +112,38 @@ Approach).
 
 ## Notes
 
+- Gates: `bun run lint`, `bun run format:check` (143 files), `bun run typecheck` all
+  clean; `bun test` 232 pass / 0 fail / 1349 assertions across 39 files. Nothing
+  flaked. `tofu validate` succeeded and `tofu plan -concise -input=false -lock=false`
+  reported **11 to add, 0 to change, 0 to destroy** — the new service account, its WIF
+  binding and its nine viewer bindings, nothing else. `tofu apply` was not run.
+- `tofu fmt -check` is clean on `iam.tf` but `-recursive` fails on `tf/terraform.tfvars`,
+  misaligned by e60ba89 on `develop` before this branch existed. Left alone (that file
+  is out of bounds for this work) and flagged in the PR; the fix is one `tofu fmt`.
+- The share preview's fallback test needed the published body to *differ* from the
+  seeded one: versions come from `git log`, so a patch that changes nothing commits
+  nothing and the current version stays v1, whose summary is the create commit's
+  subject. Worth knowing for any test that wants a specific current version.
+- The plan account's role set is three roles wider than issue #99 listed. Refreshing
+  `google_project_service` needs `serviceusage.services.get`, the two
+  `google_service_account` resources need `iam.serviceAccounts.get`, and every
+  `*_iam_member` needs a `getIamPolicy` — none of which the six named viewer roles
+  grant, and a refresh that is one read short 403s, which is exactly how #92 surfaced.
+  All three additions are read-only.
+- `/i/*` and `/d/*` shadowed their own API prefixes the same way `/admin/*` did, so the
+  fix and the spec rule cover all three rather than only the one #98 reported.
+
 ## Follow-ups
+
+- Issue [#99](https://github.com/JarvusInnovations/community-drafter/issues/99) stays
+  open for the owner: `cd tf && tofu apply -concise` from a workstation, then the one
+  `gcloud storage buckets add-iam-policy-binding` on `gs://jarvus-tfstate`
+  (`docs/operations.md` § 9). Until both run, the plan job fails at authentication.
+- **A pull-request-scoped WIF binding.** The plan account is bound by
+  `attribute.repository`, like the deploy account, because the pool provider maps no
+  event attribute. Restricting it to `pull_request` means adding a mapping — e.g. a
+  combined `attribute.repository_event = assertion.repository + ":" + assertion.event_name`
+  — to the provider the deploy account also assumes, and binding the plan account to
+  that principal set. Worth doing deliberately, on its own; not folded into a quick fix.
+- `tf/terraform.tfvars` needs `tofu fmt`; the `tf-validate.yml` gate is red on `develop`
+  until someone runs it. Not this branch's file to touch.
