@@ -15,13 +15,17 @@ What someone sees who has the document's public link rather than a personal one,
 
 All 404 when `public_access = none`, `state = draft`, or the slug is unknown, with the same body.
 
+Every route here lives on the document's **site** hostname (`behaviors/sites.md`). Asked for on another site's host, each redirects to the canonical host with its path and query intact — including the embed, JSON and widget routes, so a host page that embeds the canonical address never sees a redirect. An unknown slug is the same 404 on every host.
+
 ## Data Requirements
 
-Document (title, phase, deadlines, `show_signatories`, `reply_to`), current version, signatory counts and list (listed, approved, unrevoked only), version list.
+Document (title, phase, deadlines, `show_signatories`, `reply_to`), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list.
 
 ## Display Rules
 
 **Public read view**: the document screen layout without the status card and identity line. In its place, a card: "Want to add your name? This document is open to invited signers. Ask the team for your personal link: *reply_to*." **[phase 2]** when `public_access = participate`, the card becomes "Sign or comment: enter your email and we'll send you your own link" with name and email fields, then a "check your email" state.
+
+**Site identity**: the top bar names the document's site — its `logo_url` image when set, otherwise its `name` as text, with the name as the accessible name either way — and the accent token follows the site's `accent` when it sets one. Nothing on the page names, links to or hints at the platform or any other site.
 
 **Embed**: title, version label (with "see what changed" linking to the public history in a new tab), the document text, a footer line "Read the full page" linking to `/d/<slug>` in a new tab. No signatory list, no clock (the host page owns that context). Height reported to the parent via `postMessage` so hosts can size the frame.
 
@@ -53,8 +57,10 @@ Read; history; **[phase 2]** request a personal link.
 
 **Inherited**
 - [Say exactly who signed](../principles.md#say-exactly-who-signed): every public number comes from the same query the participant page uses.
-- [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): nothing here links to any other document or to the instance root.
+- [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): nothing here links to any other document, to the site root, or to any other site.
 - [The link is the identity](../principles.md#the-link-is-the-identity): the public view never offers a way to act as someone; **[phase 2]** it offers a way to get your own link.
 
 **Local**
 - **A share preview never confirms a document exists.** A preview is read by machines, before and without any human clicking: paste a URL into a chat and a scraper fetches it, unauthenticated, and shows the result to everyone in the room. So the metadata is held to the same standard as the response body — a private slug, a draft, and a slug that was never created all preview identically, and a personal link previews as the instance and never as the document it opens. Where a richer preview and this rule conflict, the preview loses: the cost of a plain card is a duller paste, and the cost of a leak is a document's title and existence disclosed to a room nobody chose.
+
+Also governed by `behaviors/sites.md` § Principles, "A site is the only identity a participant ever sees": the name, logo, accent, reply-to address and hostname on this page all belong to the document's site.

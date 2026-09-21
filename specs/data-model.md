@@ -13,8 +13,9 @@ Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifi
 | `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, signature |
 | `submissions` | `${{ document }}/${{ id }}` | TOML | one person's set of comments against one version, from first save through submission and disposition |
 | `operators` | `${{ id }}` | TOML | one person or bot allowed to run documents |
+| `sites` | `${{ slug }}` | TOML | one hostname the deployment answers on, and the identity it carries (`behaviors/sites.md`) |
 
-Five sheets. Cross-references are by slug so records read sensibly in a file browser.
+Six sheets. Cross-references are by slug so records read sensibly in a file browser.
 
 ## Commits are the events
 
@@ -22,8 +23,9 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-operator-add`, `site-operator-remove` | every commit |
 | `Document` | slug | every commit about a document |
+| `Site` | slug | every commit about a site, and every commit about a document that belongs to one |
 | `Person` | slug | every commit about a person's action |
 | `Actor` | an operator's email, `participant`, or `system` (bootstrap) | every commit |
 | `Version` | integer | `publish` (the number this commit becomes), `submit`, `comment`, `sign` (the version seen) |
@@ -58,6 +60,7 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `addressed_to` | array of string | who the finished statement is published or delivered to — a council, a board, an organization; required when `audience = closed` (below) |
 | `public_access` | enum `none` \| `read` \| `participate`, default `none` | **drafting-time** read access: whether anyone holding the link may read the working document; independent of `audience` (below); `participate` is **[phase 2]** |
 | `show_signatories` | enum `list` \| `count` \| `none`, default `list` | |
+| `site` | slug? | the site this document belongs to (`behaviors/sites.md`); absent = the default site, which is what every document written before the field existed reads as. It is the hostname every personal link, public link and message for this document is built on |
 | `created_by` | email | the operator who created the document; always also in `operators` |
 | `operators` | array of email | current operators of this document; never empty |
 | `sender_name`, `reply_to` | string | |
@@ -128,6 +131,27 @@ One record per person or bot allowed to run documents (`behaviors/operators.md`)
 | `superadmin` | boolean? | sees and may act on every document (`behaviors/operators.md` § Superadmins); set only by another superadmin or by editing the record in the data repo |
 
 Who added or deactivated an operator and when is the history of the record (`operator-add`, `operator-update`, `operator-remove` commits with the acting operator's email as `Actor`).
+
+**An operator record is instance-wide; membership is not.** There is one record per email however many sites the person works on. Which operators a given operator can see, add to a document, or edit is the **site's operator group** — the `operators` list on the `sites` record, mirroring `documents.operators` one level up (`behaviors/sites.md` § Operators and tenancy). Nothing about a group is stored on the operator record, so a person joins or leaves a site without their record changing.
+
+## `sites`
+
+One record per hostname (`behaviors/sites.md`). The **default site is not a record**: it is derived from the deployment's configuration and owns every document with no `site`, so an instance that has never created a site has an empty sheet and behaves as it does today.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `slug` | slug | identity; the path; `default` is reserved for the deployment's own site |
+| `hostname` | host name | lowercase, no scheme, port or path; unique across sites |
+| `name` | string | what the top bar, the footer and every message call this site |
+| `sender_name` | string? | default mail display name for this site's documents; a document's own `sender_name` wins |
+| `sender_email` | email? | the `From` address, when verified with the mail provider; absent = the platform's own verified address (`behaviors/sites.md` § Mail) |
+| `reply_to` | email | default Reply-To for this site's documents; a document's own `reply_to` wins |
+| `logo_url` | https URL? | web surfaces only; messages carry no logo on any site |
+| `accent` | color token? | overrides the accent color of `screens/document.md` § Design and nothing else |
+| `operators` | array of email | the site's operator group; never empty |
+| `created_by` | email | the operator who created the site |
+
+Who created or changed a site is the history of the record (`site-create`, `site-update`, `site-operator-add`, `site-operator-remove`, each with a `Site` trailer). Hostname routing, certificates and DNS are not fields and not records: they live in `tf/` and in the customer's DNS zone (`behaviors/sites.md` § What a site is not).
 
 ## `people`
 
@@ -215,6 +239,7 @@ The admin CLI imports invitees from NDJSON/CSV with columns matching `people` fi
 ## Relationships
 
 ```
+sites     1 ─── n documents      (a document with no `site` belongs to the derived default site)
 documents 1 ─── n participations n ─── 1 people
 documents 1 ─── n submissions   (each by one person; at most one draft per person per document)
 documents 1 ─── n versions      (body-changing commits of the document record)
@@ -223,5 +248,6 @@ documents 1 ─── n versions      (body-changing commits of the document rec
 ## What is deliberately not here
 
 - No `content`, `versions`, `reviews`, `drafts`, `comments`, `dispositions`, `signatures`, `notifications` or `sessions` sheets. Each is a field on one of the five records above, a set of commits, or (sessions) a signed token whose authority is the `operators` record.
+- No `hostnames`, `certificates` or per-site settings sheet. A site is one record; the routing, certificate and DNS behind its hostname are infrastructure, not data (`behaviors/sites.md` § What a site is not).
 - No `created_at` / `updated_at` fields anywhere; the history has them.
 - No status or time in any path.

@@ -4,11 +4,13 @@ The team's view of one document's progress. Read-mostly in phase 1; mutations ha
 
 ## Routes
 
-`/admin/login` (magic-link request), `/auth/device` (device approval page), `/admin` (the caller's document list), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/submissions`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`, `/admin/operators`.
+`/admin/login` (magic-link request), `/auth/device` (device approval page), `/admin` (the caller's document list), `/admin/d/<slug>` (dashboard), `/admin/d/<slug>/people`, `/admin/d/<slug>/submissions`, `/admin/d/<slug>/versions`, `/admin/d/<slug>/view-as/<person>`, `/admin/operators`, `/admin/sites` (superadmin).
+
+Every one of these works on **every** site hostname and is scoped to the site whose host it was reached on: its documents, its operator group, its identity (`behaviors/sites.md` § Operators and tenancy). Admin routes never redirect between hosts; an operator signs in on the hostname they work on, and a superadmin on the default site's host sees every site.
 
 ## Data Requirements
 
-Everything: document, versions (from body-changing commits), participations with derived statuses, submissions (submitted and draft, labeled) with dispositions, signatures including revoked and conditional, the `notified` tables, and the dispatcher's in-memory failure list. Plus the session itself (`GET /auth/session`): the signed-in operator, whether they are a superadmin, and the instance name the frame shows.
+Everything: document, versions (from body-changing commits), participations with derived statuses, submissions (submitted and draft, labeled) with dispositions, signatures including revoked and conditional, the `notified` tables, and the dispatcher's in-memory failure list. Plus the session itself (`GET /auth/session`): the signed-in operator, whether they are a superadmin, and the resolved **site** the frame shows — its slug, name, hostname and, where set, logo and accent.
 
 ## Display Rules
 
@@ -16,14 +18,17 @@ Everything: document, versions (from body-changing commits), participations with
 
 **Device approval** (`/auth/device?code=…`): shows the 8-character user code, the operator it will be bound to (the signed-in one), and "Approve this device" / "Not me"; after approval, "You can close this page; the command line will finish signing in."
 
-**Document list** (`/admin`): only documents the signed-in operator is on (a superadmin sees every document, with a line saying so): title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI. Header shows the operator's email and a sign-out link.
+**Document list** (`/admin`): only documents the signed-in operator is on **within this site** (a superadmin on the default host sees every document on every site, each labeled with its site, with a line saying so): title, state/phase, next deadline, invited / opened / signed counts, a "new document" hint pointing at the CLI. Header shows the operator's email and a sign-out link.
 
-**Operators** (`/admin/operators`): every operator (name, email, kind, active, a superadmin pill where set, title, org) with add / edit / deactivate / remove, each requiring a confirmation and showing the resulting commit subject. The signed-in operator cannot deactivate or remove themself here.
+**Operators** (`/admin/operators`): **this site's operator group** (name, email, kind, active, a superadmin pill where set, title, org) with add / edit / deactivate / remove-from-site, each requiring a confirmation and showing the resulting commit subject. The page says which site's group it is. No operator outside the group is listed, offered in a picker, or reachable by typing their email; "Remove" removes the email from this site, and deleting the record outright is offered only to a superadmin and says plainly that it removes the person from every site (`behaviors/sites.md` § Operators and tenancy — the scoping issue #50 asked for). The signed-in operator cannot deactivate or remove themself here.
+
+**Sites** (`/admin/sites`, superadmin, default host): one row per site — hostname, name, the From address mail will actually use (the site's `sender_email`, or the platform address with the site's name), operator count, document count — plus, per row, the **verification hints**: whether the hostname resolves to this service and whether a declared `sender_email` has been accepted by the mail provider, each shown as a plain "not verified yet" state with the DNS record the customer still has to add. Nothing on this page changes DNS; it reports what is true and what is missing (`behaviors/sites.md` § Principles, "A site record never moves DNS"). Creating and editing sites is CLI-only in phase 1, and the page shows the command.
 
 **Dashboard** (`/admin/d/<slug>`):
 
 - Header with title, state, phase and both deadlines. The **audience** is its own line — "Audience: Published for anyone to read" or "Audience: Delivered, not published", followed by "· addressed to *X* and *Y*" whenever `addressed_to` names recipients (`specs/data-model.md` § Audience). It is the promise the sign card makes to every signer, so the team reads it where they read the rest of the document's settings, and it is stated separately from the "Copy public link" affordance, which `public_access` drives and which says only who may read the draft today. Buttons: "Extend deadline…", "Copy public link" (if enabled), "Export feedback" (downloads the bundle from `behaviors/review-and-judgement.md`), "Export links" (CSV; recorded).
-- **Operators of this document**: the list with add (choose from active operators) and remove (refused for the last one), per `behaviors/operators.md`.
+- **Site**: the document's site, named, with the hostname its personal and public links are built on, so the team reads the address their participants are actually sent before they send anything (`behaviors/sites.md`). A document on the default site says so rather than showing nothing.
+- **Operators of this document**: the list with add (choose from the **document's site's** group) and remove (refused for the last one), per `behaviors/operators.md`.
 - **Funnel**: invited → sent → opened → acted (commented, signed, declined) as counts and a bar; signed split into organizations and individuals; conditional signers count; revoked count; **behind the current version** — how many live signatures are attached to an older version (`behaviors/signatures.md` § A signature belongs to a version). It is the number the team needs before marking anything final, so it appears from the moment a second version exists and is shown even when it is zero.
 - **Versions**: table (number, date, summary, publisher, dispositions count, final) with "publish a new version" pointing at the CLI and showing the exact command.
 - **Recent activity**: the last 50 commits on this document, rendered from their trailers (`Action`, `Person`, `Version`, `Judgement`, `Reason`), which is the record's own event log. A commit made outside the service — a hand edit to the document's record, pushed to the data repo — has no trailers to render and appears as its subject and its git author. Each entry names its actor. **An `extend` or `reopen` entry names every deadline it moved, with the time it moved from and the time it moved to** — an operator reading the feed should not have to open a commit, or their own mail, to learn what the deadline used to be. **An actor who is not one of this document's operators and holds `superadmin` is labeled** — "<chris@example.org> (superadmin)" — so a document's own operators can tell an instance administrator acting with standing from an account that should not have been able to write at all (`behaviors/operators.md` § Superadmins). No other actor carries a label.
@@ -41,11 +46,11 @@ Everything: document, versions (from body-changing commits), participations with
 
 Follows `screens/document.md` § Design (tokens, top bar, cards, buttons, links). Specifics:
 
-- **Frame**: the sticky top bar shows the instance name — the configured `INSTANCE_NAME`, read from `GET /auth/session`'s `instance_name` (`api/auth.md`), never a build-time literal — then a "Operators" link, the signed-in operator's email and "Sign out" on the right. Pages are centered at 1120 px.
+- **Frame**: the sticky top bar shows the resolved site's name — read from `GET /auth/session`'s `site` (`api/auth.md`), never a build-time literal and never `INSTANCE_NAME` directly — then a "Operators" link (and "Sites" for a superadmin on the default host), the signed-in operator's email and "Sign out" on the right. The admin frame is the one surface that may name the platform, because the person reading it works there. Pages are centered at 1120 px.
 - **Document list and dashboard**: cards. The funnel is a horizontal bar of segments (invited → sent → opened → acted) with counts beneath; signed is split into organizations and individuals as two stat tiles, conditional and revoked as small muted tiles, and the behind-the-current-version count as a small amber tile so a non-zero figure reads as something to act on. Deadlines reuse the timeline component from the participant screen.
 - **Tables** (people, submissions, versions, activity): a card with a header row in small muted caps, zebra-free rows separated by the border color, status as small pills (not sent muted, unopened muted, opened blue soft, drafting amber soft, commented blue soft, signed green soft, declined muted, revoked muted with strike), and actions as quiet blue links at the row end. Filters live in a toolbar above the table as selects and a search input in the rounded style; active filters show as removable chips.
 - **Submissions page**: each submission is a card: header row with the author avatar and name, capacity/org, version chip and judgement pill (or the amber **unsubmitted** pill), then its comments as bordered rows with heading path, quote and body, each with its disposition pill (pending muted, accepted green, partial blue, declined amber, noted muted).
-- **Dialogs** (extend deadline, revoke, reissue, operator forms): centered modal cards with a bold title, labeled inputs in the rounded style, a required reason where the spec says so, a primary confirm and a quiet cancel; success shows the resulting commit subject in a green soft banner.
+- **Dialogs** (extend deadline, revoke, reissue, operator and site forms): centered modal cards with a bold title, labeled inputs in the rounded style, a required reason where the spec says so, a primary confirm and a quiet cancel; success shows the resulting commit subject in a green soft banner.
 - **Sign-in and device pages**: a single centered card at 420 px with the same input and button styles.
 - **View as**: the participant screen unchanged — including its sign card — with a full-width amber banner pinned under the top bar. Disabled controls keep their own shape at reduced opacity rather than being replaced by text.
 
@@ -62,7 +67,7 @@ Publishing, creating documents, importing invitees and sending are CLI/API only 
 
 ## Navigation
 
-`/admin` ↔ dashboards ↔ sub-pages. Any admin route without a session redirects to `/admin/login` with a return path. The instance root (`/`) shows one card naming the instance, one sentence saying documents are reached by personal link, and a "Sign in" button to `/admin/login`; nothing else, per `principles.md` § One instance, many documents, no lobby.
+`/admin` ↔ dashboards ↔ sub-pages. Any admin route without a session redirects to `/admin/login` with a return path. The root (`/`) of **every** site hostname shows one card naming that site, one sentence saying documents are reached by personal link, and a "Sign in" button to `/admin/login`; nothing else, per `principles.md` § One instance, many documents, no lobby. A site root lists no documents and names no other site.
 
 ## Principles
 

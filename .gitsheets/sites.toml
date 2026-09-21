@@ -1,0 +1,81 @@
+# specs/data-model.md → `sites`; specs/behaviors/sites.md. One record per
+# hostname the deployment answers on: the identity every participant and
+# public surface of that site's documents carries. Copied into the data repo
+# by `initDataRepo()` (apps/api/src/storage/init.ts). Managed only through
+# the admin API and CLI, so the service stays the single writer.
+#
+# The default site is NOT a record here: it is derived from the deployment's
+# own configuration (`specs/behaviors/sites.md` § The default site), and the
+# slug `default` is reserved so nothing can shadow it.
+
+[gitsheet]
+root = 'sites'
+path = '${{ slug }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['slug', 'hostname', 'name', 'reply_to', 'operators', 'created_by']
+additionalProperties = false
+
+[gitsheet.schema.properties.slug]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+# No scheme, no port, no path: a DNS host name, lowercase. Uniqueness across
+# sites is enforced by the admin API (a JSON Schema cannot see other
+# records), as is the reservation of the default site's own hostname.
+[gitsheet.schema.properties.hostname]
+type = 'string'
+pattern = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+
+[gitsheet.schema.properties.name]
+type = 'string'
+minLength = 1
+
+# Default display name for mail from this site's documents; a document's own
+# `sender_name` wins (`specs/behaviors/sites.md` § Mail).
+[gitsheet.schema.properties.sender_name]
+type = 'string'
+
+# The address mail is sent From, when the operator has verified it (or its
+# domain) with the mail provider. Absent = the platform's own verified
+# address with this site's `name` as the display name.
+[gitsheet.schema.properties.sender_email]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.reply_to]
+type = 'string'
+format = 'email'
+
+# Shown on this site's web surfaces in place of the site name. Web only:
+# messages carry no logo on any site (`specs/behaviors/notifications.md`
+# § Shape).
+[gitsheet.schema.properties.logo_url]
+type = 'string'
+format = 'uri'
+pattern = '^https://'
+
+# Overrides the accent color token of `specs/screens/document.md` § Design
+# and nothing else.
+[gitsheet.schema.properties.accent]
+type = 'string'
+pattern = '^#[0-9a-f]{6}$'
+
+# The site's operator group (`specs/behaviors/sites.md` § Operators and
+# tenancy). Never empty; a removal that would empty it is refused by the
+# admin API.
+[gitsheet.schema.properties.operators]
+type = 'array'
+minItems = 1
+
+[gitsheet.schema.properties.operators.items]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.created_by]
+type = 'string'
+format = 'email'
+
+[gitsheet.fields.operators]
+sort = true

@@ -6,11 +6,13 @@ All routes are under `/i/:token/api`. The token resolves to an invitation; the p
 
 Everything the document screen needs in one call.
 
+`site` is the **document's** site — name, and logo and accent where set (`behaviors/sites.md` § Identity on a surface) — which on a deployment with no sites is the default site, whose `name` is the instance name. It replaces the earlier `instance: { name }`. Reached on another site's host, this route redirects to the document's own before returning anything.
+
 Response:
 
 ```
 {
-  instance: { name },
+  site:     { name, logo_url, accent },
   person:   { id, name },
   document: { slug, title, state, phase, opened_at, comments_close_at, signing_closes_at,
               capacities, show_signatories, audience, addressed_to, reply_to, sender_name },

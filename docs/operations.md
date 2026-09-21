@@ -126,7 +126,10 @@ magic link lands in the CSV row same as any other message. To switch to
 Postmark:
 
 1. Add/verify a sender signature for `INSTANCE_FROM_EMAIL` in the Postmark
-   account.
+   account. **One Postmark server and one API key serve every site**; a site
+   with its own `sender_email` needs its own verified signature or domain in
+   that same account (step 7), and messages carry the site's slug as a
+   Postmark tag so per-site statistics do not need per-site accounts.
 2. Create a Postmark server API token.
 3. `gcloud secrets create community-drafter-postmark-api-key ... && gcloud secrets versions add ...`
    (not yet wired into `tf/` — add a `data`/`google_secret_manager_secret`
@@ -149,11 +152,99 @@ gcloud run domain-mappings describe --domain=drafter.jarv.us \
 
 This is out of `tf/`'s scope (the DNS zone is a different GCP
 project/registrar) — add the printed CNAME (`drafter` →
-`ghs.googlehosted.com.` at last check) by hand. Certificate provisioning
+`ghs.googlehosted.com.` at last check) by hand. Additional customer hostnames
+follow the same path through `var.site_hostnames`, except that customers are
+given the `sites.signatories.org` alias rather than Google's hostname; see
+step 7. Certificate provisioning
 finishes automatically once the record resolves; no further `tofu apply`
 needed.
 
-### 7. Signing in: a human, the CLI, and a bot operator
+### 7. Onboarding a site (a customer hostname)
+
+One deployment answers on many hostnames; each is a **site** with its own name,
+sender and operator group (`specs/behaviors/sites.md`). The platform itself is
+**Signatories** at `signatories.org` — the default site, the marketing site and
+the `sites.signatories.org` alias customers point their DNS at all live in that
+zone. Four steps, in this order. Steps 1–3 are infrastructure and DNS; only
+step 4 is data. Creating, changing or deleting a site is a superadmin action;
+managing a site's operator group is not.
+
+**1. Verify the domain to the GCP project.** Google refuses to create a domain
+mapping for a domain the project has not been verified for. Either have the
+customer add the TXT record Google prints, or verify the domain yourself in
+Search Console with the project's service account as an owner:
+
+```sh
+gcloud domains verify letters.example.org
+```
+
+**2. Map the hostname.** Add it to `site_hostnames` in `tf/terraform.tfvars`
+and apply. `tf/cloudrun.tf` creates one `google_cloud_run_domain_mapping` per
+entry alongside the deployment's own:
+
+```sh
+cd tf
+tofu apply -concise
+gcloud run domain-mappings describe --domain=letters.example.org \
+  --project=community-drafter --region=us-east4 \
+  --format='value(status.resourceRecords)'
+```
+
+The mapping is created before DNS exists; Cloud Run reports
+`CertificatePending` and waits.
+
+**3. Point DNS at the service.** The customer adds a CNAME in their own zone
+pointing the hostname at **`sites.signatories.org`**:
+
+```
+letters.example.org.   CNAME   sites.signatories.org.
+```
+
+`sites.signatories.org` is an alias the platform maintains in the
+`signatories.org` zone; it resolves to `ghs.googlehosted.com.`, which is what
+`domain-mappings describe` prints. Hand customers the platform alias, never
+Google's hostname directly: it is one name we control, so if the target ever
+changes we edit one record instead of asking every customer to edit theirs.
+
+The certificate provisions automatically once the record resolves — usually
+minutes, occasionally longer. No further apply.
+
+**4. Create the site record.**
+
+```sh
+drafter-axi sites create example \
+  --hostname letters.example.org \
+  --name "Example Letters" \
+  --reply-to team@example.org \
+  --sender-email letters@example.org
+drafter-axi sites operators add example someone@example.org
+```
+
+`sites create` prints, in one block, every DNS record the customer still has to
+add — the CNAME above, and with `--sender-email` the two Postmark records (a
+DKIM `TXT` and a Return-Path `CNAME`). **Take those two values from the
+Postmark UI** (Sender Signatures → the domain → DKIM / Return-Path); automating
+this through Postmark's Account API is a follow-up, not something the service
+does today.
+
+Until the sender's domain is verified in Postmark, mail from that site's
+documents **fails per recipient** rather than going out under the platform's
+address — that is deliberate (`specs/behaviors/notifications.md` § Sending).
+Leave `--sender-email` off until verification is done and the site's mail goes
+out from the platform address under the site's name, which is a fine place to
+start.
+
+Assign documents with `drafter-axi docs create <slug> --site example …` or
+`drafter-axi docs update <slug> --site example`. A document with no `--site`
+belongs to the default site, which is this deployment's own hostname, name and
+sender — nothing about existing documents changes.
+
+**Watch the ceiling.** Cloud Run enforces a per-project limit on domain
+mappings and each one is slow to provision. Check the current quota before
+promising a customer a hostname, and onboard in batches rather than one apply
+per signup.
+
+### 8. Signing in: a human, the CLI, and a bot operator
 
 **A human**, at `/admin/login`: enter the operator's email, follow the
 emailed magic link. Sessions last 24 hours.

@@ -20,6 +20,7 @@ specs/
 │   ├── document-lifecycle.md     phases, the clock, transitions
 │   ├── access-and-identity.md    personal links, tokens, public links
 │   ├── operators.md              operators, magic-link sign-in, sessions, device-code CLI auth, refresh webhook
+│   ├── sites.md                  hostnames, per-site identity, tenancy, per-site mail
 │   ├── versioning.md             versions, changelog, diffs, rendering
 │   ├── inline-comments.md        anchoring comments to text across versions
 │   ├── review-and-judgement.md   drafts, submission, judgements, dispositions
