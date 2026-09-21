@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 depends: []
 specs:
   - specs/data-model.md
@@ -11,6 +11,7 @@ specs:
   - specs/screens/document.md
   - specs/screens/admin-dashboard.md
 issues: [51]
+pr: 110
 ---
 
 # Plan: people-per-site
@@ -102,26 +103,26 @@ not offered). Also out: any cross-site people directory, which would be a lobby.
 
 ## Validation
 
-- [ ] Two sites, one email: importing the same address on a document of each
+- [x] Two sites, one email: importing the same address on a document of each
       site creates two person records with independent fields, and neither
       import touches the other's record.
-- [ ] Prefill resolves field by field: participation `prefill` wins, the person's
+- [x] Prefill resolves field by field: participation `prefill` wins, the person's
       default fills the rest, a field neither supplies is absent; a participation
       with no `prefill` resolves exactly as before.
-- [ ] Import without `--update` fills an existing person's blanks and keeps their
+- [x] Import without `--update` fills an existing person's blanks and keeps their
       set fields; with `--update` the row's values replace them and an existing
       participation's `prefill` is refreshed.
-- [ ] Dry run reports `would_change` and `kept` accurately in both modes, and
+- [x] Dry run reports `would_change` and `kept` accurately in both modes, and
       writes nothing.
-- [ ] The boot migration moves pre-site records to `people/default/<id>.toml`
+- [x] The boot migration moves pre-site records to `people/default/<id>.toml`
       with `site = 'default'` in one `Action: migrate` commit, and a second run
       makes no commit at all.
-- [ ] The participant bundle exposes no `people` field beyond the resolved
+- [x] The participant bundle exposes no `people` field beyond the resolved
       prefill and the person's id and name.
-- [ ] A person is resolved through the document's site, not the caller's: a
+- [x] A person is resolved through the document's site, not the caller's: a
       superadmin reading a document on site A sees site A's person even when the
       same email exists on the default site.
-- [ ] `bun run lint`, `format:check`, `typecheck` and `bun test` green in every
+- [x] `bun run lint`, `format:check`, `typecheck` and `bun test` green in every
       touched package; the CLI bundle drift gate green.
 
 ## Risks / unknowns
@@ -139,4 +140,49 @@ not offered). Also out: any cross-site people directory, which would be a lobby.
 
 ## Notes
 
+- **The path template cannot fall back, and that is what forced a real
+  migration.** `${{ site || "default" }}` renders as un-renderable when the
+  field is absent (gitsheets 2.6.0, verified against a scratch repo), so a
+  record without `site` cannot be written or read at all. The pre-site
+  records therefore had to be *rewritten* with the field, not moved — which
+  in turn is why the migration parses the old blobs itself.
+- **`sheet.delete` takes a root-relative path, without the extension.**
+  `delete('jane-doe')` removes `people/jane-doe.toml`; `delete('people/jane-doe')`
+  and `delete('jane-doe.toml')` both raise `record_not_found`. That one call
+  is the only way to reach a record the current template can no longer
+  render, and it is what lets the whole migration be one gitsheets commit
+  rather than a plain-git file move plus a fix-up commit.
+- **The migration reads the git tree, never the working copy.** gitsheets
+  writes land in the branch ref and leave checked-out files stale, so a warm
+  data directory's `people/` on disk is not what the store is reading.
+- **`site` on a person is required; `site` on a document is not.** They look
+  like the same field and are not: a document's site is a plain field that
+  reads as `default` when absent, but a person's is a path component, so
+  absence is unrepresentable. That asymmetry is the reason this is the first
+  change in the sites arc to need a migration at all.
+- **Three names for one fact, deliberately.** The import row and the person
+  record call it `role`, the participation's prefill calls it `title`
+  (because it prefills `signature.title`), and the bundle keeps `role` on the
+  wire. `lib/prefill.ts` is the single place the mapping lives, and
+  `data-model.md` states it so nobody re-derives it.
+- **`people_updated` changed meaning.** It used to count every row that
+  matched an existing person; it now counts rows that actually change a
+  person field, so a re-import of an unchanged list reports 0. Two existing
+  tests asserted the old number and were updated rather than worked around.
+- **The admin People screen needed no React change.** The invitations list
+  now returns the document's *resolved* name and org, so the existing table
+  renders the effective prefill without touching a component. The `org`
+  column the dashboard spec has always listed is still not rendered by the
+  web table — pre-existing drift, untouched here.
+
 ## Follow-ups
+
+- **Issue [#51](https://github.com/JarvusInnovations/signatories/issues/51) names three more defects this plan did not take:** no per-row capacity
+  in the import, `--suggested-capacity` having no visible effect on the
+  card's default, and no way to delete a person imported by mistake
+  (`people remove` takes back a staged invitation; the person record stays).
+  They are independent of the tenancy decision and want their own plan.
+- **Tracked as spec drift:** `specs/screens/admin-dashboard.md` § People
+  lists an `org` column the web table does not render. The API now returns
+  the value, so closing this is a one-column change whenever the People
+  screen is next opened.
