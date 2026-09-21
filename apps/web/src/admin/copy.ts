@@ -136,6 +136,14 @@ export const copy = {
     addressedTo: (recipients: string[]) => `addressed to ${recipients.join(", ")}`,
     extendDeadline: "Extend deadline…",
     copyPublicLink: "Copy public link",
+    /**
+     * `specs/screens/admin-dashboard.md` § Dashboard: labeled "(draft)"
+     * while the deliverable is still the watermarked form, so the team
+     * reads what they are about to hand someone before they hand it over.
+     */
+    downloadPdf: "Download PDF",
+    downloadPdfDraft: "Download PDF (draft)",
+    downloadPdfUnavailable: "Publish a version before you can download the statement",
     exportFeedback: "Export feedback",
     exportLinks: "Export links",
     funnel: "Funnel",

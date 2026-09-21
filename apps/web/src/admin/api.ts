@@ -304,6 +304,17 @@ export function feedbackExportUrl(slug: string): string {
   return `${BASE}/documents/${encodeURIComponent(slug)}/feedback-export`;
 }
 
+/**
+ * `specs/screens/deliverable.md` § Routes. A plain GET behind the operator
+ * session cookie: reads carry no CSRF header, so this is an address the
+ * browser can simply follow, and the filename the server sets is the one
+ * the operator ends up with — including the `-draft` it carries while the
+ * copy is still a draft.
+ */
+export function statementPdfUrl(slug: string): string {
+  return `${BASE}/documents/${encodeURIComponent(slug)}/statement.pdf`;
+}
+
 export function getVersions(slug: string): Promise<VersionListItem[]> {
   return request<VersionListItem[]>(`${BASE}/documents/${encodeURIComponent(slug)}/versions`);
 }

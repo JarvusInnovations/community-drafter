@@ -36,6 +36,13 @@ export interface PublicDocumentInfo {
   show_signatories: ShowSignatories;
   reply_to?: string;
   sender_name?: string;
+  /**
+   * `specs/screens/public-and-embed.md` § Data Requirements: here for one
+   * reason — it decides whether the footer offers the statement download
+   * (`specs/screens/deliverable.md`). `public_access` is not in this
+   * payload and never has been.
+   */
+  audience?: "public" | "closed";
 }
 
 export interface PublicVersionInfo {

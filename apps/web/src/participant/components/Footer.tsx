@@ -43,6 +43,19 @@ export function Footer({
         {copy.footer.managePrefs}
       </Link>,
     );
+    // A real destination outside the SPA, so a plain anchor rather than a
+    // router `Link` — and dropped under `readOnly` for the same reason the
+    // preferences link is: nothing on the admin "view as" render issues a
+    // request (`specs/screens/admin-dashboard.md` § View as).
+    links.push(
+      <a
+        key="statement-pdf"
+        href={`/i/${token}/api/statement.pdf`}
+        className="font-medium text-primary hover:underline"
+      >
+        {copy.footer.downloadStatement}
+      </a>,
+    );
   }
 
   return (

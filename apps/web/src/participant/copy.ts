@@ -343,6 +343,12 @@ export const copy = {
   footer: {
     questions: "Questions? Email the team",
     managePrefs: "Manage how we contact you",
+    /**
+     * `specs/screens/document.md` § Display Rules 8: offered to everyone
+     * holding a personal link, in every phase, because they can already
+     * read every word of it on this page (`specs/screens/deliverable.md`).
+     */
+    downloadStatement: "Download the statement (PDF)",
     privateLink: (senderName: string) =>
       `This is a private link made for you by ${senderName || "the team"}.`,
   },

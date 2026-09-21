@@ -30,6 +30,10 @@ export const copy = {
     readFullPage: "Read the full page",
   },
 
+  footer: {
+    downloadStatement: participantCopy.footer.downloadStatement,
+  },
+
   signatoriesPage: {
     updatedAt: (absolute: string) => `Last updated ${absolute}`,
   },

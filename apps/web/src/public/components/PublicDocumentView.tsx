@@ -1,3 +1,4 @@
+import { copy } from "../copy.ts";
 import { AskTeamCard } from "./AskTeamCard.tsx";
 import { PublicDocumentHeader } from "./PublicDocumentHeader.tsx";
 import { PublicVersionLabel } from "./PublicVersionLabel.tsx";
@@ -36,6 +37,23 @@ export function PublicDocumentView({
             <DocumentBody html={bundle.version.html} />
           </section>
           <Signatories signatories={bundle.signatories} />
+          {/*
+            `specs/screens/public-and-embed.md` § The statement download:
+            offered only when `/d/<slug>/statement.pdf` would render rather
+            than 404 — which, on a page that is already rendering, comes
+            down to the document's audience. On a `closed` one the link is
+            absent and nothing here says a download exists.
+          */}
+          {bundle.document.audience === "public" ? (
+            <footer className="mt-9 mb-4 text-sm leading-relaxed text-muted-foreground">
+              <a
+                href={`/d/${slug}/statement.pdf`}
+                className="font-medium text-primary hover:underline"
+              >
+                {copy.footer.downloadStatement}
+              </a>
+            </footer>
+          ) : null}
         </div>
       </div>
     </main>
