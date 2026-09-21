@@ -35,7 +35,11 @@ Success bodies are the resource or a domain-shaped object; no generic envelope. 
 | 404 | `not_found` (also used for unknown/revoked/expired tokens and non-public documents) |
 | 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `already_exists`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
 | 422 | `validation_failed` with field errors; a record the store rejects (schema `ValidationError`) is reported the same way, with `details.issues` |
+| 413 | `payload_too_large` |
+| 415 | `unsupported_media_type` |
 | 429 | `rate_limited` |
+
+**A request the server rejects before a handler runs is still the caller's mistake.** A body that fails to parse, a body over the size limit, a content type nothing accepts: each already carries a 4xx status by the time the error envelope is built, and that status is kept, with the `error` value this table gives for it (any other 4xx reads as `invalid_request`), a message naming the problem, and the framework's own error code in `details.code` so a caller can look it up. `internal_error` means a 5xx and nothing else — reporting a malformed request as a server fault sends the caller looking for the fault in the wrong place.
 
 Every response carries `X-Request-Id`; the id is also written as a commit trailer on any write it caused.
 
