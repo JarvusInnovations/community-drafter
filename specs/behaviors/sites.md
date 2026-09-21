@@ -6,11 +6,11 @@ One deployment serves many hostnames. A **site** is one hostname and the identit
 
 A **default site** is derived from the deployment's own configuration rather than from a record. It owns every document that names no site, so an instance that has never created a site behaves exactly as it does today and nothing needs migrating.
 
-A site is also the tenancy boundary: an operator sees the documents and the operators of the sites they belong to, and nothing else.
+A site is also the tenancy boundary: an operator sees the documents, the operators and the people of the sites they belong to, and nothing else.
 
 ## Applies To
 
-Every participant route (`/i/<token>/…`), public and embed route (`/d/<slug>/…`), admin route (`/admin/…`) and auth route (`/auth/…`); every outbound message; `screens/document.md`, `screens/public-and-embed.md` and `screens/admin-dashboard.md`; `api/admin.md`, `api/admin-cli.md` and `api/auth.md`; the hostnames declared in `tf/` and the onboarding procedure in `docs/operations.md`.
+Every participant route (`/i/<token>/…`), public and embed route (`/d/<slug>/…`), admin route (`/admin/…`) and auth route (`/auth/…`); every outbound message; `screens/document.md`, `screens/public-and-embed.md` and `screens/admin-dashboard.md`; `api/admin.md`, `api/admin-cli.md` and `api/auth.md`; the `people` sheet and every lookup of a person (§ People are per site); the hostnames declared in `tf/` and the onboarding procedure in `docs/operations.md`.
 
 ## The site record
 
@@ -112,6 +112,18 @@ This section replaces the instance-wide operators directory and closes issue #50
 
 Nothing here changes what a superadmin may do, and nothing changes how an action is attributed: the `Actor` trailer is the operator's email on every site.
 
+## People are per site
+
+A **person belongs to one site**, the same way a document does. The `people` sheet is keyed `${{ site }}/${{ id }}` (`data-model.md` → `people`), and every lookup of a person is scoped by the site of the document being read or written.
+
+- **Email is unique within a site, not across the instance.** The same address invited on two sites is two independent records with two ids, two sets of defaults and no link between them. Neither site can see, read or edit the other's.
+- **Within a site, documents share the person.** Correcting a name or an organization once fixes it for every document on that site — which is the reason the record is not per document.
+- **What a particular document prefills is not on the person**; it is `prefill` on that document's participation (`data-model.md` → `participations`). This is what stops an import on one document from changing what another document's sign card offers (issue #51).
+- **The scope follows the document, not the caller.** A person is resolved through the site of the document in hand, so an operator of one site never reads another's contacts, and a superadmin reaches every site's people only because they reach every site's documents — no lookup widens for them. There is no endpoint that lists people across sites, and adding one would be a lobby ([One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby)).
+- **Nothing from `people` reaches a participant or public surface** except the resolved sign-card prefill, exactly as before.
+
+Records written before people had a site are migrated to the default site in one boot-time commit (`data-model.md` § Migrating the pre-site layout). This is the one place a site change needs a migration: a document with no `site` reads as the default site with no rewrite, but a person's site is a path component, so the file has to move.
+
 ## Mail
 
 One mail provider account, one API key, many sites. The provider will accept a message only if its `From` is a sender or a domain that account has verified, so the From line is chosen per message:
@@ -134,7 +146,6 @@ Messages carry no logo and no header image on any site (`notifications.md` § Sh
 - **Not a lobby.** No site host lists documents, sites or operators outside the caller's own scope ([One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby)).
 - **Not DNS.** Creating a record routes nothing: the hostname reaches the service only once it is verified to the project and mapped (§ Onboarding a hostname). A record whose hostname is not yet mapped is inert, and every surface that prints it says so rather than implying a live address.
 - **Not an access control on participants.** `audience`, `public_access` and `show_signatories` are unchanged and answer their own questions (`data-model.md` § Audience).
-- **Not a per-document tenant.** Sharing a person record across documents is issue #51 and is out of scope here.
 
 ## Onboarding a hostname
 

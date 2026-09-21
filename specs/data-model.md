@@ -9,7 +9,7 @@ Field names below are the on-record names. Timestamps are ISO 8601 UTC. Identifi
 | Sheet | Path template | Format | One record per |
 | --- | --- | --- | --- |
 | `documents` | `${{ slug }}` | markdown | document: settings in frontmatter, **the text as the body**; the body's history is the version history |
-| `people` | `${{ id }}` | TOML | person known to the instance |
+| `people` | `${{ site }}/${{ id }}` | TOML | person known to **one site** (`behaviors/sites.md`); two sites may hold the same email as two independent records |
 | `participations` | `${{ document }}/${{ person }}` | TOML | one person's relationship to one document: link, tracking, preferences, signature |
 | `submissions` | `${{ document }}/${{ id }}` | TOML | one person's set of comments against one version, from first save through submission and disposition |
 | `operators` | `${{ id }}` | TOML | one person or bot allowed to run documents |
@@ -23,7 +23,7 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove`, `migrate` | every commit |
 | `Document` | slug | every commit about a document |
 | `Site` | slug | every commit about a site, and every commit about a document that belongs to one |
 | `Person` | slug | every commit about a person's action |
@@ -40,6 +40,8 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Opened` | comma-separated person slugs | `track`, naming the people whose **first** open this commit recorded; a `track` commit that only bumped `last_seen_at` and `opens` carries none |
 | `Reason` | text | `revoke`, `withdraw`, `admin-revoke`, and `submit` with `decline` |
 | `Request-Id` | id | every commit from a request |
+
+`migrate` is the one action no operator can ask for: a boot-time, idempotent rewrite the service performs on itself when it finds records in a layout an earlier build wrote. It is always attributed to `system`, always one commit, and always a no-op on the next boot.
 
 A `track` commit is per document, like every other commit, so the opens it records belong to one document's history. Subjects look like `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (jane-doe-k7q2)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
 
@@ -157,17 +159,42 @@ Who created, changed or deleted a site is the history of the record (`site-creat
 
 ## `people`
 
+One record per person **per site**. The path is `${{ site }}/${{ id }}`, so `people/default/jane-doe.toml` and `people/river-alliance/jane-doe.toml` are two independent people who may carry the same email address and know nothing of each other.
+
 | Field | Type | Notes |
 | --- | --- | --- |
-| `id` | slug | stable across documents |
+| `site` | slug | the site this person belongs to, and the first path component; `default` for the derived default site (`behaviors/sites.md` § The default site) |
+| `id` | slug | identity **within the site**; stable across that site's documents. Two sites may each have a `jane-doe` |
 | `name` | string | default signature name |
-| `email` | string, email | merge key on import |
+| `email` | string, email | merge key on import, within the site |
 | `phone` | string? | E.164; **[phase 2]** SMS |
-| `org`, `role`, `descriptor` | string? | defaults for the sign card |
+| `org`, `role`, `descriptor` | string? | the site-level defaults for the sign card |
 | `source` | string | `crm`, `public`, `admin` |
 | `external_id` | string? | id in the adopting team's own CRM |
 
-Never rendered on any participant or public surface.
+Never rendered on any participant or public surface, beyond the sign-card prefill resolved below.
+
+### A person belongs to a site; a per-document prefill belongs to the participation
+
+A person record is **shared by every document on its site** and by none outside it. Two facts decided this (issue #51, from the 2026-09-20 simulated run, where an import on one document silently rewrote another document's signer and the unrelated document's sign card then offered them the wrong organization):
+
+- **The site is the tenancy boundary**, so it is the only boundary a contact list can safely have. An instance-wide `people` sheet makes one coalition's import edit another coalition's contact; a per-document sheet makes the same person four records on four documents of the same campaign, and every correction has to be made four times. The site is the unit that already means "one team's data" everywhere else in this model (`behaviors/sites.md` § Operators and tenancy), and it is the right unit here.
+- **A default and an override are different facts.** `name`, `org`, `role` and `descriptor` on the person are what this team usually calls them — the fallback for any document on the site. What a *particular* statement should prefill is a fact about that statement: the same person signs one letter as a parent and another as a board chair. That belongs on the `participations` record, where it cannot reach a second document.
+
+So the sign card's fields resolve in one direction, field by field, with no merging of the two into a third thing:
+
+1. the participation's `prefill` value for that field, if it has one;
+2. else the person's site-level default;
+3. else nothing — an empty box the signer fills in.
+
+An import writes the row's values into the participation's `prefill` for the document it is importing into, which is why a second document's import can no longer change what the first one prefills. The signature itself is still whatever the signer typed; neither the person nor the prefill is written from a signature (`behaviors/signatures.md`).
+
+### Migrating the pre-site layout
+
+Records written before people had a site live at `people/<id>.toml`, one level above the path template, where nothing reads them. They all belong to the default site: an instance could not have had a second site's people, because a person was instance-wide.
+
+The service migrates them itself, at boot, in **one commit** (`Action: migrate`, `Actor: system`): every record directly under `people/` is rewritten at `people/default/<id>.toml` with `site = 'default'` and removed from the old path. It runs only when the old layout is found, so the next boot is a no-op and running it twice writes nothing. `participations` need no migration: they name a person by slug, and the person's site is the document's site.
+
 
 ## `participations`
 
@@ -179,6 +206,7 @@ One record per person per document, created by an invitation. Current state only
 | `token` | string, ≥ 16 chars base62 | the personal link; unique across the instance |
 | `source` | enum `crm` \| `admin` \| `public` | |
 | `suggested_capacity` | enum? | preselects the sign card |
+| `prefill` | table? | what **this document** prefills on the sign card for this person, overriding the person's site-level defaults: `name`, `org`, `title`, `descriptor`, each optional. Absent — as on every participation written before the field existed — means the person's defaults alone |
 | `link_revoked` | boolean | link no longer resolves (a reissue mints a new `token`) |
 | `expires_at` | timestamp? | |
 | `sent_at` | timestamp? | invitation message accepted by the mailer or exported; written in the same commit as `notified.invitation`, never before delivery |
@@ -186,6 +214,8 @@ One record per person per document, created by an invitation. Current state only
 | `notify` | table | `channel`, `every_revision`, `daily_digest`, `phase_changes`, `my_comments_addressed`, `reminders` |
 | `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified."reminder-2"`; `notified.reminder = 2` is the reminder count beside those per-reminder timestamps. A timestamp here means the message was delivered, so the newest of them is when this document last reached the person (`notified."links-exported"` is an operator's CSV export, not a message) |
 | `signature` | table? | absent = never signed; see below |
+
+`prefill` table: `name`, `org`, `title` and `descriptor`, each optional, each overriding one of the person's site-level defaults (§ `people`). It is named for what it prefills — the `signature` table's own fields — so `prefill.title` is the default for `signature.title` and overrides the person's `role`, which is the same fact recorded as a standing one. An import writes it from the row it imported; nothing else writes it, and a signature never writes back into it.
 
 `signature` table:
 
@@ -236,12 +266,15 @@ Timing comes from commits: the submission's first commit is when its author star
 
 ## Import from a CRM
 
-The admin CLI imports invitees from NDJSON/CSV with columns matching `people` fields plus optional `suggested_capacity`. Email is the merge key into `people`; an existing person is updated, not duplicated. One import is one commit (`Action: invite`): N people upserted, N participations created, tokens minted. A gitsheets people sheet in the adopting team's repo exports directly to this shape.
+The admin CLI imports invitees from NDJSON/CSV with columns matching `people` fields plus optional `suggested_capacity`. Email is the merge key into `people` **within the document's site**; an existing person on that site is matched, not duplicated, and the same address on another site is a different person and is never touched. One import is one commit (`Action: invite`): N people upserted, N participations created with their `prefill`, tokens minted. A gitsheets people sheet in the adopting team's repo exports directly to this shape.
+
+**An import never overwrites a person field that already has a value unless it is told to.** The row's values always fill the person's *blank* fields and always become the participation's `prefill`; replacing a value the person already carries takes `--update` (`api/admin-cli.md`), because a second document's list is a reason to prefill differently, not a reason to correct the contact record. The dry run says per row which fields it would change and which it would keep, so the operator sees the difference before either mode writes anything.
 
 ## Relationships
 
 ```
 sites     1 ─── n documents      (a document with no `site` belongs to the derived default site)
+sites     1 ─── n people         (a person belongs to exactly one site; two sites may hold one email twice)
 documents 1 ─── n participations n ─── 1 people
 documents 1 ─── n submissions   (each by one person; at most one draft per person per document)
 documents 1 ─── n versions      (body-changing commits of the document record)
