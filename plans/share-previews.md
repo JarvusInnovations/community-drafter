@@ -42,7 +42,7 @@ Out: per-document rendered card images (a generic instance card is enough — a 
 ## Validation
 
 - [ ] `GET /d/<public-slug>` returns HTML whose `og:title` is the document title, whose `og:description` is the current version's summary, whose `og:url` is `<PUBLIC_URL>/d/<slug>`, and whose `og:type` is `article`.
-- [ ] `GET /d/<private-slug>`, `GET /d/<unknown-slug>`, `GET /i/<token>` and `GET /admin` return the generic instance tags, identical to each other in everything but the URL, with the document's title appearing nowhere.
+- [ ] `GET /d/<private-slug>`, `GET /d/<unknown-slug>`, `GET /i/<token>` and `GET /admin` return the generic instance tags — identical to each other but for the `noindex` the personal-link and admin pages add — with the document's title appearing nowhere.
 - [ ] The marketing site's card renders at 1200×630 from the site's own tokens and fonts, is served from `site/`, and the page makes no third-party request.
 - [ ] A whole added or removed list item in the compare view shows its marker and lines up with its unchanged neighbours (#83).
 - [ ] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test`; `apps/web` also `build` and `check:bundle-size` under 120 KB gzip.
