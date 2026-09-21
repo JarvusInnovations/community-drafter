@@ -263,6 +263,13 @@ export interface FeedbackExport {
 
 export interface NotificationsSummary {
   sent: Record<string, number>;
+  /**
+   * The date the last operator digest went out for this document
+   * (`specs/behaviors/notifications.md` § Operator digest). Absent when
+   * none has: an operator message writes nothing to a participation, so
+   * `sent` above cannot show it.
+   */
+  operator_digest_sent?: string;
   pending: number;
   failed: number;
   failures?: Array<{ event: string; person: string; error: string; at: string }>;
