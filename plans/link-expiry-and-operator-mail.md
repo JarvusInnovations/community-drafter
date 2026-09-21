@@ -7,6 +7,7 @@ specs:
   - specs/data-model.md
   - specs/behaviors/notifications.md
   - specs/behaviors/operators.md
+  - specs/api/admin.md
 ---
 
 # Plan: link-expiry-and-operator-mail
@@ -54,6 +55,8 @@ dashboard surface for operator mail; a message on `operator-remove` / `doc-opera
   `operator-magic-link` too, which shipped with those rules implicit.
 - **`specs/behaviors/operators.md`** § Operators — one bullet saying a new operator is told,
   pointing at those two messages.
+- **`specs/api/admin.md`** § Operators — `POST /operators` notes the message and that a refused
+  mailer is logged rather than failing the request.
 
 ## Approach
 
