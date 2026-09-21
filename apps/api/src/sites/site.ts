@@ -1,4 +1,4 @@
-import { DEFAULT_SITE_SLUG, type SiteRecord } from "@community-drafter/shared";
+import { DEFAULT_SITE_SLUG, type SiteRecord } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 /**
@@ -36,7 +36,7 @@ export interface ResolvedSite {
 }
 
 /** The instance-wide fallback name, used when `INSTANCE_NAME` is unset. */
-export const FALLBACK_INSTANCE_NAME = "Community Drafter";
+export const FALLBACK_INSTANCE_NAME = "Signatories";
 
 export { DEFAULT_SITE_SLUG };
 

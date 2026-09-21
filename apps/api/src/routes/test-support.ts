@@ -6,7 +6,7 @@ import type {
   DocumentState,
   PublicAccess,
   ShowSignatories,
-} from "@community-drafter/shared";
+} from "@signatories/shared";
 
 import { app } from "../app.ts";
 import { mintOperatorToken } from "../auth/tokens.ts";

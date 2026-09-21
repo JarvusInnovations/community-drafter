@@ -29,7 +29,7 @@ const VERSIONS_FLAGS: Record<string, FlagSpec> = {
   compare: { positionals: 3, boolean: ["--unchanged"] },
 };
 
-export const VERSIONS_HELP = `usage: drafter-axi versions <list|show|publish|compare> ...
+export const VERSIONS_HELP = `usage: signatories-axi versions <list|show|publish|compare> ...
 
 list <slug>
 show <slug> <n> [--body]
@@ -102,7 +102,7 @@ export async function versionsCommand(args: string[]): Promise<string> {
 
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi versions list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi versions list <slug>");
       const versions = await client.get<VersionListItem[]>(
         `/documents/${encodeURIComponent(slug)}/versions`,
       );
@@ -120,8 +120,8 @@ export async function versionsCommand(args: string[]): Promise<string> {
     }
 
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi versions show <slug> <n>");
-      const n = requirePositional(parsed, 1, "n", "drafter-axi versions show <slug> <n>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi versions show <slug> <n>");
+      const n = requirePositional(parsed, 1, "n", "signatories-axi versions show <slug> <n>");
       const version = await client.get<VersionDetail>(
         `/documents/${encodeURIComponent(slug)}/versions/${encodeURIComponent(n)}`,
       );
@@ -156,7 +156,7 @@ export async function versionsCommand(args: string[]): Promise<string> {
             : "",
           !showBody && version.body.length > BODY_PREVIEW_CHARS
             ? renderHelp([
-                `Run \`drafter-axi versions show ${slug} ${n} --body\` for the full body`,
+                `Run \`signatories-axi versions show ${slug} ${n} --body\` for the full body`,
               ])
             : "",
         ),
@@ -168,17 +168,17 @@ export async function versionsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."',
+        'signatories-axi versions publish <slug> --file <path> --summary "..."',
       );
       const filePath = requireStr(
         parsed,
         "--file",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."',
+        'signatories-axi versions publish <slug> --file <path> --summary "..."',
       );
       const summary = requireStr(
         parsed,
         "--summary",
-        'drafter-axi versions publish <slug> --file <path> --summary "..."',
+        'signatories-axi versions publish <slug> --file <path> --summary "..."',
       );
       const body = await readFileOrStdin(filePath);
       const notesFile = str(parsed, "--notes-file");
@@ -211,7 +211,7 @@ export async function versionsCommand(args: string[]): Promise<string> {
             ...(result.signing_closes_at ? { signing_closes_at: result.signing_closes_at } : {}),
           }),
           renderObject({ notified: result.notified }),
-          renderHelp([`Run \`drafter-axi docs show ${slug}\` to see the updated dashboard`]),
+          renderHelp([`Run \`signatories-axi docs show ${slug}\` to see the updated dashboard`]),
         ),
       );
     }
@@ -221,19 +221,19 @@ export async function versionsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi versions compare <slug> <from> <to>",
+        "signatories-axi versions compare <slug> <from> <to>",
       );
       const from = requirePositional(
         parsed,
         1,
         "from",
-        "drafter-axi versions compare <slug> <from> <to>",
+        "signatories-axi versions compare <slug> <from> <to>",
       );
       const to = requirePositional(
         parsed,
         2,
         "to",
-        "drafter-axi versions compare <slug> <from> <to>",
+        "signatories-axi versions compare <slug> <from> <to>",
       );
       const result = await client.get<CompareResult>(
         `/documents/${encodeURIComponent(slug)}/compare`,
@@ -260,7 +260,7 @@ export async function versionsCommand(args: string[]): Promise<string> {
             includeUnchanged
               ? []
               : [
-                  `Run \`drafter-axi versions compare ${slug} ${from} ${to} --unchanged\` to include unchanged blocks`,
+                  `Run \`signatories-axi versions compare ${slug} ${from} ${to} --unchanged\` to include unchanged blocks`,
                 ],
           ),
         ),

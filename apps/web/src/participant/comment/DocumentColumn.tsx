@@ -1,4 +1,4 @@
-import { type Anchor, type SelectionInfo, computeAnchor } from "@community-drafter/shared/browser";
+import { type Anchor, type SelectionInfo, computeAnchor } from "@signatories/shared/browser";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { AutoTextarea } from "../components/AutoTextarea.tsx";

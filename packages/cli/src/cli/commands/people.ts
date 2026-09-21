@@ -43,7 +43,7 @@ const PEOPLE_FLAGS: Record<string, FlagSpec> = {
   expire: { positionals: 2, value: ["--expires-at"] },
 };
 
-export const PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
+export const PEOPLE_HELP = `usage: signatories-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
@@ -195,7 +195,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi people import <slug> [<file.ndjson>|-]",
+        "signatories-axi people import <slug> [<file.ndjson>|-]",
       );
       const filePath = parsed.positional[1] ?? "-";
       const suggestedCapacity = str(parsed, "--suggested-capacity");
@@ -228,14 +228,14 @@ export async function peopleCommand(args: string[]): Promise<string> {
           renderHelp(
             dryRun
               ? [`Nothing was written. Run again without --dry-run to import`]
-              : [`Run \`drafter-axi people list ${slug}\` to see the imported invitees`],
+              : [`Run \`signatories-axi people list ${slug}\` to see the imported invitees`],
           ),
         ),
       );
     }
 
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people list <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people list <slug>");
       const contacts = bool(parsed, "--contacts");
       const rows = await client.get<InvitationRow[]>(
         `/documents/${encodeURIComponent(slug)}/invitations`,
@@ -264,7 +264,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
     }
 
     case "links": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people links <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people links <slug>");
       const person = csv(str(parsed, "--person"));
       const csvText = await client.post<string>(
         `/documents/${encodeURIComponent(slug)}/invitations/links`,
@@ -304,7 +304,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
     }
 
     case "send": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi people send <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi people send <slug>");
       const person = csv(str(parsed, "--person"));
       const dryRun = bool(parsed, "--dry-run");
       const result = await client.post<SendResult>(
@@ -358,7 +358,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
             : "",
           failures.length > 0
             ? renderHelp([
-                `${failures.length} invitation(s) were not delivered and are still not_sent — fix the address, then run \`drafter-axi people send ${slug}\` again`,
+                `${failures.length} invitation(s) were not delivered and are still not_sent — fix the address, then run \`signatories-axi people send ${slug}\` again`,
               ])
             : "",
         ),
@@ -370,13 +370,13 @@ export async function peopleCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi people remove <slug> <person>",
+        "signatories-axi people remove <slug> <person>",
       );
       const personId = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people remove <slug> <person>",
+        "signatories-axi people remove <slug> <person>",
       );
       const result = await client.delete<{ ok: boolean; commit?: string | null }>(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(personId)}`,
@@ -394,12 +394,12 @@ export async function peopleCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi people remind <slug> --target unopened|opened-not-acted",
+        "signatories-axi people remind <slug> --target unopened|opened-not-acted",
       );
       const targetFlag = requireStr(
         parsed,
         "--target",
-        "drafter-axi people remind <slug> --target unopened|opened-not-acted",
+        "signatories-axi people remind <slug> --target unopened|opened-not-acted",
       );
       const target = targetFlag === "opened-not-acted" ? "opened_not_acted" : targetFlag;
       if (target !== "unopened" && target !== "opened_not_acted") {
@@ -468,13 +468,13 @@ export async function peopleCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi people revoke-link <slug> <person>",
+        "signatories-axi people revoke-link <slug> <person>",
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people revoke-link <slug> <person>",
+        "signatories-axi people revoke-link <slug> <person>",
       );
       const result = await client.post<RevokeLinkResult>(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/revoke-link`,
@@ -487,13 +487,13 @@ export async function peopleCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi people reissue-link <slug> <person>",
+        "signatories-axi people reissue-link <slug> <person>",
       );
       const person = requirePositional(
         parsed,
         1,
         "person",
-        "drafter-axi people reissue-link <slug> <person>",
+        "signatories-axi people reissue-link <slug> <person>",
       );
       const result = await client.post<ReissueLinkResult>(
         `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/reissue-link`,
@@ -509,7 +509,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
     }
 
     case "expire": {
-      const usage = "drafter-axi people expire <slug> <person> --expires-at <when>";
+      const usage = "signatories-axi people expire <slug> <person> --expires-at <when>";
       const slug = requirePositional(parsed, 0, "slug", usage);
       const person = requirePositional(parsed, 1, "person", usage);
       // `specs/api/admin-cli.md`: the same `<when>` grammar as `docs open`,
@@ -529,7 +529,7 @@ export async function peopleCommand(args: string[]): Promise<string> {
           renderObject({ person, ...result }),
           renderHelp([
             expiresAt.note,
-            `The link stops working then; \`drafter-axi people reissue-link ${slug} ${person}\` issues a fresh one`,
+            `The link stops working then; \`signatories-axi people reissue-link ${slug} ${person}\` issues a fresh one`,
           ]),
         ),
       );

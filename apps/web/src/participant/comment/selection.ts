@@ -1,4 +1,4 @@
-import { type SelectionInfo, anchorFromSelection } from "@community-drafter/shared/browser";
+import { type SelectionInfo, anchorFromSelection } from "@signatories/shared/browser";
 
 export interface SelectionCaptureOptions {
   /** Debounce for the `selectionchange` listener (ms). */

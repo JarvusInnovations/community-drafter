@@ -1,4 +1,4 @@
-import { audienceOf } from "@community-drafter/shared";
+import { audienceOf } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";

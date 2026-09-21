@@ -24,7 +24,7 @@ function buildFixtureDist(): { root: string; cleanup: () => void } {
     // Shaped like a real `vite build` shell: the head rewrite
     // (`lib/share-preview.ts`) replaces the `<title>` and splices its tags
     // in before `</head>`, leaving the module script alone.
-    '<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>Community Drafter</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/assets/index-abc123.js"></script>\n  </body>\n</html>\n',
+    '<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>Signatories</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/assets/index-abc123.js"></script>\n  </body>\n</html>\n',
   );
   writeFileSync(join(root, "assets", "index-abc123.js"), "console.log('participant entry');");
   writeFileSync(join(root, "favicon.svg"), "<svg></svg>");
@@ -59,7 +59,7 @@ describe("static SPA serving", () => {
       const response = await server.inject({ method: "GET", url: path });
       expect(response.statusCode).toBe(200);
       expect(response.headers["content-type"]).toContain("text/html");
-      expect(response.body).toContain("Community Drafter");
+      expect(response.body).toContain("Signatories");
     }
 
     const asset = await server.inject({ method: "GET", url: "/assets/index-abc123.js" });

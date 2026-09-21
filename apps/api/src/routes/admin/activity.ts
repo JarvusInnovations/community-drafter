@@ -1,4 +1,4 @@
-import { parseDeadlinesTrailer } from "@community-drafter/shared";
+import { parseDeadlinesTrailer } from "@signatories/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";

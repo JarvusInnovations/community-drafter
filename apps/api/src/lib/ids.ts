@@ -1,4 +1,4 @@
-import type { Comment } from "@community-drafter/shared";
+import type { Comment } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { anchorFromSelection, computeAnchor } from "@community-drafter/shared/browser";
+import { anchorFromSelection, computeAnchor } from "@signatories/shared/browser";
 
 import { blocksFromDom } from "./blocks.ts";
 

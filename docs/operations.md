@@ -14,7 +14,7 @@ once, that then holds the gitsheets records as its only content.
 
 ```sh
 gh repo create JarvusInnovations/community-drafter-data --private \
-  --description "Private data repository for the Community Drafter instance (gitsheets records)"
+  --description "Private data repository for the Signatories instance (gitsheets records)"
 ```
 
 Leave it empty. The Cloud Run service's boot-time clone (via the storage
@@ -113,7 +113,7 @@ Set only while the `operators` sheet is empty (the storage layer ignores it
 otherwise). Once bootstrapped, sign in at `/admin/login` with that address —
 a magic link is emailed (requires the mailer to be configured; `MAILER=export`
 writes the link to the CSV instead, see below) — and manage further
-operators from the dashboard or `drafter-axi operators add`.
+operators from the dashboard or `signatories-axi operators add`.
 
 ### 5. Postmark sender (when moving off `MAILER=export`)
 
@@ -290,12 +290,12 @@ or simply by loading the hostname over https.
 **4. Create the site record.**
 
 ```sh
-drafter-axi sites create example \
+signatories-axi sites create example \
   --hostname letters.example.org \
   --name "Example Letters" \
   --reply-to team@example.org \
   --sender-email letters@example.org
-drafter-axi sites operators add example someone@example.org
+signatories-axi sites operators add example someone@example.org
 ```
 
 `sites create` prints, in one block, every DNS record the customer still has to
@@ -323,8 +323,8 @@ Leave `--sender-email` off until verification is done and the site's mail goes
 out from the platform address under the site's name, which is a fine place to
 start.
 
-Assign documents with `drafter-axi docs create <slug> --site example …` or
-`drafter-axi docs update <slug> --site example`. A document with no `--site`
+Assign documents with `signatories-axi docs create <slug> --site example …` or
+`signatories-axi docs update <slug> --site example`. A document with no `--site`
 belongs to the default site, which is this deployment's own hostname, name and
 sender — nothing about existing documents changes.
 
@@ -349,29 +349,35 @@ sender — nothing about existing documents changes.
 **A human**, at `/admin/login`: enter the operator's email, follow the
 emailed magic link. Sessions last 24 hours.
 
-**The CLI** (`drafter-axi`), device-code style — there's no password or
+**The CLI** (`signatories-axi`), device-code style — there's no password or
 long-lived secret to copy around:
 
 ```sh
-drafter-axi login you@jarv.us --url https://drafts.example.org
+signatories-axi login you@jarv.us --url https://drafts.example.org
 ```
 
 This sends the same magic-link email, prints an 8-character code, and
 waits. Follow the link (or have the mailbox owner follow it, for a bot —
 see below), click "Approve this device" on the page it lands on, and the
 CLI finishes on its own: it writes the instance URL, the operator's email
-and a 90-day token to `~/.config/drafter/default.toml` (mode 600). Every
-later `drafter-axi` command reads from there and refreshes the token
-silently once it's more than 30 days old; `drafter-axi logout` forgets it,
-`drafter-axi whoami` shows who's signed in and until when.
+and a 90-day token to `~/.config/signatories/default.toml` (mode 600). Every
+later `signatories-axi` command reads from there and refreshes the token
+silently once it's more than 30 days old; `signatories-axi logout` forgets it,
+`signatories-axi whoami` shows who's signed in and until when.
+
+Anyone who signed in when the tool was `drafter-axi` needs to do nothing:
+a profile still in `~/.config/drafter/` is read as before, with one note
+on stderr saying where it came from, and the next `login` writes it to
+the new directory. `DRAFTER_URL` and `DRAFTER_TOKEN` in a CI job keep
+working too, each behind its `SIGNATORIES_*` counterpart.
 
 **A bot operator** (`kind: bot`, created with
-`drafter-axi operators add bot@jarv.us --name "Release Bot" --kind bot`) has
+`signatories-axi operators add bot@jarv.us --name "Release Bot" --kind bot`) has
 its own mailbox but no hands to click a link with. Signing it in the first
 time — and every time its 90-day token lapses without a human noticing — is
 a human's job:
 
-1. Run `drafter-axi login bot@jarv.us --url https://drafts.example.org` from
+1. Run `signatories-axi login bot@jarv.us --url https://drafts.example.org` from
    wherever the bot's automation will read the resulting profile (its own
    machine/container, or a shared secret store the automation reads from).
 2. A human with access to the bot's mailbox opens the magic-link email and

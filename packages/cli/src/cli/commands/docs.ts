@@ -57,7 +57,7 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   operators: { positionals: 3 },
 };
 
-export const DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
+export const DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --audience public|closed
        [--site <slug>] [--sender-name <text>] [--reply-to <email>]
@@ -163,9 +163,9 @@ export async function docsCommand(args: string[]): Promise<string> {
   const { sub, parsed } = parseSubcommand("docs", args, DOCS_FLAGS);
   const client = clientFrom(parsed);
   // `specs/api/admin-cli.md` § Output rules: emitted commands always read
-  // `drafter-axi …`; the home view's `invoke_as` is the one place the
+  // `signatories-axi …`; the home view's `invoke_as` is the one place the
   // resolved shim path is printed.
-  const cli = "drafter-axi";
+  const cli = "signatories-axi";
   const instanceUrl = resolveConfig({ profile: str(parsed, "--profile") }).url;
 
   switch (sub) {
@@ -174,13 +174,17 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>',
+        'signatories-axi docs create <slug> --title "..." --sender-name "..." --reply-to <email>',
       );
       const capacities = csv(str(parsed, "--capacities"));
       const tags = csv(str(parsed, "--tags"));
       const body = {
         slug,
-        title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
+        title: requireStr(
+          parsed,
+          "--title",
+          'signatories-axi docs create <slug> --title "..." ...',
+        ),
         // `specs/behaviors/sites.md`: the document is created on the site
         // this profile is signed in to unless it names another the caller
         // operates; the site supplies the sender the document omits.
@@ -194,7 +198,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         audience: requireStr(
           parsed,
           "--audience",
-          "drafter-axi docs create <slug> --audience public|closed ...",
+          "signatories-axi docs create <slug> --audience public|closed ...",
         ),
         addressed_to: list(parsed, "--addressed-to"),
         public_access: str(parsed, "--public"),
@@ -216,7 +220,7 @@ export async function docsCommand(args: string[]): Promise<string> {
     }
 
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs show <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs show <slug>");
       const doc = await client.get<DocumentDetail>(`/documents/${encodeURIComponent(slug)}`);
       return render(parsed, doc, () =>
         joinBlocks(
@@ -244,7 +248,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]',
+        'signatories-axi docs update <slug> [--audience public|closed] [--addressed-to "..."]',
       );
       // `specs/api/admin-cli.md`: settings only, over `PATCH /documents/:slug`.
       // Sending only what was given keeps an omitted flag from clearing a
@@ -254,7 +258,7 @@ export async function docsCommand(args: string[]): Promise<string> {
       const site = str(parsed, "--site");
       if (audience === undefined && addressedTo === undefined && site === undefined) {
         throw new AxiError("nothing to update", "USAGE", [
-          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`',
+          'Run `signatories-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`',
         ]);
       }
       const doc = await client.patch<DocumentSummary>(
@@ -278,10 +282,10 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>",
+        "signatories-axi docs open <slug> --comments-close <when> --signing-closes <when>",
       );
       const openUsage =
-        "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>";
+        "signatories-axi docs open <slug> --comments-close <when> --signing-closes <when>";
       const comments = parseDeadline(
         requireStr(parsed, "--comments-close", openUsage),
         "--comments-close",
@@ -333,10 +337,10 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]",
+        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]",
       );
       const extendUsage =
-        "drafter-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
+        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
       const rawComments = str(parsed, "--comments-close");
       const rawSigning = str(parsed, "--signing-closes");
       const comments = rawComments
@@ -362,7 +366,7 @@ export async function docsCommand(args: string[]): Promise<string> {
     }
 
     case "close": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs close <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs close <slug>");
       const doc = await client.post<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}/close`,
       );
@@ -374,10 +378,10 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>",
+        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>",
       );
       const reopenUsage =
-        "drafter-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
+        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
       const rawComments = str(parsed, "--comments-close");
       const comments = rawComments
         ? parseDeadline(rawComments, "--comments-close", reopenUsage)
@@ -405,13 +409,13 @@ export async function docsCommand(args: string[]): Promise<string> {
         parsed,
         0,
         "slug",
-        'drafter-axi docs withdraw <slug> --reason "..." [--public]',
+        'signatories-axi docs withdraw <slug> --reason "..." [--public]',
       );
       const body = {
         reason: requireStr(
           parsed,
           "--reason",
-          'drafter-axi docs withdraw <slug> --reason "..." [--public]',
+          'signatories-axi docs withdraw <slug> --reason "..." [--public]',
         ),
         public: bool(parsed, "--public"),
       };
@@ -429,13 +433,13 @@ export async function docsCommand(args: string[]): Promise<string> {
           parsed,
           1,
           "slug",
-          `drafter-axi docs operators ${first} <slug> <email>`,
+          `signatories-axi docs operators ${first} <slug> <email>`,
         );
         const email = requirePositional(
           parsed,
           2,
           "email",
-          `drafter-axi docs operators ${first} <slug> <email>`,
+          `signatories-axi docs operators ${first} <slug> <email>`,
         );
         if (first === "add") {
           const result = await client.post<DocOperatorAddResult>(
@@ -452,7 +456,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         return render(parsed, result, () => renderObject(result));
       }
 
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi docs operators <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi docs operators <slug>");
       const operators = await client.get<OperatorRecord[]>(
         `/documents/${encodeURIComponent(slug)}/operators`,
       );

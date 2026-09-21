@@ -1,4 +1,4 @@
-import type { DocumentRecord } from "@community-drafter/shared";
+import type { DocumentRecord } from "@signatories/shared";
 
 import { ApiError } from "../errors.ts";
 

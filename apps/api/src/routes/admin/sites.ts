@@ -1,4 +1,4 @@
-import { DEFAULT_SITE_SLUG, HOSTNAME_PATTERN, type SiteRecord } from "@community-drafter/shared";
+import { DEFAULT_SITE_SLUG, HOSTNAME_PATTERN, type SiteRecord } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";

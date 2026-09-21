@@ -21,12 +21,12 @@ export interface GitIdentity {
 
 const PARTICIPANT_IDENTITY: GitIdentity = {
   name: "Participant",
-  email: "participant@community-drafter.local",
+  email: "participant@signatories.local",
 };
 
 const SYSTEM_IDENTITY: GitIdentity = {
   name: "system",
-  email: "system@community-drafter.local",
+  email: "system@signatories.local",
 };
 
 /** The exact string that lands in the `Actor` trailer. */

@@ -1,4 +1,4 @@
-import type { DeadlineChange, Judgement } from "@community-drafter/shared";
+import type { DeadlineChange, Judgement } from "@signatories/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 

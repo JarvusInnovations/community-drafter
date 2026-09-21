@@ -9,21 +9,21 @@ const LOGIN_FLAGS: FlagSpec = { positionals: 1, value: ["--url"] };
 const LOGOUT_FLAGS: FlagSpec = { positionals: 0 };
 const WHOAMI_FLAGS: FlagSpec = { positionals: 0 };
 
-export const LOGIN_HELP = `usage: drafter-axi login <email> [--url <instance>]
+export const LOGIN_HELP = `usage: signatories-axi login <email> [--url <instance>]
 
-Device-code sign-in. Resolves the instance from --url, else DRAFTER_URL, else
+Device-code sign-in. Resolves the instance from --url, else SIGNATORIES_URL, else
 fails with exit 2. Sends the operator a magic-link email whose return path
 approves this device, prints the user code to watch for, then polls until
 approved (or the code expires — 15 minutes). On success, writes the instance
 url, the operator's email and a 90-day token to
-~/.config/drafter/<profile>.toml (mode 600); every later command reads from
-there unless DRAFTER_URL/DRAFTER_TOKEN are set.`;
+~/.config/signatories/<profile>.toml (mode 600); every later command reads from
+there unless SIGNATORIES_URL/SIGNATORIES_TOKEN are set.`;
 
-export const LOGOUT_HELP = `usage: drafter-axi logout
+export const LOGOUT_HELP = `usage: signatories-axi logout
 
 Forgets the stored sign-in token for this profile (url/email are kept).`;
 
-export const WHOAMI_HELP = `usage: drafter-axi whoami
+export const WHOAMI_HELP = `usage: signatories-axi whoami
 
 Shows the signed-in operator (email, kind) and the token's expiry.`;
 
@@ -41,7 +41,7 @@ export async function loginCommand(args: string[]): Promise<string> {
     parsed,
     0,
     "email",
-    "drafter-axi login <email> [--url <instance>]",
+    "signatories-axi login <email> [--url <instance>]",
   )
     .trim()
     .toLowerCase();
@@ -66,8 +66,8 @@ export async function loginCommand(args: string[]): Promise<string> {
     joinBlocks(
       renderObject({ signed_in_as: token.email, url, expires_at: token.expires_at }),
       renderHelp([
-        "Run `drafter-axi whoami` to confirm",
-        "Run `drafter-axi` to see your documents",
+        "Run `signatories-axi whoami` to confirm",
+        "Run `signatories-axi` to see your documents",
       ]),
     ),
   );

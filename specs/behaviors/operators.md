@@ -55,17 +55,17 @@ A request by an operator for a document on another site returns the same 404, an
 ## Sessions: signed tokens, no server-side store
 
 - A **web session** is an HMAC-signed token (JWT, HS256 with `AUTH_SECRET`) in an HttpOnly, SameSite=Lax cookie, 24-hour lifetime, claims: operator email, `kind`, issued-at, expiry, `sid`, and the `site` it was minted on. The cookie carries no `Domain`, so it is host-only already; the claim is what makes a bearer token behave the same way. A token presented to a host whose resolved site is not its `site` is 401 `unauthenticated`, exactly as no credential at all.
-- A **CLI token** is the same token shape with a 90-day lifetime and `aud: cli`, delivered by the device-code flow below and stored by the CLI under `~/.config/drafter/<profile>.toml`. Someone who works on two sites signs in twice and keeps one profile per site. The CLI refreshes it silently when it is older than 30 days by calling `POST /auth/refresh` with the current token; a refresh is refused for an inactive operator.
+- A **CLI token** is the same token shape with a 90-day lifetime and `aud: cli`, delivered by the device-code flow below and stored by the CLI under `~/.config/signatories/<profile>.toml`. Someone who works on two sites signs in twice and keeps one profile per site. The CLI refreshes it silently when it is older than 30 days by calling `POST /auth/refresh` with the current token; a refresh is refused for an inactive operator.
 - **Every request** with a token loads the operator record; `active = false` or a missing record means 401, regardless of the token's validity. This is the only revocation mechanism and it is enough: to shut someone out, deactivate the record.
 - Cookie-authenticated writes require the `X-Requested-With: drafter` header (CSRF). Bearer-authenticated requests are exempt. A present `Authorization` header is decisive; the cookie is consulted only when it is absent.
 - The `Actor` trailer on every admin-originated commit is the operator's email.
 
 ## CLI sign-in: device code
 
-1. `drafter-axi login you@example.org` calls `POST /auth/device` with the email and receives a `device_code` (secret, kept by the CLI) and a `user_code` (8 characters, shown to the person), and the server emails the operator a magic link whose return path is `/auth/device?code=<user_code>`.
+1. `signatories-axi login you@example.org` calls `POST /auth/device` with the email and receives a `device_code` (secret, kept by the CLI) and a `user_code` (8 characters, shown to the person), and the server emails the operator a magic link whose return path is `/auth/device?code=<user_code>`.
 2. The person (or the bot's mailbox owner) follows the link, which is on the same hostname the CLI was pointed at; the web session is created; the approval page shows the `user_code` and an "Approve this device" button. Approving binds the pending device code to the operator.
 3. The CLI polls `POST /auth/device/token` with the `device_code` every 3 seconds for up to 15 minutes; once approved it receives the 90-day CLI token and writes it to the profile. Pending device codes live in memory; a restart before approval fails the login and the CLI says so.
-4. `drafter-axi logout` deletes the stored token. `drafter-axi whoami` shows the operator and expiry.
+4. `signatories-axi logout` deletes the stored token. `signatories-axi whoami` shows the operator and expiry.
 
 ## Data-repository refresh (webhook)
 

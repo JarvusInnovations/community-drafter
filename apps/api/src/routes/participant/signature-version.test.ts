@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
-import type { Signature } from "@community-drafter/shared";
+import type { Signature } from "@signatories/shared";
 
 import { adminHeaders, buildTestServer, seedDocument, seedParticipant } from "../test-support.ts";
 

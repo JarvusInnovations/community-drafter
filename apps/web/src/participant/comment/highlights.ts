@@ -1,8 +1,4 @@
-import {
-  type Anchor,
-  placeAnchor,
-  rangeFromAnchorPlacement,
-} from "@community-drafter/shared/browser";
+import { type Anchor, placeAnchor, rangeFromAnchorPlacement } from "@signatories/shared/browser";
 
 import { blocksFromDom } from "./blocks.ts";
 

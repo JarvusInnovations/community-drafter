@@ -11,7 +11,7 @@ import { joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
 
 /**
  * `specs/api/admin-cli.md` § Session hook: "the skill ships a SessionStart
- * hook that prints the home view when `DRAFTER_URL` is set." Managed
+ * hook that prints the home view when `SIGNATORIES_URL` is set." Managed
  * explicitly (not via the SDK's auto-install, which is a no-op for a
  * `.mjs`-named bundle) so it can target **project** scope — the vendored
  * skill in the adopting team's own repo — by default, with **global**
@@ -23,12 +23,12 @@ const HOOK_FLAGS: Record<string, FlagSpec> = {
   status: { positionals: 0 },
 };
 
-export const HOOK_HELP = `usage: drafter-axi hook <install|uninstall> [--scope project|global] [--dir <path>]
-       drafter-axi hook status
+export const HOOK_HELP = `usage: signatories-axi hook <install|uninstall> [--scope project|global] [--dir <path>]
+       signatories-axi hook status
 
 Manage the SessionStart hook that prints the home view (open documents, phase,
 next deadline, funnel counts) at the start of every agent session, when
-DRAFTER_URL is set (silent otherwise — a fresh clone without a configured
+SIGNATORIES_URL is set (silent otherwise — a fresh clone without a configured
 instance stays quiet).
 
 Default scope is project: written to <repo>/.claude/settings.json (so it is
@@ -36,7 +36,9 @@ committed and portable for every contributor). --dir sets the repo root
 (default: the git repo root of the current directory). --scope global installs
 to ~/.claude/settings.json for every session on this machine instead.`;
 
-const MARKER = "drafter-axi";
+const MARKER = "signatories-axi";
+/** The name this tool shipped under before the rename; hooks written then still match. */
+const LEGACY_MARKER = "drafter-axi";
 const TIMEOUT_SECONDS = 10;
 
 type Scope = "project" | "global";
@@ -68,8 +70,8 @@ function resolveScope(scopeFlag: string | undefined): Scope {
   if (scopeFlag === undefined) return "project";
   if (scopeFlag !== "project" && scopeFlag !== "global") {
     throw new AxiError("--scope must be project or global", "USAGE", [
-      "drafter-axi hook install                 (project — the default)",
-      "drafter-axi hook install --scope global",
+      "signatories-axi hook install                 (project — the default)",
+      "signatories-axi hook install --scope global",
     ]);
   }
   return scopeFlag;
@@ -80,27 +82,27 @@ function settingsPath(scope: Scope, dirFlag: string | undefined): string {
   return join(base, ".claude", "settings.json");
 }
 
-/** Absolute path to the bundle's sibling `drafter-axi` shim on this machine. */
+/** Absolute path to the bundle's sibling `signatories-axi` shim on this machine. */
 function shimPath(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), "drafter-axi");
+  return join(dirname(fileURLToPath(import.meta.url)), "signatories-axi");
 }
 
 /**
  * Project scope must be portable across contributors and machines: the
  * hook is written to `<repo>/.claude/settings.json` and committed, so it
  * runs `${CLAUDE_PROJECT_DIR}`-relative to the vendored skill's shim (the
- * `.claude/skills/drafter-axi` symlink the `npx skills add` install
+ * `.claude/skills/signatories-axi` symlink the `npx skills add` install
  * creates), never a machine-specific absolute path. Global scope is
  * per-machine and never committed, so the absolute shim path is correct
  * there — it self-locates wherever the global skill lives.
  *
  * Both run the explicit `home --if-configured` form (not the bare
- * zero-arg invocation) so the hook can stay silent when DRAFTER_URL isn't
+ * zero-arg invocation) so the hook can stay silent when SIGNATORIES_URL isn't
  * set — the SDK rejects a leading flag before a command, so the zero-arg
  * form cannot itself take that flag.
  */
 const PROJECT_HOOK_COMMAND =
-  '"${CLAUDE_PROJECT_DIR}/.claude/skills/drafter-axi/scripts/drafter-axi" home --if-configured';
+  '"${CLAUDE_PROJECT_DIR}/.claude/skills/signatories-axi/scripts/signatories-axi" home --if-configured';
 
 function hookCommand(scope: Scope): string {
   return scope === "global"
@@ -125,16 +127,39 @@ function writeSettings(path: string, settings: HookSettings): void {
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
+function isManaged(command: unknown): boolean {
+  return (
+    typeof command === "string" && (command.includes(MARKER) || command.includes(LEGACY_MARKER))
+  );
+}
+
 function managedCommand(settings: HookSettings): string | undefined {
   const groups = settings.hooks?.SessionStart;
   if (!Array.isArray(groups)) return undefined;
   for (const group of groups) {
     for (const hook of group.hooks ?? []) {
-      if (typeof hook.command === "string" && hook.command.includes(MARKER)) return hook.command;
+      if (isManaged(hook.command)) return hook.command;
     }
   }
   return undefined;
 }
+
+/** Drops the hooks `matches` selects. Returns how many went. */
+function stripHooks(settings: HookSettings, matches: (command: unknown) => boolean): number {
+  const groups = settings.hooks?.SessionStart;
+  if (!Array.isArray(groups)) return 0;
+  let removed = 0;
+  for (const group of groups) {
+    const before = group.hooks?.length ?? 0;
+    if (group.hooks) group.hooks = group.hooks.filter((h) => !matches(h.command));
+    removed += before - (group.hooks?.length ?? 0);
+  }
+  settings.hooks!.SessionStart = groups.filter((g) => (g.hooks?.length ?? 0) > 0);
+  return removed;
+}
+
+const isLegacy = (command: unknown): boolean =>
+  typeof command === "string" && command.includes(LEGACY_MARKER);
 
 function install(args: string[]): string {
   const parsed = parseFlags("hook install", args, HOOK_FLAGS.install!);
@@ -143,23 +168,27 @@ function install(args: string[]): string {
   const command = hookCommand(scope);
 
   const settings = readSettings(path);
+  // A hook left over from when this tool was `drafter-axi` points at a skill
+  // directory that no longer exists, so installing replaces it rather than
+  // running alongside it.
+  const legacyRemoved = stripHooks(settings, isLegacy) > 0;
   const [updated, changed] = computeSessionStartHookUpdate(settings, {
     marker: MARKER,
     command,
     timeoutSeconds: TIMEOUT_SECONDS,
   });
 
-  if (changed) writeSettings(path, updated);
+  if (changed || legacyRemoved) writeSettings(path, updated);
   return joinBlocks(
     renderObject({
-      hook: changed ? "installed" : "already up to date",
+      hook: changed ? "installed" : legacyRemoved ? "replaced" : "already up to date",
       scope,
       file: path,
       runs: command,
     }),
     renderHelp([
-      "Every session in this scope opens with the documents dashboard (when DRAFTER_URL is set)",
-      `Run \`drafter-axi hook uninstall --scope ${scope}\` to remove it`,
+      "Every session in this scope opens with the documents dashboard (when SIGNATORIES_URL is set)",
+      `Run \`signatories-axi hook uninstall --scope ${scope}\` to remove it`,
     ]),
   );
 }
@@ -174,20 +203,7 @@ function uninstall(args: string[]): string {
   }
 
   const settings = readSettings(path);
-  const groups = settings.hooks?.SessionStart;
-  let removed = 0;
-  if (Array.isArray(groups)) {
-    for (const group of groups) {
-      const before = group.hooks?.length ?? 0;
-      if (group.hooks) {
-        group.hooks = group.hooks.filter(
-          (h) => !(typeof h.command === "string" && h.command.includes(MARKER)),
-        );
-      }
-      removed += before - (group.hooks?.length ?? 0);
-    }
-    settings.hooks!.SessionStart = groups.filter((g) => (g.hooks?.length ?? 0) > 0);
-  }
+  const removed = stripHooks(settings, isManaged);
 
   if (removed > 0) writeSettings(path, settings);
   return renderObject({
@@ -226,7 +242,7 @@ function status(): string {
       { name: "installed", extract: (r) => r.installed },
       { name: "file", extract: (r) => r.file },
     ]),
-    renderHelp(["Run `drafter-axi hook install` to load the documents dashboard each session"]),
+    renderHelp(["Run `signatories-axi hook install` to load the documents dashboard each session"]),
   );
 }
 

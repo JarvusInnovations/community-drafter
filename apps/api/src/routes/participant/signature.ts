@@ -1,4 +1,4 @@
-import type { Capacity, Signature } from "@community-drafter/shared";
+import type { Capacity, Signature } from "@signatories/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";

@@ -1,4 +1,4 @@
-import { AnchorSchema, placeAnchor, type Anchor } from "@community-drafter/shared";
+import { AnchorSchema, placeAnchor, type Anchor } from "@signatories/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";

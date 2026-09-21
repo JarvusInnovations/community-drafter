@@ -192,7 +192,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   }
 
   fastify.addHook("onReady", async () => {
-    fastify.log.info("community-drafter API initialized");
+    fastify.log.info("signatories API initialized");
     fastify.log.info(`Environment: ${fastify.config.NODE_ENV}`);
   });
 };

@@ -4,7 +4,7 @@ import type { MailAddress } from "../lib/mailer/index.ts";
 import type { ResolvedSite } from "../sites/site.ts";
 
 /** The address used when nothing is configured at all (local dev, tests). */
-const FALLBACK_FROM_EMAIL = "no-reply@community-drafter.local";
+const FALLBACK_FROM_EMAIL = "no-reply@signatories.app";
 
 export interface ResolvedMailSender {
   from: MailAddress;

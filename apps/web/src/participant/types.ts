@@ -1,6 +1,6 @@
 /**
  * Hand-authored types mirroring `specs/api/participant.md`'s JSON shapes.
- * Deliberately not imported from `@community-drafter/shared` — that
+ * Deliberately not imported from `@signatories/shared` — that
  * package's main barrel pulls in the server-only `unified`/remark/rehype
  * render pipeline (see `packages/shared/src/browser.ts`'s own doc comment),
  * and this plan's compare/diff rendering is server-computed HTML the

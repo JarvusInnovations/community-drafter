@@ -1,4 +1,4 @@
-import type { OperatorKind } from "@community-drafter/shared";
+import type { OperatorKind } from "@signatories/shared";
 import type { FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";

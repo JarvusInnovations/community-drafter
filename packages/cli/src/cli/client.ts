@@ -1,4 +1,4 @@
-import type { DrafterConfig } from "./config.js";
+import type { SignatoriesConfig } from "./config.js";
 import { writeProfile } from "./config.js";
 import { ApiCallError, NetworkError, SignInExpiredError } from "./errors.js";
 import { decodeJwtIatSeconds } from "./jwt.js";
@@ -42,11 +42,11 @@ const REAUTH_CODES = new Set(["unauthenticated", "operator_inactive"]);
  * revoked token), or `NetworkError` (transport failure) — `cli.ts` maps
  * each to the CLI's exit code.
  */
-export class DrafterClient {
-  private config: DrafterConfig;
+export class SignatoriesClient {
+  private config: SignatoriesConfig;
   private refreshChecked = false;
 
-  constructor(config: DrafterConfig) {
+  constructor(config: SignatoriesConfig) {
     this.config = config;
   }
 
@@ -54,9 +54,9 @@ export class DrafterClient {
    * `specs/behaviors/operators.md` § CLI sign-in: "The CLI refreshes it
    * silently when it is older than 30 days by calling `POST /auth/refresh`
    * with the current token; a refresh is refused for an inactive
-   * operator." Runs at most once per `DrafterClient` instance (i.e. once
+   * operator." Runs at most once per `SignatoriesClient` instance (i.e. once
    * per CLI invocation), and only for a token that came from the profile
-   * file — a `DRAFTER_TOKEN` override is never rewritten anywhere.
+   * file — a `SIGNATORIES_TOKEN` override is never rewritten anywhere.
    */
   private async ensureFreshToken(): Promise<void> {
     if (this.refreshChecked) return;

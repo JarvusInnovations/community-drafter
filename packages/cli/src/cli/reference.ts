@@ -1,13 +1,13 @@
 /**
  * Single source of truth for the CLI's identity and command catalog
  * (`specs/api/admin-cli.md` § Commands). The home view's help, every
- * `--help` block, and the generated `skills/drafter-axi/SKILL.md` command
+ * `--help` block, and the generated `skills/signatories-axi/SKILL.md` command
  * reference all derive from `COMMAND_GROUPS`, so the skill doc can never
  * drift from the implementation.
  */
 
 export const DESCRIPTION =
-  "Drive a community-drafter document from the shell — create, open, publish revisions, invite and track signers, and export feedback bundles for an LLM round.";
+  "Drive a Signatories document from the shell — create, open, publish revisions, invite and track signers, and export feedback bundles for an LLM round.";
 
 export interface CommandRef {
   usage: string;
@@ -284,11 +284,11 @@ export function renderCommandHelp(name: string): string | null {
   const doc = commandDoc(name);
   if (!doc) return null;
   const lines = [
-    `usage: drafter-axi ${doc.usage}`,
+    `usage: signatories-axi ${doc.usage}`,
     "",
     doc.summary,
     "",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or SIGNATORIES_PROFILE) selects a config profile.",
   ];
   // The SDK writes this string verbatim, so the trailing newline is ours.
   return `${lines.join("\n")}\n`;
@@ -296,7 +296,11 @@ export function renderCommandHelp(name: string): string | null {
 
 /** Render the top-level help listing every command by group. */
 export function renderTopLevelHelp(): string {
-  const lines = [`drafter-axi — ${DESCRIPTION}`, "", "usage: drafter-axi <command> [args] [flags]"];
+  const lines = [
+    `signatories-axi — ${DESCRIPTION}`,
+    "",
+    "usage: signatories-axi <command> [args] [flags]",
+  ];
 
   for (const group of COMMAND_GROUPS) {
     lines.push("", `${group.group}:`);
@@ -308,10 +312,10 @@ export function renderTopLevelHelp(): string {
 
   lines.push(
     "",
-    "Config: run `login <email> --url <instance>` once, or set DRAFTER_URL / DRAFTER_TOKEN in the environment.",
-    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or DRAFTER_PROFILE) selects a config profile.",
-    "Run `drafter-axi <command> --help` for usage on any command.",
-    "Run `drafter-axi` with no arguments to see every open document's status.",
+    "Config: run `login <email> --url <instance>` once, or set SIGNATORIES_URL / SIGNATORIES_TOKEN in the environment.",
+    "`--json` prints raw JSON instead of TOON; `--profile <name>` (or SIGNATORIES_PROFILE) selects a config profile.",
+    "Run `signatories-axi <command> --help` for usage on any command.",
+    "Run `signatories-axi` with no arguments to see every open document's status.",
   );
 
   return lines.join("\n");

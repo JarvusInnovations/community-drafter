@@ -1,10 +1,10 @@
 # Specs
 
-`specs/` declares the complete desired state of Community Drafter: what *should be true* of the running software. Implementation follows spec; spec↔code drift is a bug. The methodology (spec-first flow, plans DAG, draft planning PRs, closeout ritual) is carried by the vendored **specops** skill at `.agents/skills/specops/`.
+`specs/` declares the complete desired state of Signatories: what *should be true* of the running software. Implementation follows spec; spec↔code drift is a bug. The methodology (spec-first flow, plans DAG, draft planning PRs, closeout ritual) is carried by the vendored **specops** skill at `.agents/skills/specops/`.
 
 ## What this system is
 
-Community Drafter is a single-instance web service that lets a small core team publish a draft statement, letter, or charter to an invited community, collect comments and signatures against a visible clock, publish revisions as plain-numbered versions (v1, v2, v3) with a one-line changelog, and come out the other side with a final text and a truthful signatory list.
+Signatories is a single-instance web service that lets a small core team publish a draft statement, letter, or charter to an invited community, collect comments and signatures against a visible clock, publish revisions as plain-numbered versions (v1, v2, v3) with a one-line changelog, and come out the other side with a final text and a truthful signatory list.
 
 It exists so that a coalition can say "the community saw this and could object" and mean it, without the statement dying in committee. The tool is generic: one instance serves any number of organizations and documents. The **pilot** is the Save the Academy Coalition, whose draft charter (September 2026) is the concrete process the first release must serve: draft → open window with a real deadline → signatories added by name → a record the press can ask about. Where a spec uses the pilot as an example it says so; nothing in the desired state is specific to it.
 

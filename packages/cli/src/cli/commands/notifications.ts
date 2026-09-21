@@ -8,7 +8,7 @@ const NOTIFICATIONS_FLAGS: Record<string, FlagSpec> = {
   retry: { positionals: 1, value: ["--event", "--person"] },
 };
 
-export const NOTIFICATIONS_HELP = `usage: drafter-axi notifications <list|retry> ...
+export const NOTIFICATIONS_HELP = `usage: signatories-axi notifications <list|retry> ...
 
 list <slug>
 retry <slug> [--event <name>] [--person <id>]`;
@@ -19,7 +19,12 @@ export async function notificationsCommand(args: string[]): Promise<string> {
 
   switch (sub) {
     case "list": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications list <slug>");
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi notifications list <slug>",
+      );
       const summary = await client.get<NotificationsSummary>(
         `/documents/${encodeURIComponent(slug)}/notifications`,
       );
@@ -44,14 +49,19 @@ export async function notificationsCommand(args: string[]): Promise<string> {
               ])
             : "",
           summary.failed > 0
-            ? renderHelp([`Run \`drafter-axi notifications retry ${slug}\` to re-dispatch`])
+            ? renderHelp([`Run \`signatories-axi notifications retry ${slug}\` to re-dispatch`])
             : "",
         ),
       );
     }
 
     case "retry": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi notifications retry <slug>");
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi notifications retry <slug>",
+      );
       const result = await client.post<NotificationsRetryResult>(
         `/documents/${encodeURIComponent(slug)}/notifications/retry`,
         {

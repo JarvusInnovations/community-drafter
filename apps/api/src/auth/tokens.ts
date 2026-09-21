@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { SignJWT, jwtVerify } from "jose";
 
-import { DEFAULT_SITE_SLUG, type OperatorKind } from "@community-drafter/shared";
+import { DEFAULT_SITE_SLUG, type OperatorKind } from "@signatories/shared";
 
 /**
  * `specs/api/auth.md` § Token shape: "JWT, HS256 with `AUTH_SECRET`. Claims:

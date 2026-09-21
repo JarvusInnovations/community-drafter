@@ -26,7 +26,7 @@ const SITES_FLAGS: Record<string, FlagSpec> = {
   operators: { positionals: 3 },
 };
 
-export const SITES_HELP = `usage: drafter-axi sites <list|show|create|update|remove|operators> ...
+export const SITES_HELP = `usage: signatories-axi sites <list|show|create|update|remove|operators> ...
 
 list
 show <slug>
@@ -90,7 +90,7 @@ function dnsBlock(records: DnsRecord[]): string {
 export async function sitesCommand(args: string[]): Promise<string> {
   const { sub, parsed } = parseSubcommand("sites", args, SITES_FLAGS);
   const client = clientFrom(parsed);
-  const cli = "drafter-axi";
+  const cli = "signatories-axi";
 
   switch (sub) {
     case "list": {
@@ -117,7 +117,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
     }
 
     case "show": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites show <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites show <slug>");
       const site = await client.get<SiteDetail>(`/sites/${encodeURIComponent(slug)}`);
       const missing = site.hostname_verified ? [] : site.dns;
       return render(parsed, site, () =>
@@ -135,7 +135,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
 
     case "create": {
       const usage =
-        'drafter-axi sites create <slug> --hostname <host> --name "..." --reply-to <email>';
+        'signatories-axi sites create <slug> --hostname <host> --name "..." --reply-to <email>';
       const slug = requirePositional(parsed, 0, "slug", usage);
       const body = compact({
         slug,
@@ -164,7 +164,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
     }
 
     case "update": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites update <slug> ...");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites update <slug> ...");
       const body = compact({
         name: str(parsed, "--name"),
         reply_to: str(parsed, "--reply-to"),
@@ -178,7 +178,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
     }
 
     case "remove": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites remove <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites remove <slug>");
       const result = await client.delete<{ ok: boolean; commit?: string | null }>(
         `/sites/${encodeURIComponent(slug)}`,
       );
@@ -195,7 +195,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
     case "operators": {
       const first = parsed.positional[0];
       if (first === "add" || first === "remove") {
-        const usage = `drafter-axi sites operators ${first} <slug> <email>`;
+        const usage = `signatories-axi sites operators ${first} <slug> <email>`;
         const slug = requirePositional(parsed, 1, "slug", usage);
         const email = requirePositional(parsed, 2, "email", usage);
         if (first === "add") {
@@ -218,7 +218,7 @@ export async function sitesCommand(args: string[]): Promise<string> {
         );
       }
 
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi sites operators <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi sites operators <slug>");
       const operators = await client.get<SiteOperator[]>(
         `/sites/${encodeURIComponent(slug)}/operators`,
       );

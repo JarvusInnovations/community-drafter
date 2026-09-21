@@ -4,7 +4,7 @@
  * family as `../participant/types.ts` minus every person-specific field
  * (no `person`, `signature`, `position`, `submissions`, `prefill`,
  * `notify`) and minus `capacities` (irrelevant with no sign form here).
- * Kept as its own module, not imported from `@community-drafter/shared`,
+ * Kept as its own module, not imported from `@signatories/shared`,
  * for the same reason as the participant mirror (see that file's doc
  * comment): no runtime need to pull in the server-only render pipeline.
  */

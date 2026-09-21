@@ -1,23 +1,25 @@
 # API: Admin CLI
 
-An agent-facing command-line tool over `api/admin.md`, built to the AXI conventions (TOON output by default, `--json` for raw, idempotent mutations, stable error codes, a no-argument "home" view). Working name: `drafter-axi`.
+An agent-facing command-line tool over `api/admin.md`, built to the AXI conventions (TOON output by default, `--json` for raw, idempotent mutations, stable error codes, a no-argument "home" view). It is called `signatories-axi`.
 
 ## Distribution: a skill with the CLI embedded
 
-This is the **primary admin interface** of the system, and it ships as a **skill** in this repository (`skills/drafter-axi/`) whose `scripts/` holds the committed, self-contained bundle built from `packages/cli/` per `axi-skills`. An adopting team installs it into *their* repo (`npx skills add JarvusInnovations/community-drafter --skill drafter-axi`), and their own agent drives documents from there: import invitees from that repo's own gitsheets people sheet, publish revisions its agent drafted, read progress every session. The CLI is not published to npm; the bundle in the skill is the artifact, and a CI drift gate keeps it in sync with the source.
+This is the **primary admin interface** of the system, and it ships as a **skill** in this repository (`skills/signatories-axi/`) whose `scripts/` holds the committed, self-contained bundle built from `packages/cli/` per `axi-skills`. An adopting team installs it into *their* repo (`npx skills add JarvusInnovations/community-drafter --skill signatories-axi`), and their own agent drives documents from there: import invitees from that repo's own gitsheets people sheet, publish revisions its agent drafted, read progress every session. The CLI is not published to npm; the bundle in the skill is the artifact, and a CI drift gate keeps it in sync with the source.
 
 `SKILL.md` opens with a **quickstart written for a person**, not for an agent: sign in, create, publish, open, invite, revise — six numbered steps with the literal commands, plus the one line that says the web console at `<instance>/admin` is where you read what happened. The agent-facing material (TOON, the disposition loop, the session hook, the generated command reference) follows it. A first-time operator who reads only the top of the file can run a document; an agent that reads the whole file loses nothing.
 
 ## Configuration
 
-The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. A credential belongs to one hostname (`api/auth.md` § Token shape), so someone who works on two **sites** keeps one profile per site and selects it with `--profile`. The profile is selected by `--profile <name>`, else the `DRAFTER_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `DRAFTER_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
+The instance URL and the credential live in `~/.config/signatories/<profile>.toml` (mode 600), written by `signatories-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `SIGNATORIES_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `SIGNATORIES_URL` and `SIGNATORIES_TOKEN` in the environment override the profile for CI and bots. A credential belongs to one hostname (`api/auth.md` § Token shape), so someone who works on two **sites** keeps one profile per site and selects it with `--profile`. The profile is selected by `--profile <name>`, else the `SIGNATORIES_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `SIGNATORIES_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
+
+**Reading the old location.** The tool was once called `drafter-axi` and kept its profiles in `~/.config/drafter/`. When the selected profile does not exist in `~/.config/signatories/` but does exist under the old path, the old file is read, and the CLI says so once on stderr — where it read from, and that the next `login` will write to the new place. Writes always go to the new directory; nothing is copied or deleted behind the operator's back. The old environment variables `DRAFTER_URL`, `DRAFTER_TOKEN` and `DRAFTER_PROFILE` are still honoured, each only when its `SIGNATORIES_*` counterpart is unset, so a CI job that exported them keeps working. No output ever names the old variables: they are a compatibility surface, not part of the contract.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
-| `drafter-axi` | home: first the identity line (signed-in operator's email, name and kind, the instance URL, the profile in use), then that operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login`; when the stored token is expired or revoked, says that and how to `login` again |
-| `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `DRAFTER_URL`; refused if neither is given). The URL's hostname picks the **site**, and the resulting token is good on that host only (`specs/behaviors/sites.md`): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
+| `signatories-axi` | home: first the identity line (signed-in operator's email, name and kind, the instance URL, the profile in use), then that operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login`; when the stored token is expired or revoked, says that and how to `login` again |
+| `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `SIGNATORIES_URL`; refused if neither is given). The URL's hostname picks the **site**, and the resulting token is good on that host only (`specs/behaviors/sites.md`): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
 | `logout` / `whoami` | forget the token / show operator, site and expiry |
 | `sites list` | the caller's sites: hostname, name, the From address mail will actually use, operator and document counts, and whether the hostname and the sender are verified yet |
 | `sites show <slug>` | one site whole, with the DNS records it still needs |
@@ -63,7 +65,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 - **`docs create`, `docs show` and `docs open` print `public_url`** — `https://<the document's site hostname>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
 - Errors map API `error` codes to exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other; the message is the API's `message`.
 - The home view includes `help[]` lines suggesting the next likely command, per AXI.
-- **One invocation form per surface.** Everything the CLI itself emits — `help[]` hints, error suggestions, hook output, `--help` usage lines — writes commands as `drafter-axi <command> …`, never a resolved path. The resolved path of the bundled shim (which is not on `PATH`) appears exactly once, as the home view's `invoke_as` field, which is where a reader learns how to turn those hints into a runnable command. `SKILL.md` is the other surface and uses `scripts/drafter-axi` throughout, stated once at its top; within either surface the form never varies.
+- **One invocation form per surface.** Everything the CLI itself emits — `help[]` hints, error suggestions, hook output, `--help` usage lines — writes commands as `signatories-axi <command> …`, never a resolved path. The resolved path of the bundled shim (which is not on `PATH`) appears exactly once, as the home view's `invoke_as` field, which is where a reader learns how to turn those hints into a runnable command. `SKILL.md` is the other surface and uses `scripts/signatories-axi` throughout, stated once at its top; within either surface the form never varies.
 
 ## Help
 
@@ -74,7 +76,7 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 
 ## Session hook
 
-Per `axi-skills`, the skill ships a SessionStart hook that prints the home view when `DRAFTER_URL` is set, so an agent in the adopting repo opens every session knowing where each open document stands. The home view's identity line names the site the profile is signed in to, since the same command against two profiles is two different tenants.
+Per `axi-skills`, the skill ships a SessionStart hook that prints the home view when `SIGNATORIES_URL` is set, so an agent in the adopting repo opens every session knowing where each open document stands. The home view's identity line names the site the profile is signed in to, since the same command against two profiles is two different tenants.
 
 `SKILL.md` carries a **Sites** section: what a site is in one paragraph, the four onboarding steps in order (verify, map, point DNS, create the record), the `sites` commands, and the warning that the record routes nothing on its own.
 

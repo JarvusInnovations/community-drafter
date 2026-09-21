@@ -1,5 +1,5 @@
-import { diffVersions, render } from "@community-drafter/shared";
-import type { Block, DiffResult, RenderResult } from "@community-drafter/shared";
+import { diffVersions, render } from "@signatories/shared";
+import type { Block, DiffResult, RenderResult } from "@signatories/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 

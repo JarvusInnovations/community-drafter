@@ -14,7 +14,7 @@ export const copy = {
   // literal is only the fallback for a session that predates that field —
   // the same one the backend uses when `INSTANCE_NAME` is unset
   // (`apps/api/src/sites/site.ts`).
-  siteName: "Community Drafter",
+  siteName: "Signatories",
 
   signIn: {
     heading: "Sign in",
@@ -57,7 +57,7 @@ export const copy = {
     intro:
       "One hostname each, with the identity its documents carry. Creating and changing a site is CLI-only:",
     createCommand:
-      'drafter-axi sites create <slug> --hostname <host> --name "…" --reply-to <email>',
+      'signatories-axi sites create <slug> --hostname <host> --name "…" --reply-to <email>',
     empty: "No sites yet — every document belongs to this deployment's own site.",
     defaultPill: "this deployment",
     hostnameVerified: "routing here",
@@ -114,7 +114,8 @@ export const copy = {
       "You're a superadmin on this deployment's own site, so this list shows every document on every site.",
     siteColumn: "Site",
     newDocumentHint: "New documents are created from the CLI (you become its first operator):",
-    newDocumentCommand: 'drafter-axi docs create <slug> --title "…" --sender-name … --reply-to …',
+    newDocumentCommand:
+      'signatories-axi docs create <slug> --title "…" --sender-name … --reply-to …',
   },
 
   dashboard: {
@@ -162,7 +163,7 @@ export const copy = {
     versions: "Versions",
     publishHint: "Publishing is CLI-only. To publish a new version:",
     publishCommand: (slug: string) =>
-      `drafter-axi versions publish ${slug} --file <file.md> --summary "…"`,
+      `signatories-axi versions publish ${slug} --file <file.md> --summary "…"`,
     recentActivity: "Recent activity",
     noActivity: "No activity yet.",
     /**
@@ -185,7 +186,7 @@ export const copy = {
     notOpenedYet:
       "This document has not been opened, so it has no deadlines to extend. Open it from the CLI:",
     openCommand: (slug: string) =>
-      `drafter-axi docs open ${slug} --comments-close "…" --signing-closes "…"`,
+      `signatories-axi docs open ${slug} --comments-close "…" --signing-closes "…"`,
     notificationHealth: "Notification health",
     sentLabel: "Sent",
     pendingLabel: "Pending",

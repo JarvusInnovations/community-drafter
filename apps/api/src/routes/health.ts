@@ -9,7 +9,7 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       status: "healthy",
       timestamp: new Date().toISOString(),
-      service: "community-drafter-api",
+      service: "signatories-api",
       environment: fastify.config.NODE_ENV,
       storage: {
         ready: true,

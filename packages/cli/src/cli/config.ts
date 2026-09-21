@@ -5,8 +5,8 @@ import { AxiError } from "axi-sdk-js";
 
 /**
  * `specs/api/admin-cli.md` § Configuration: the instance URL and the
- * credential live in `~/.config/drafter/<profile>.toml` (mode 600), written
- * by `login`. `DRAFTER_URL`/`DRAFTER_TOKEN` in the environment override the
+ * credential live in `~/.config/signatories/<profile>.toml` (mode 600), written
+ * by `login`. `SIGNATORIES_URL`/`SIGNATORIES_TOKEN` in the environment override the
  * profile independently (for CI and bots); `--profile <name>` selects a
  * profile (default `default`). There is no actor label any more — every
  * write is attributed to the signed-in operator.
@@ -28,12 +28,47 @@ type StringKey = (typeof STRING_KEYS)[number];
  * `process.env.HOME`). Checking it here keeps the two runtimes consistent
  * and lets tests sandbox the profile directory by setting `$HOME` alone.
  */
+function homeDir(): string {
+  return process.env.HOME || homedir();
+}
+
 function configDir(): string {
-  return join(process.env.HOME || homedir(), ".config", "drafter");
+  return join(homeDir(), ".config", "signatories");
+}
+
+/**
+ * `specs/api/admin-cli.md` § Configuration, "Reading the old location": the
+ * tool used to be `drafter-axi` and wrote `~/.config/drafter/`. Writes never
+ * come back here — a read falls back to it only when the new directory has
+ * nothing for the selected profile.
+ */
+function legacyConfigDir(): string {
+  return join(homeDir(), ".config", "drafter");
 }
 
 function profilePath(profile: string): string {
   return join(configDir(), `${profile}.toml`);
+}
+
+/**
+ * The notice is said once per process and on **stderr**, so it can never
+ * contaminate the TOON or JSON a caller is parsing on stdout.
+ */
+let legacyNoticeSaid = false;
+
+/** Test seam: one process runs many cases, and the notice is one-shot. */
+export function resetLegacyProfileNotice(): void {
+  legacyNoticeSaid = false;
+}
+
+/**
+ * The environment variable for `name`, new spelling first. The `DRAFTER_*`
+ * spellings stay honoured for a CI job or bot that exported them, but
+ * nothing the CLI prints ever names them: they are a compatibility surface,
+ * not part of the contract.
+ */
+function envValue(name: "URL" | "TOKEN" | "PROFILE"): string | undefined {
+  return process.env[`SIGNATORIES_${name}`] ?? process.env[`DRAFTER_${name}`];
 }
 
 /**
@@ -64,10 +99,25 @@ function parseFlatToml(text: string): StoredProfile {
 }
 
 export function readProfile(profile: string): StoredProfile {
-  const path = profilePath(profile);
-  if (!existsSync(path)) return {};
+  let path = profilePath(profile);
+  let fromLegacy = false;
+
+  if (!existsSync(path)) {
+    const legacy = join(legacyConfigDir(), `${profile}.toml`);
+    if (!existsSync(legacy)) return {};
+    path = legacy;
+    fromLegacy = true;
+  }
+
   try {
-    return parseFlatToml(readFileSync(path, "utf8"));
+    const parsed = parseFlatToml(readFileSync(path, "utf8"));
+    if (fromLegacy && !legacyNoticeSaid) {
+      legacyNoticeSaid = true;
+      process.stderr.write(
+        `note: read the profile from ${path}; the next \`login\` writes to ${configDir()}\n`,
+      );
+    }
+    return parsed;
   } catch {
     // A corrupt profile file must not brick every command — env vars still work.
     return {};
@@ -101,11 +151,11 @@ export function clearProfileToken(profile: string): boolean {
   return true;
 }
 
-export interface DrafterConfig {
+export interface SignatoriesConfig {
   url: string;
   token: string;
   profile: string;
-  /** Whether `token` came from `DRAFTER_TOKEN` (never persisted back) or the profile file (refreshed in place). */
+  /** Whether `token` came from `SIGNATORIES_TOKEN` (never persisted back) or the profile file (refreshed in place). */
   tokenSource: "env" | "profile";
 }
 
@@ -113,29 +163,29 @@ export interface ResolveConfigOptions {
   profile?: string;
 }
 
-const LOGIN_HINT = "Run `drafter-axi login <email> --url <instance>` to sign in";
+const LOGIN_HINT = "Run `signatories-axi login <email> --url <instance>` to sign in";
 
 /**
  * `specs/api/admin-cli.md`: the profile is selected by `--profile <name>`,
- * else `DRAFTER_PROFILE`, else `default` — so a bot exports
- * `DRAFTER_PROFILE=<bot>` once and never touches the human's default profile.
+ * else `SIGNATORIES_PROFILE`, else `default` — so a bot exports
+ * `SIGNATORIES_PROFILE=<bot>` once and never touches the human's default profile.
  */
 export function resolveProfileName(flagValue?: string): string {
-  const fromEnv = process.env.DRAFTER_PROFILE?.trim();
+  const fromEnv = envValue("PROFILE")?.trim();
   return flagValue ?? (fromEnv && fromEnv.length > 0 ? fromEnv : "default");
 }
 
 /** Used by every command except `login` itself. */
-export function resolveConfig(options: ResolveConfigOptions = {}): DrafterConfig {
+export function resolveConfig(options: ResolveConfigOptions = {}): SignatoriesConfig {
   const profile = resolveProfileName(options.profile);
   const stored = readProfile(profile);
 
-  const url = process.env.DRAFTER_URL ?? stored.url;
+  const url = envValue("URL") ?? stored.url;
   if (!url) {
     throw new AxiError("Not signed in: no instance URL is configured", "USAGE", [LOGIN_HINT]);
   }
 
-  const envToken = process.env.DRAFTER_TOKEN;
+  const envToken = envValue("TOKEN");
   const token = envToken ?? stored.token;
   if (!token) {
     throw new AxiError("Not signed in: no token is configured", "USAGE", [LOGIN_HINT]);
@@ -149,21 +199,21 @@ export function resolveConfig(options: ResolveConfigOptions = {}): DrafterConfig
   };
 }
 
-/** `login <email> [--url <instance>]`: resolves the instance from `--url`, else `DRAFTER_URL`, else fails. */
+/** `login <email> [--url <instance>]`: resolves the instance from `--url`, else `SIGNATORIES_URL`, else fails. */
 export function resolveLoginUrl(flagUrl: string | undefined): string {
-  const url = flagUrl ?? process.env.DRAFTER_URL;
+  const url = flagUrl ?? envValue("URL");
   if (!url) {
     throw new AxiError("An instance URL is required", "USAGE", [
-      "Pass --url <instance>, or set DRAFTER_URL in the environment",
+      "Pass --url <instance>, or set SIGNATORIES_URL in the environment",
     ]);
   }
   return url.replace(/\/+$/, "");
 }
 
 /** Whether the environment carries enough to talk to an instance — used by the SessionStart hook and the home view. */
-/** Whether a session exists for the selected profile (`--profile`, `DRAFTER_PROFILE`, else `default`) or the env pair. */
+/** Whether a session exists for the selected profile (`--profile`, `SIGNATORIES_PROFILE`, else `default`) or the env pair. */
 export function isConfigured(options: ResolveConfigOptions = {}): boolean {
-  if (process.env.DRAFTER_URL && process.env.DRAFTER_TOKEN) return true;
+  if (envValue("URL") && envValue("TOKEN")) return true;
   const stored = readProfile(resolveProfileName(options.profile));
   return Boolean(stored.url && stored.token);
 }

@@ -11,7 +11,7 @@ const FEEDBACK_FLAGS: Record<string, FlagSpec> = {
   export: { positionals: 1, value: ["--format", "--out"] },
 };
 
-export const FEEDBACK_HELP = `usage: drafter-axi feedback export <slug> [--format json|md] [--out <file>]
+export const FEEDBACK_HELP = `usage: signatories-axi feedback export <slug> [--format json|md] [--out <file>]
 
 The LLM-round bundle (\`specs/behaviors/review-and-judgement.md\`): every
 pending comment, organized by submission. Feed the json form straight into
@@ -23,7 +23,7 @@ export async function feedbackCommand(args: string[]): Promise<string> {
 
   switch (sub) {
     case "export": {
-      const slug = requirePositional(parsed, 0, "slug", "drafter-axi feedback export <slug>");
+      const slug = requirePositional(parsed, 0, "slug", "signatories-axi feedback export <slug>");
       const format = str(parsed, "--format", "json");
       if (format !== "json" && format !== "md") {
         throw new AxiError(`"${format}" is not a valid --format`, "USAGE", [

@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# GENERATED alongside scripts/drafter-axi.mjs — do not edit by hand.
-# Shim so the bundled CLI can be invoked as `scripts/drafter-axi <command>`.
-# Never run this shim with `node` — it's bash. Run it directly, or run
-# `node .../drafter-axi.mjs` instead.
-exec node "$(dirname "$0")/drafter-axi.mjs" "$@"

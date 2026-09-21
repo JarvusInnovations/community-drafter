@@ -95,7 +95,7 @@ export async function pollDeviceToken(
     if (response.status === 409 && body.error === "device_pending") {
       if (Date.now() >= deadline) {
         throw new DeviceExpiredError(
-          "Timed out waiting for the device to be approved (15 minutes). Run `drafter-axi login` again.",
+          "Timed out waiting for the device to be approved (15 minutes). Run `signatories-axi login` again.",
         );
       }
       await sleep(intervalMs);
@@ -105,7 +105,8 @@ export async function pollDeviceToken(
     // 404 (unknown/expired code) or anything else unexpected — the device
     // code is done for, one way or another.
     throw new DeviceExpiredError(
-      body.message ?? "The device code is unknown or has expired. Run `drafter-axi login` again.",
+      body.message ??
+        "The device code is unknown or has expired. Run `signatories-axi login` again.",
     );
   }
 }

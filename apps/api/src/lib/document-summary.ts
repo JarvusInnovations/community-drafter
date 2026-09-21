@@ -1,4 +1,4 @@
-import { audienceOf } from "@community-drafter/shared";
+import { audienceOf } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 import { computeSignatories } from "./signatories.ts";

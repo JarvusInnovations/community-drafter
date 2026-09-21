@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# GENERATED alongside scripts/signatories-axi.mjs — do not edit by hand.
+# Shim so the bundled CLI can be invoked as `scripts/signatories-axi <command>`.
+# Never run this shim with `node` — it's bash. Run it directly, or run
+# `node .../signatories-axi.mjs` instead.
+exec node "$(dirname "$0")/signatories-axi.mjs" "$@"

@@ -55,7 +55,7 @@ variable "site_hostnames" {
 variable "instance_name" {
   description = "Display name for this instance (specs/architecture.md § Deployment → Configuration: INSTANCE_NAME)"
   type        = string
-  default     = "Community Drafter"
+  default     = "Signatories"
 }
 
 variable "instance_from_email" {

@@ -1,7 +1,7 @@
 /**
  * Hand-authored wire types mirroring `specs/api/admin.md`'s JSON shapes —
  * same rationale as `participant/types.ts`: keeps the heavy
- * `@community-drafter/shared` render-pipeline barrel out of the web bundle.
+ * `@signatories/shared` render-pipeline barrel out of the web bundle.
  * The admin bundle isn't budget-constrained the way the participant entry
  * is, but every admin screen is lazy-loaded (`App.tsx`), so there's no
  * reason to pull that barrel in either.

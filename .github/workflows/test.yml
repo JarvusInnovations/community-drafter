@@ -33,10 +33,10 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - '@community-drafter/api'
-          - '@community-drafter/web'
-          - '@community-drafter/shared'
-          - '@community-drafter/cli'
+          - '@signatories/api'
+          - '@signatories/web'
+          - '@signatories/shared'
+          - '@signatories/cli'
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-asdf
@@ -48,11 +48,11 @@ jobs:
       # files) that `tsc -b` never sees — cheap, credential-free, in scope
       # per ci-quality-gates (container image builds are not). Web-only.
       - name: Build
-        if: matrix.package == '@community-drafter/web'
+        if: matrix.package == '@signatories/web'
         run: bun run --filter='${{ matrix.package }}' build
       # `specs/architecture.md` § Web app: "Bundle budget for the
       # participant entry: under 120 KB gzipped JS on first load, measured
       # in CI." Reads the `dist/` this Build step just produced.
       - name: Check participant bundle size
-        if: matrix.package == '@community-drafter/web'
+        if: matrix.package == '@signatories/web'
         run: bun run --filter='${{ matrix.package }}' check:bundle-size

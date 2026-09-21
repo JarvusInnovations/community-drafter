@@ -5,7 +5,7 @@ import {
   PersonRecordSchema,
   SiteRecordSchema,
   SubmissionRecordSchema,
-} from "@community-drafter/shared";
+} from "@signatories/shared";
 import type { Store } from "gitsheets";
 
 /**

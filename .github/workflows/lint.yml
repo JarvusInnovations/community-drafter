@@ -36,10 +36,10 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - '@community-drafter/api'
-          - '@community-drafter/web'
-          - '@community-drafter/shared'
-          - '@community-drafter/cli'
+          - '@signatories/api'
+          - '@signatories/web'
+          - '@signatories/shared'
+          - '@signatories/cli'
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-asdf

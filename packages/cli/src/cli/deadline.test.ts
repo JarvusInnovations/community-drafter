@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import { parseDeadline } from "./deadline.ts";
 
-const USAGE = "drafter-axi docs open <slug> --comments-close <when> --signing-closes <when>";
+const USAGE = "signatories-axi docs open <slug> --comments-close <when> --signing-closes <when>";
 
 describe("parseDeadline", () => {
   it("passes a zoned ISO time through, normalized to UTC", () => {

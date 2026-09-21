@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import { CLI_PACKAGE_NAME } from "./index.ts";
 
-describe("@community-drafter/cli", () => {
+describe("@signatories/cli", () => {
   it("exports its package name", () => {
-    expect(CLI_PACKAGE_NAME).toBe("@community-drafter/cli");
+    expect(CLI_PACKAGE_NAME).toBe("@signatories/cli");
   });
 });
