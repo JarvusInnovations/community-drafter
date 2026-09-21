@@ -477,6 +477,68 @@ describe("drafter-axi end to end (real API, temp data repo)", () => {
     rmSync(scratch, { recursive: true, force: true });
   }, 30_000);
 
+  it("people expire records the expiry and says what it read the time as", async () => {
+    const harness = await bootServer();
+    cleanups.push(harness.cleanup);
+    withAdminEnv(harness);
+    const slug = "e2e-expire";
+
+    await run([
+      "docs",
+      "create",
+      slug,
+      "--title",
+      "Expiry Check",
+      "--sender-name",
+      "The Board",
+      "--reply-to",
+      "board@example.org",
+      "--audience",
+      "public",
+    ]);
+
+    const scratch = mkdtempSync(join(tmpdir(), "drafter-axi-e2e-"));
+    const peopleFile = join(scratch, "people.ndjson");
+    writeFileSync(
+      peopleFile,
+      JSON.stringify({ name: "Ada Lovelace", email: "ada@example.org" }),
+      "utf8",
+    );
+    await run(["people", "import", slug, peopleFile]);
+    const listed = await run(["people", "list", slug, "--json"]);
+    const person = (JSON.parse(listed.output) as Array<{ person: string }>)[0]!.person;
+
+    // --expires-at is required, and the refusal names the flag rather than
+    // leaving an operator to guess which argument was missing.
+    const missingFlag = await run(["people", "expire", slug, person]);
+    expect(missingFlag.exitCode).toBe(2);
+    expect(missingFlag.output).toContain("--expires-at");
+
+    // The zone-less form is read in the machine's local zone and echoed, so
+    // the operator sees the instant they actually set.
+    const expired = await run([
+      "people",
+      "expire",
+      slug,
+      person,
+      "--expires-at",
+      "2027-01-04T17:00",
+    ]);
+    expect(expired.exitCode).toBe(0);
+    expect(expired.output).toContain("expires_at");
+    expect(expired.output).toContain("read as");
+    expect(expired.output).toContain(new Date("2027-01-04T17:00").toISOString());
+
+    const subjects = commitSubjects(harness.dataDir);
+    expect(subjects.some((s) => s.includes(`link-expire: ${person} on ${slug}`))).toBe(true);
+    const trailers = trailersFor(harness.dataDir, `link-expire: ${person} on ${slug}`);
+    expect(trailers.Action).toBe("link-expire");
+    expect(trailers.Document).toBe(slug);
+    expect(trailers.Person).toBe(person);
+
+    rmSync(scratch, { recursive: true, force: true });
+  }, 30_000);
+
   it("login --url completes the device flow, writes a 600-mode profile, and the next command needs no DRAFTER_URL", async () => {
     const harness = await bootServer({ DEV_ADMIN_EMAIL: TEST_ACTOR.email });
     cleanups.push(harness.cleanup);

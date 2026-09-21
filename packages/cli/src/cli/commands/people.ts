@@ -20,6 +20,7 @@ import {
   type FieldDef,
 } from "../output.js";
 import type {
+  ExpireLinkResult,
   ImportResult,
   InvitationRow,
   ReissueLinkResult,
@@ -27,6 +28,7 @@ import type {
   RevokeLinkResult,
   SendResult,
 } from "../types.js";
+import { parseDeadline } from "../deadline.js";
 import { clientFrom, readFileOrStdin, render } from "./common.js";
 
 const PEOPLE_FLAGS: Record<string, FlagSpec> = {
@@ -38,9 +40,10 @@ const PEOPLE_FLAGS: Record<string, FlagSpec> = {
   remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 },
+  expire: { positionals: 2, value: ["--expires-at"] },
 };
 
-export const PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link> ...
+export const PEOPLE_HELP = `usage: drafter-axi people <import|list|remove|links|send|remind|revoke-link|reissue-link|expire> ...
 
 import <slug> [<file.ndjson>|-] [--suggested-capacity personal|official] [--dry-run]
        Reads NDJSON or a JSON array (defaults to stdin when the file is omitted);
@@ -80,7 +83,12 @@ remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
        counting recently-messaged and reminders-off invitees separately.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
-       Prints the new link once.`;
+       Prints the new link once.
+expire <slug> <person> --expires-at <when>
+       Set when this person's link stops working. <when> is ISO 8601 with a zone
+       (2026-10-01T17:00:00-04:00, 2026-10-01T21:00:00Z) or a zone-less time
+       (2026-10-01T17:00) read in this machine's local zone; either way the
+       command prints the instant it resolved to.`;
 
 interface ImportRow {
   name: string;
@@ -490,6 +498,33 @@ export async function peopleCommand(args: string[]): Promise<string> {
           renderObject(result),
           renderHelp([
             "This link is shown once — it is not retrievable again except via `people links`",
+          ]),
+        ),
+      );
+    }
+
+    case "expire": {
+      const usage = "drafter-axi people expire <slug> <person> --expires-at <when>";
+      const slug = requirePositional(parsed, 0, "slug", usage);
+      const person = requirePositional(parsed, 1, "person", usage);
+      // `specs/api/admin-cli.md`: the same `<when>` grammar as `docs open`,
+      // echoed back — the API only accepts a zoned instant, and an operator
+      // reaching for an expiry should not have to convert one by hand.
+      const expiresAt = parseDeadline(
+        requireStr(parsed, "--expires-at", usage),
+        "--expires-at",
+        usage,
+      );
+      const result = await client.post<ExpireLinkResult>(
+        `/documents/${encodeURIComponent(slug)}/invitations/${encodeURIComponent(person)}/expire`,
+        { expires_at: expiresAt.iso },
+      );
+      return render(parsed, result, () =>
+        joinBlocks(
+          renderObject({ person, ...result }),
+          renderHelp([
+            expiresAt.note,
+            `The link stops working then; \`drafter-axi people reissue-link ${slug} ${person}\` issues a fresh one`,
           ]),
         ),
       );
