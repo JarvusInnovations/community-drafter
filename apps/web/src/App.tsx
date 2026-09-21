@@ -314,6 +314,15 @@ function App(): JSX.Element {
           />
         </Route>
       </Route>
+
+      {/*
+        `specs/api/conventions.md`: an address nobody routed — `/login`,
+        `/sign-in`, a mistyped link — is answered with the app's own
+        "isn't available" page. The API serves this shell with a 404 for
+        any unmatched HTML `GET`; this route is what the shell then
+        renders (#60).
+      */}
+      <Route path="*" element={<NotFoundScreen />} />
     </Routes>
   );
 }
