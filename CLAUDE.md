@@ -1,4 +1,4 @@
-# Community Drafter
+# Signatories
 
 A single-instance service for community drafting and signing of collective statements: personal links, comment and signature periods on a visible clock, numbered versions with a one-line changelog, personal- or official-capacity signatures, and a private git repo of gitsheets records as the only durable store. It is generic infrastructure; the Save the Academy Coalition is the pilot, not the product. Start with `specs/README.md`.
 
@@ -40,14 +40,14 @@ The Jarvus house skills are vendored under `.agents/skills/` and symlinked into 
 | `ci-quality-gates` | adding or changing GitHub Actions checks, linters/formatters (oxlint, oxfmt, ruff, tofu fmt), `.tool-versions`, test scripts, or when CI is slow or a gate is missing |
 | `repo-setup` | creating the GitHub repo, pushing for the first time, touching branch rulesets/default branch/merge policy, or when develop/main plumbing misbehaves |
 | `release-flow` | shipping merged work, drafting or editing a `Release: v*` PR, choosing a version bump, writing release notes; the moment you see `.github/workflows/release-*.yml` or an open Release PR |
-| `axi-skills` | any work on `packages/cli/` or `skills/drafter-axi/` (the admin CLI and its skill packaging): build pipeline, bash shim, SessionStart hook, generated SKILL.md, home vs dashboard views, the bundle drift gate |
+| `axi-skills` | any work on `packages/cli/` or `skills/signatories-axi/` (the admin CLI and its skill packaging): build pipeline, bash shim, SessionStart hook, generated SKILL.md, home vs dashboard views, the bundle drift gate |
 
 Also load the user-level `gitsheets` skill before touching `.gitsheets/*.toml`, the storage layer, or anything that calls `openRepo` / `repo.transact`, and `axi` before designing CLI output.
 
 ## Stack (see `specs/architecture.md` for the full statement)
 
 - **Bun** everywhere: runtime, package manager, test runner. TypeScript run directly; `tsc` type-checks only.
-- **API**: Fastify 5 with a deny-by-default auth gateway. **Web**: React 19 + Vite + Tailwind v4 + React Router v7, built to static assets the API serves. **CLI**: AXI-style `drafter-axi`, shipped as a **skill with the bundle embedded** (`skills/drafter-axi/`, built from `packages/cli/`), installed into adopting repos with `npx skills add`; not an npm package. This skill is the primary admin interface.
+- **API**: Fastify 5 with a deny-by-default auth gateway. **Web**: React 19 + Vite + Tailwind v4 + React Router v7, built to static assets the API serves. **CLI**: AXI-style `signatories-axi`, shipped as a **skill with the bundle embedded** (`skills/signatories-axi/`, built from `packages/cli/`), installed into adopting repos with `npx skills add`; not an npm package. This skill is the primary admin interface.
 - **Storage**: a private git data repo of four flat gitsheets sheets, single writer, push daemon. **No database. Commits are the data model**: records hold current state, paths name things (never moments or statuses), and git trailers carry the structured facts; versions, dates and activity come from `git log`. Open counts are write-behind; everything else commits immediately.
 - **Deploy**: Cloud Run, `max_instance_count = 1`, OpenTofu under `tf/`.
 

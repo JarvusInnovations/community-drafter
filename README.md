@@ -1,4 +1,6 @@
-# Community Drafter
+# Signatories
+
+*Formerly Community Drafter. Same project, new name; the GCP project, the data repository and a few infrastructure identifiers still read `community-drafter` and are deliberately left alone.*
 
 Community drafting and signing of collective statements: open letters, coalition charters, position papers, anything a group needs to put its name to together.
 
@@ -23,7 +25,7 @@ The full desired behavior lives in [`specs/`](specs/README.md); [`specs/principl
 - **API**: Fastify 5 on Bun with a deny-by-default auth gateway. Participant credential is the opaque token in the personal link; admins are operators: a bearer token (agents, CLI, via device-code `login`) or a magic-link session cookie (dashboard).
 - **Web**: React 19, Vite, Tailwind v4, React Router v7. Participant routes work in email webviews and iframes with cookies and local storage disabled.
 - **Storage**: no database. A private git data repository of four flat [gitsheets](https://github.com/JarvusInnovations/gitsheets) sheets (`documents`, `people`, `participations`, `submissions`). Commits are the data model: records hold current state, and every change is a commit whose trailers carry the structured facts. Versions are the document record's body-changing commits; dates, positions and activity feeds are read from `git log`.
-- **Admin CLI**: `drafter-axi`, an agent-facing CLI shipped as an installable skill with the bundle embedded. It is the primary admin interface.
+- **Admin CLI**: `signatories-axi`, an agent-facing CLI shipped as an installable skill with the bundle embedded. It is the primary admin interface.
 - **Deploy**: a single Cloud Run instance (one writer), OpenTofu under `tf/`.
 
 Details and the deliberate departures from the house stacks: [`specs/architecture.md`](specs/architecture.md).
@@ -31,15 +33,15 @@ Details and the deliberate departures from the house stacks: [`specs/architectur
 ## Repository layout
 
 ```
-specs/             what should be true (source of truth)
-plans/             the work DAG that bridges specs to merged code
-apps/api/          Fastify API: gateway, storage, rendering, notifications, routes
-apps/web/          React SPA: participant, public and admin routes
-packages/shared/   record types, markdown render with block ids, redline diff, comment anchors
-packages/cli/      drafter-axi source
-skills/drafter-axi the installable skill (SKILL.md, shim, committed bundle)
-tf/                OpenTofu for the instance
-docs/operations.md runbook: data repo, secrets, deploy, operator sign-in, DNS
+specs/                  what should be true (source of truth)
+plans/                  the work DAG that bridges specs to merged code
+apps/api/               Fastify API: gateway, storage, rendering, notifications, routes
+apps/web/               React SPA: participant, public and admin routes
+packages/shared/        record types, markdown render with block ids, redline diff, comment anchors
+packages/cli/           signatories-axi source
+skills/signatories-axi/ the installable skill (SKILL.md, shim, committed bundle)
+tf/                     OpenTofu for the instance
+docs/operations.md      runbook: data repo, secrets, deploy, operator sign-in, DNS
 ```
 
 ## Developing
@@ -61,20 +63,20 @@ This repo uses spec-driven development: change the spec, then the code, and reco
 Install the admin skill into the repo your team (or its agent) works from:
 
 ```bash
-npx skills add JarvusInnovations/community-drafter --skill drafter-axi
+npx skills add JarvusInnovations/community-drafter --skill signatories-axi
 ```
 
-Then, with `DRAFTER_URL` and `DRAFTER_ADMIN_TOKEN` set:
+Then, with `SIGNATORIES_URL` and `SIGNATORIES_TOKEN` set:
 
 ```bash
-drafter-axi                                              # every open document at a glance
-drafter-axi docs create my-statement --title "…" --owner … --sender-name … --reply-to …
-drafter-axi versions publish my-statement --file draft.md --summary "Initial draft"
-drafter-axi docs open my-statement --comments-close 2026-10-01T21:00Z --signing-closes 2026-10-08T21:00Z
-drafter-axi people import my-statement invitees.ndjson   # merges by email, mints links
-drafter-axi people links my-statement --out links.csv    # the only way tokens leave
-drafter-axi feedback export my-statement --format md     # the bundle for a revision round
-drafter-axi versions publish my-statement --file v2.md --summary "…" --dispositions d.json
+signatories-axi                                              # every open document at a glance
+signatories-axi docs create my-statement --title "…" --owner … --sender-name … --reply-to …
+signatories-axi versions publish my-statement --file draft.md --summary "Initial draft"
+signatories-axi docs open my-statement --comments-close 2026-10-01T21:00Z --signing-closes 2026-10-08T21:00Z
+signatories-axi people import my-statement invitees.ndjson   # merges by email, mints links
+signatories-axi people links my-statement --out links.csv    # the only way tokens leave
+signatories-axi feedback export my-statement --format md     # the bundle for a revision round
+signatories-axi versions publish my-statement --file v2.md --summary "…" --dispositions d.json
 ```
 
 The skill's `SKILL.md` documents every command.
