@@ -135,6 +135,11 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         usage: 'docs withdraw <slug> --reason "<text>" [--public]',
         summary: "Withdraw the document.",
       },
+      {
+        usage: "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]",
+        summary:
+          "Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. The list is computed at the moment of the render and never frozen.",
+      },
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
         usage: "docs operators add <slug> <email>",

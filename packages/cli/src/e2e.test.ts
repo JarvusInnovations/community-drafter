@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 // (not hoisted to a shared root, so importing `jose` straight from this
 // file would fail to resolve).
 import { mintOperatorToken } from "../../../apps/api/src/auth/tokens.ts";
+import { PdfRenderer } from "../../../apps/api/src/deliverable/renderer.ts";
 import {
   buildTestServer,
   TEST_ACTOR,
@@ -131,6 +132,12 @@ async function mintStaleCliToken(email: string, daysOld: number): Promise<string
   return minted.token;
 }
 
+/**
+ * `docs export` is the one command whose work is a render, so it skips where
+ * no Chromium exists at all rather than failing (`specs/screens/deliverable.md`).
+ */
+const chromiumAvailable = new PdfRenderer().available();
+
 describe("signatories-axi end to end (real API, temp data repo)", () => {
   const cleanups: Array<() => void> = [];
   let originalHome: string | undefined;
@@ -228,6 +235,62 @@ describe("signatories-axi end to end (real API, temp data repo)", () => {
     expect(unaddressed.exitCode).toBe(2);
     expect(unaddressed.output).toContain("addressed");
   }, 30_000);
+
+  it.if(chromiumAvailable)(
+    "docs export --pdf writes the file and prints what it wrote, never the bytes",
+    async () => {
+      const harness = await bootServer();
+      cleanups.push(harness.cleanup);
+      withAdminEnv(harness);
+
+      await run([
+        "docs",
+        "create",
+        "e2e-charter",
+        "--title",
+        "Charter of the Coalition",
+        "--sender-name",
+        "The Board",
+        "--reply-to",
+        "board@example.org",
+        "--audience",
+        "public",
+      ]);
+
+      const source = join(tempHome, "v1.md");
+      writeFileSync(source, "# Preamble\n\nWe, the undersigned.\n");
+      await run([
+        "versions",
+        "publish",
+        "e2e-charter",
+        "--file",
+        source,
+        "--summary",
+        "Initial draft",
+      ]);
+
+      const out = join(tempHome, "charter.pdf");
+      const exported = await run(["docs", "export", "e2e-charter", "--pdf", "--out", out]);
+
+      expect(exported.exitCode).toBe(0);
+      expect(exported.output).toContain(out);
+      expect(exported.output).toContain("version: 1");
+      expect(exported.output).toContain("copy: draft");
+      expect(exported.output).toContain("paper: letter");
+      // Nothing binary on stdout — the whole reason this command insists on
+      // a file (`specs/api/admin-cli.md` § Output rules).
+      expect(exported.output).not.toContain("%PDF-");
+
+      const written = readFileSync(out);
+      expect(written.subarray(0, 5).toString("utf8")).toBe("%PDF-");
+      expect(written.byteLength).toBeGreaterThan(1000);
+
+      const badPaper = await run(["docs", "export", "e2e-charter", "--paper", "legal"]);
+      expect(badPaper.exitCode).toBe(2);
+      expect(badPaper.output).toContain("--paper");
+    },
+    60_000,
+  );
 
   it("docs create -> versions publish -> docs open -> people import -> people links round-trips against a real API", async () => {
     const harness = await bootServer();

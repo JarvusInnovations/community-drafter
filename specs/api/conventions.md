@@ -57,6 +57,8 @@ Participant and public endpoints accept `?v=<n>` where a version is optional; de
 
 Token-resolution failures: 30 per minute per source address. Participant writes: 60 per minute per token. Admin bearer: none.
 
+`GET /d/:slug/statement.pdf`: 10 per minute per source address. It is the only anonymous route whose cost is a headless browser rather than a map lookup, and a cached render does not help a caller walking the paper sizes or a document that has just taken a signature. Over budget is 429 `rate_limited`; every other public route stays unlimited.
+
 ## Principles
 
 **Inherited**

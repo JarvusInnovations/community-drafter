@@ -7,8 +7,10 @@ import {
   getActivity,
   getInvitations,
   getNotifications,
+  statementPdfUrl,
 } from "./api.ts";
 import { copy } from "./copy.ts";
+import { deliverableIsDraft } from "./deliverable.ts";
 import { Card } from "./components/Card.tsx";
 import { Pill } from "./components/Pill.tsx";
 import { TableScroller } from "./components/TableScroller.tsx";
@@ -238,6 +240,26 @@ export function DashboardScreen(): JSX.Element {
             {copy.dashboard.copyPublicLink}
           </button>
         ) : null}
+        {/*
+          `specs/screens/deliverable.md` § Actions: a real destination, so
+          it is a link and not a button pretending to be one — the browser
+          keeps the filename the server chose, `-draft` and all.
+        */}
+        {document.versions.length === 0 ? (
+          <span
+            className={`${quietButtonClass} cursor-not-allowed opacity-50`}
+            aria-disabled="true"
+            title={copy.dashboard.downloadPdfUnavailable}
+          >
+            {copy.dashboard.downloadPdf}
+          </span>
+        ) : (
+          <a className={quietButtonClass} href={statementPdfUrl(document.slug)}>
+            {deliverableIsDraft(document)
+              ? copy.dashboard.downloadPdfDraft
+              : copy.dashboard.downloadPdf}
+          </a>
+        )}
         <button
           type="button"
           onClick={() => void handleExportFeedback()}

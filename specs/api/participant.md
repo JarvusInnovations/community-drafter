@@ -79,6 +79,12 @@ Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (
 
 Response: `{ from, to, summary: { changed, added, removed, items: [{ kind: "paragraph"|"heading"|"list item"|"table", change: "changed"|"added"|"removed", count }] }, blocks: [{ status: "same"|"changed"|"added"|"removed", id, html }] }` where `changed` blocks' `html` contains the redline markup. Counts are per comparison unit, not per HTML element: a table is one (`behaviors/versioning.md` § Diff), and `items` is what the summary line is built from.
 
+## `GET /i/:token/api/statement.pdf`
+
+The deliverable (`../screens/deliverable.md`): the current version's text, its title block, and the signatory list as it stands, rendered to a PDF. `application/pdf`, `Content-Disposition: attachment` with the filename that spec gives. `?paper=letter|a4` selects the paper size; letter is the default.
+
+Every holder of a personal link may fetch it, in every phase in which they may read the document at all — they can already read every word of it on their own screen, and the `audience` gate that guards the public door has nothing to add here. `not_found` for a document with no version yet and for a `withdrawn` one. Whether the render is watermarked `DRAFT` is a fact about the document, never about the caller (`../screens/deliverable.md` § Draft and clean).
+
 ## `GET /i/:token/api/prefs` / `PUT /i/:token/api/prefs`
 
 Body/response: the `notify` table plus `forced` (list of keys the server keeps on) and `email_masked` (`j***@example.org` — `screens/preferences.md`'s masked email display; no other endpoint exposes a participant's own contact address). `PUT` ignores attempts to turn off forced keys and reports them (as `ignored`).

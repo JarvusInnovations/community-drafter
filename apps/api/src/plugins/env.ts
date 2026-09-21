@@ -82,6 +82,12 @@ const schema = {
     // once daily at a configured hour in the instance time zone." 0-23,
     // local to INSTANCE_TIMEZONE.
     INSTANCE_DIGEST_HOUR: { type: "number", default: 8 },
+
+    // --- The deliverable (specs/screens/deliverable.md) ---
+    // The system Chromium `puppeteer-core` drives to print the statement.
+    // Optional: unset, the renderer probes the usual Debian locations, which
+    // is what the image provides (`specs/architecture.md` § Deployment).
+    CHROMIUM_PATH: { type: "string" },
   },
 };
 
@@ -117,6 +123,8 @@ declare module "fastify" {
       INSTANCE_FROM_EMAIL?: string;
       INSTANCE_TIMEZONE?: string;
       INSTANCE_DIGEST_HOUR: number;
+
+      CHROMIUM_PATH?: string;
     };
   }
 }

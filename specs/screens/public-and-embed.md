@@ -12,18 +12,23 @@ What someone sees who has the document's public link rather than a personal one,
 | `/d/<slug>/signatories` | signatory list and counts, minimal chrome | frameable |
 | `/d/<slug>/signatories.json` | counts and the listed signatories | CORS `*` |
 | `/d/<slug>/widget.js` | a tiny script that renders counts + "signed by" into a host element | CORS `*` |
+| `/d/<slug>/statement.pdf` | the deliverable (`screens/deliverable.md`) | not frameable |
 
 All 404 when `public_access = none`, `state = draft`, or the slug is unknown, with the same body.
+
+`statement.pdf` carries **one further gate**: it 404s, with that same body, whenever `audience = closed`. `public_access` says who may read the working draft; `audience` says who the finished statement is for (`../data-model.md` § Audience), and a statement addressed to a named body is delivered to that body and not published as a download to anyone who guesses the slug. A `closed` document drafted in the open is therefore readable here and not downloadable here, which is exactly what its signers were told before they signed. It is also the one expensive anonymous endpoint on the instance — a render costs a headless browser — so it is rate-limited per source address (`api/conventions.md` § Rate limits).
 
 Every route here lives on the document's **site** hostname (`behaviors/sites.md`). Asked for on another site's host, each redirects to the canonical host with its path and query intact — including the embed, JSON and widget routes, so a host page that embeds the canonical address never sees a redirect. An unknown slug is the same 404 on every host.
 
 ## Data Requirements
 
-Document (title, phase, deadlines, `show_signatories`, `reply_to`), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list.
+Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list. `audience` is here for one reason — it decides whether the footer offers the statement download — and it is the same stored value the admin API returns; `public_access` is not in this payload and never has been.
 
 ## Display Rules
 
 **Public read view**: the document screen layout without the status card and identity line. In its place, a card: "Want to add your name? This document is open to invited signers. Ask the team for your personal link: *reply_to*." **[phase 2]** when `public_access = participate`, the card becomes "Sign or comment: enter your email and we'll send you your own link" with name and email fields, then a "check your email" state.
+
+**The statement download**: when `statement.pdf` would render rather than 404, the public read view's footer carries "Download the statement (PDF)", the same quiet link the participant page carries. When it would 404 — a `closed` audience — the link is absent, and nothing on the page says a download exists.
 
 **Site identity**: the top bar names the document's site — its `logo_url` image when set, otherwise its `name` as text, with the name as the accessible name either way — and the accent token follows the site's `accent` when it sets one. Nothing on the page names, links to or hints at the platform or any other site.
 

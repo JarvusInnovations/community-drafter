@@ -52,6 +52,12 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
           comments_close_at: document.record.comments_close_at,
           signing_closes_at: document.record.signing_closes_at,
           show_signatories: document.record.show_signatories ?? "list",
+          // `specs/screens/public-and-embed.md` § Data Requirements: here
+          // for one reason — it decides whether the footer offers the
+          // statement download (`specs/screens/deliverable.md`). A document
+          // stored without it reads `closed` (`specs/data-model.md` §
+          // Audience). `public_access` is still not in this payload.
+          audience: document.record.audience ?? "closed",
           reply_to: document.record.reply_to,
           sender_name: document.record.sender_name,
         },

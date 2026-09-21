@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+
 import {
   bool,
   csv,
@@ -55,9 +57,10 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   reopen: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
   operators: { positionals: 3 },
+  export: { positionals: 1, value: ["--out", "--paper"], boolean: ["--pdf", "--draft"] },
 };
 
-export const DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
+export const DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|export|operators> ...
 
 create <slug> --title <text> --audience public|closed
        [--site <slug>] [--sender-name <text>] [--reply-to <email>]
@@ -97,6 +100,20 @@ reopen <slug> [--comments-close <when>] --signing-closes <when>
 zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
 what it resolved to.
 withdraw <slug> --reason <text> [--public]
+export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
+       The deliverable: the current version's text with a title block naming
+       who it is addressed to, then the signatory list as it stands. --pdf
+       names the format and is the only one today, so it may be omitted.
+
+       Without --out the file is <slug>-v<n>.pdf in the working directory, or
+       <slug>-v<n>-draft.pdf while the copy is still a draft. A copy is a
+       draft — watermarked DRAFT, with the version number — until the
+       document has a final version AND signing has closed. --draft forces
+       the watermark back on; there is deliberately no flag the other way.
+
+       The signatory list is computed at the moment of the render and is
+       never frozen, so a name revoked after closing is simply not in the
+       next copy. For the counts themselves, run \`signatures list <slug>\`.
 operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
@@ -424,6 +441,55 @@ export async function docsCommand(args: string[]): Promise<string> {
         body,
       );
       return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
+    }
+
+    case "export": {
+      const slug = requirePositional(
+        parsed,
+        0,
+        "slug",
+        "signatories-axi docs export <slug> --pdf [--out <file>]",
+      );
+      // `specs/api/admin-cli.md`: `--pdf` names the format and is the only
+      // one today, so a bare `docs export <slug>` means the same thing
+      // rather than failing over a flag with one legal value.
+      const paper = str(parsed, "--paper");
+      if (paper !== undefined && paper !== "letter" && paper !== "a4") {
+        throw new AxiError("--paper must be letter or a4", "USAGE", [
+          `Run \`${cli} docs export ${slug} --pdf --paper letter\``,
+        ]);
+      }
+      const download = await client.getBinary(
+        `/documents/${encodeURIComponent(slug)}/statement.pdf`,
+        { paper, draft: bool(parsed, "--draft") ? "1" : undefined },
+      );
+
+      // The version number and the draft-or-clean word are read off the
+      // name the server chose, so what is printed describes the bytes that
+      // were written rather than a second, later look at the document.
+      const serverName = download.filename ?? `${slug}.pdf`;
+      const out = str(parsed, "--out") ?? serverName;
+      writeFileSync(out, download.bytes);
+
+      const draftCopy = serverName.endsWith("-draft.pdf");
+      const version = /-v(\d+)(?:-draft)?\.pdf$/u.exec(serverName)?.[1];
+      const result = {
+        out,
+        version: version === undefined ? undefined : Number(version),
+        copy: draftCopy ? "draft" : "clean",
+        paper: paper ?? "letter",
+        bytes: download.bytes.byteLength,
+      };
+      return render(parsed, result, () =>
+        joinBlocks(
+          renderObject(compact(result)),
+          renderHelp([
+            draftCopy
+              ? `This copy is watermarked DRAFT; it goes clean once ${slug} has a final version and signing has closed`
+              : `Run \`${cli} signatures list ${slug}\` to read the names on this copy`,
+          ]),
+        ),
+      );
     }
 
     case "operators": {
