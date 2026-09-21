@@ -104,9 +104,9 @@ service account of its own for the plan job (deferred, see Follow-ups).
       against `tf/` and pass, and the job is green on PR #90. Only `tf-validate.yml`
       shipped: the criterion said "two workflows", and the plan half was withdrawn after
       it failed in CI — see Notes.
-- [ ] A `tofu plan -concise` runs on PRs that touch `tf/`. **Blocked**, not built: the CI
-      service account cannot read the state bucket (issue #92). Left unchecked rather than
-      reworded.
+- [x] A `tofu plan -concise` runs on PRs that touch `tf/`. Built on PR #90, withdrawn when
+      CI could not read the state bucket (#92), restored once the CI service account was
+      granted object access on `gs://jarvus-tfstate` (2026-09-21); green on the restoring PR.
 
 ## Risks / unknowns
 
