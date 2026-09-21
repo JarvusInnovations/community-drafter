@@ -19,7 +19,7 @@ import { useAdminDocument } from "./DocumentContext.tsx";
 import { quietButtonClass } from "./styles.ts";
 import { type ActivityEntry, type InvitationRow, type NotificationsHealth } from "./types.ts";
 import { Timeline } from "../participant/components/Timeline.tsx";
-import { formatAbsolute } from "../participant/format.ts";
+import { formatAbsolute, formatDayStamp } from "../participant/format.ts";
 
 function downloadText(filename: string, text: string, mime: string): void {
   const blob = new Blob([text], { type: mime });
@@ -440,6 +440,18 @@ export function DashboardScreen(): JSX.Element {
             <p className="mt-1">
               {copy.dashboard.pendingLabel}: {notifications.pending} · {copy.dashboard.failedLabel}:{" "}
               {notifications.failed}
+            </p>
+            {/*
+              `specs/screens/admin-dashboard.md` § Notification health: the
+              team's own mail is the one delivery figure `notified` cannot
+              show, because an operator message writes nothing to any
+              participation (#74).
+            */}
+            <p className="mt-1">
+              {copy.dashboard.operatorDigestLabel}:{" "}
+              {notifications.operator_digest_sent
+                ? formatDayStamp(notifications.operator_digest_sent)
+                : copy.dashboard.operatorDigestNone}
             </p>
             {/*
               `specs/screens/admin-dashboard.md` § Notification health: a

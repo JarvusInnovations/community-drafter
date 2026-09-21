@@ -191,6 +191,8 @@ export const copy = {
     sentLabel: "Sent",
     pendingLabel: "Pending",
     failedLabel: "Failed",
+    operatorDigestLabel: "Last operator digest",
+    operatorDigestNone: "none yet",
     sinceRestart: "Queued and failed are counted since the process last started.",
   },
 

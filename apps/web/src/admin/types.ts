@@ -181,6 +181,11 @@ export interface NotificationFailure {
 
 export interface NotificationsHealth {
   sent: Record<string, number>;
+  /**
+   * `specs/screens/admin-dashboard.md` § Notification health: the date the
+   * last operator digest went out for this document, absent when none has.
+   */
+  operator_digest_sent?: string;
   pending: number;
   failed: number;
   /**
