@@ -32,7 +32,7 @@ Top to bottom:
 5. **The document**: rendered markdown, readable typography, max line length for prose, headings with anchor links. No highlights in this view. A wide element the prose measure cannot hold — a table, in practice — scrolls horizontally inside its own container; the page itself never scrolls sideways.
 6. **Your submissions**: if the person has submitted, a collapsed section listing each submission whole (version, date, judgement, its comments with disposition badges).
 7. **Signatories**: per `show_signatories`: counts line, then organizations, then individuals. The counts line reads "Signed by 2 organizations and 14 individuals, and 1 other who asked not to be listed"; a signer who asked not to be listed is counted **once**, in that trailing clause only, and never inside the organizations or individuals figure (`behaviors/signatures.md` § Display). Collapsed beyond 20 entries with "show all". Updates on each load.
-8. **Footer**: the document's reply-to address as "Questions? Email the team" (the site's `reply_to` when the document sets none, per `behaviors/sites.md` § Mail), "Manage how we contact you" (preferences), and a one-line explanation of what this page is ("This is a private link made for you by *sender_name*." — the document's `sender_name`, else the site's, else the site's name). No line names the platform or any other site.
+8. **Footer**: the document's reply-to address as "Questions? Email the team" (the site's `reply_to` when the document sets none, per `behaviors/sites.md` § Mail), "Manage how we contact you" (preferences), **"Download the statement (PDF)"** — the deliverable (`screens/deliverable.md`), offered to everyone holding a personal link in every phase, because they can already read every word of it on this page; it is absent only before a first version exists — and a one-line explanation of what this page is ("This is a private link made for you by *sender_name*." — the document's `sender_name`, else the site's, else the site's name). No line names the platform or any other site.
 
 The page must render its status card and title within the bundle budget in `architecture.md`; the document body and signatory list may stream in after. Nothing on this route depends on cookies or local storage.
 
@@ -69,6 +69,7 @@ Screenshots of the mock that defines this are in `site/img/` once the live app m
 | I have comments first / Add comments / Continue | navigates to comment mode (`/i/<token>/comment`) |
 | See what changed / All versions | version history (`/i/<token>/history`) |
 | Manage how we contact you | preferences (`/i/<token>/prefs`) |
+| Download the statement (PDF) | fetches the deliverable (`screens/deliverable.md`); no state change |
 | Not you? | expands an explanation panel naming the sender the document was sent under (`sender_name`, with `reply_to` as the address to ask); no state change |
 
 Each action is refused with the phase message when the phase forbids it (`behaviors/document-lifecycle.md`).

@@ -28,6 +28,7 @@ specs/
 │   └── notifications.md          events, channels, subscriptions, sending
 ├── screens/
 │   ├── document.md               the participant page: read + sign
+│   ├── deliverable.md            the finished statement as a PDF
 │   ├── comment-mode.md           PR-review-style commenting
 │   ├── version-history.md        versions list and diff view
 │   ├── preferences.md            notification preferences

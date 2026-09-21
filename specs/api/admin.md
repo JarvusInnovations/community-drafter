@@ -34,6 +34,10 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
   One transaction, one commit: the document body, disposition fields on the affected submissions (`Disposed` trailer), and the `signing_closes_at` extension if in signing phase; notifications queued from it. Errors: `validation_failed` (summary length, unknown comment id, `declined` without note), `no_change` (text identical to current), `phase_closed` when `state` is `closed` or `withdrawn`. Response: the version (number, summary, commit) and `{ notified: { every_revision: n, dispositions: n, signers: n } }`.
 - `GET /documents/:slug/compare?from=&to=` → same shape as the participant compare.
 
+## The deliverable
+
+- `GET /documents/:slug/statement.pdf` → the deliverable (`../screens/deliverable.md`) as `application/pdf`, `Content-Disposition: attachment`. `?paper=letter|a4` (default letter) and `?draft=1` — which forces the watermarked form of a document that has already gone clean, for an operator who wants a marked copy to circulate; there is no flag the other way, because a clean copy of an unfinished statement is the one thing nobody may produce. Errors: `not_found` for an unknown slug, a document with no version, and a `withdrawn` one. Recorded nowhere: rendering is a read, and the PDF is never written to the data repo.
+
 ## People and invitations
 
 - `POST /documents/:slug/invitations/import[?dry_run=1]` — body: NDJSON or JSON array of `{ name, email, phone?, org?, role?, descriptor?, external_id?, suggested_capacity?, tags? }`. Merges people by email (case-insensitive), creates invitations for those without one, mints tokens. One transaction. Response: `{ people_created, people_updated, invitations_created, skipped_existing, rows: [{ email, name, person, action, changes }] }` where `action` is `invite_new_person`, `invite_existing_person` or `skip_existing` and `changes` lists the person fields the row would overwrite. With `dry_run=1` nothing is written and the same shape comes back with `dry_run: true`, so a list can be built and reviewed before anything exists.
