@@ -159,6 +159,29 @@ step 7. Certificate provisioning
 finishes automatically once the record resolves; no further `tofu apply`
 needed.
 
+**The platform's own zones.** `signatories.org` and `signatories.app` are
+Cloud DNS zones in *this* project (`tf/dns.tf`), so their records — including
+`sites.signatories.org`, the alias every customer CNAMEs to — are `tofu`'s,
+not hand work. Two things still live at the registrar:
+
+- the **name servers**, from the `signatories_org_name_servers` /
+  `signatories_app_name_servers` outputs;
+- the **DS record**. DNSSEC is on for both zones: Cloud DNS signs them, but
+  nothing validates until the registrar publishes the DS record for the
+  key-signing key. Read it out and paste it into the registrar's DNSSEC
+  form:
+
+  ```sh
+  gcloud dns dns-keys list --zone=signatories-org --project=community-drafter
+  gcloud dns dns-keys describe 0 --zone=signatories-org \
+    --project=community-drafter --format='value(ds_record())'
+  ```
+
+  (`0` is the `keySigning` key's ID from the first command; use
+  `--zone=signatories-app` for the other domain.) A missing DS is not an
+  outage — it is DNSSEC simply not in force — but it is easy to forget and
+  invisible afterwards. Re-do it if the key-signing key is ever rotated.
+
 ### 7. Onboarding a site (a customer hostname)
 
 One deployment answers on many hostnames; each is a **site** with its own name,
@@ -169,29 +192,81 @@ zone. Four steps, in this order. Steps 1–3 are infrastructure and DNS; only
 step 4 is data. Creating, changing or deleting a site is a superadmin action;
 managing a site's operator group is not.
 
-**1. Verify the domain to the GCP project.** Google refuses to create a domain
-mapping for a domain the project has not been verified for. Either have the
-customer add the TXT record Google prints, or verify the domain yourself in
-Search Console with the project's service account as an owner:
+**1. Verify ownership of the domain.** Google refuses to create a domain
+mapping unless the *account making the call* is a verified owner of the
+domain. Verification belongs to a Google account, not to a project: being a
+project owner is not enough, and a domain someone else verified does nothing
+for us. Start by checking what the active account already holds:
 
 ```sh
-gcloud domains verify letters.example.org
+gcloud domains list-user-verified
+```
+
+That command takes no `--project` — the list is the account's. As of
+2026-09-20 it lists `jarv.us` (which is why the `drafter.jarv.us` mapping
+exists) and neither `signatories.org` nor `signatories.app`, so the platform's
+own domains still need this step before their first mapping.
+
+If the base domain is not listed:
+
+```sh
+gcloud domains verify example.org
+```
+
+**This step is interactive and it needs a human with a browser.** It opens
+Search Console signed in as whatever account `gcloud` is authenticated as, and
+asks for a **Domain property**, which is verified by adding a TXT record of the
+form `google-site-verification=<token>` at the base domain. There is no
+non-interactive form, nothing in `tf/` does it, and — checked against the
+Cloud Run documentation — a domain whose Cloud DNS zone happens to live in
+this same project is **not** auto-verified. The only shortcut Google offers is
+a domain bought through Google in the same account.
+
+Verify the **base domain** (`example.org`), not the hostname the site will use.
+
+Two ways to divide the work; prefer the first:
+
+- **We hold the verification.** The project owner runs `gcloud domains verify
+  example.org` in their own Google account, sends the customer the
+  `google-site-verification` TXT record Search Console prints, and clicks
+  *Verify* once the customer confirms it resolves (`dig +short TXT example.org`).
+  This matches what the spec promises the customer: they add one record, we own
+  the Google-side state.
+- **The customer holds it.** They verify the property in their own account,
+  then add ours as owners: Search Console → the property → *Settings* →
+  *Users and permissions* → *Verified owners* → *Add an owner*.
+
+Either way, **add every identity that will ever create a mapping for this
+domain as a verified owner** — the human who applies `tf/` by hand *and* the CI
+service account `community-drafter-ci@community-drafter.iam.gserviceaccount.com`.
+An apply by an unlisted identity fails with *"Caller is not authorized to
+administer the domain"*, which reads like an IAM problem and is not one.
+
+For a hostname on one of the platform's own domains, the TXT record is ours to
+add — either in `tf/dns.tf` next to the other records, or directly:
+
+```sh
+gcloud dns record-sets create signatories.app. --type=TXT --ttl=300 \
+  --zone=signatories-app --project=community-drafter \
+  --rrdatas='"google-site-verification=<token>"'
 ```
 
 **2. Map the hostname.** Add it to `site_hostnames` in `tf/terraform.tfvars`
-and apply. `tf/cloudrun.tf` creates one `google_cloud_run_domain_mapping` per
-entry alongside the deployment's own:
+and apply, as an identity that is a verified owner of its domain (step 1).
+`tf/cloudrun.tf` creates one `google_cloud_run_domain_mapping` per entry
+alongside the deployment's own:
 
 ```sh
 cd tf
 tofu apply -concise
-gcloud run domain-mappings describe --domain=letters.example.org \
+gcloud beta run domain-mappings describe --domain=letters.example.org \
   --project=community-drafter --region=us-east4 \
   --format='value(status.resourceRecords)'
 ```
 
-The mapping is created before DNS exists; Cloud Run reports
-`CertificatePending` and waits.
+(`beta` because the installed `gcloud` only accepts `--region` on the beta and
+alpha tracks for `run domain-mappings`.) The mapping is created before DNS
+exists; Cloud Run reports `CertificatePending` and waits.
 
 **3. Point DNS at the service.** The customer adds a CNAME in their own zone
 pointing the hostname at **`sites.signatories.org`**:
@@ -201,13 +276,16 @@ letters.example.org.   CNAME   sites.signatories.org.
 ```
 
 `sites.signatories.org` is an alias the platform maintains in the
-`signatories.org` zone; it resolves to `ghs.googlehosted.com.`, which is what
-`domain-mappings describe` prints. Hand customers the platform alias, never
-Google's hostname directly: it is one name we control, so if the target ever
-changes we edit one record instead of asking every customer to edit theirs.
+`signatories.org` zone (`tf/dns.tf`); it resolves to `ghs.googlehosted.com.`,
+which is what `domain-mappings describe` prints. Hand customers the platform
+alias, never Google's hostname directly: it is one name we control, so if the
+target ever changes we edit one record instead of asking every customer to edit
+theirs.
 
 The certificate provisions automatically once the record resolves — usually
-minutes, occasionally longer. No further apply.
+minutes, occasionally longer. No further apply. Check with
+`gcloud beta run domain-mappings describe --domain=… --format='value(status.conditions)'`
+or simply by loading the hostname over https.
 
 **4. Create the site record.**
 
@@ -221,11 +299,22 @@ drafter-axi sites operators add example someone@example.org
 ```
 
 `sites create` prints, in one block, every DNS record the customer still has to
-add — the CNAME above, and with `--sender-email` the two Postmark records (a
-DKIM `TXT` and a Return-Path `CNAME`). **Take those two values from the
-Postmark UI** (Sender Signatures → the domain → DKIM / Return-Path); automating
-this through Postmark's Account API is a follow-up, not something the service
-does today.
+add. For the invocation above that block is exactly three records, and this
+table is the same three — if the two ever disagree, one of them is a bug:
+
+| type | name | value | why |
+| --- | --- | --- | --- |
+| `CNAME` | `letters.example.org` | `sites.signatories.org` | routes the hostname (step 3); the certificate follows on its own |
+| `TXT` | `<the DKIM host Postmark shows>.example.org` | from Postmark | DKIM signing for this site's mail |
+| `CNAME` | `pm-bounces.example.org` | from Postmark | Return-Path for this site's mail |
+
+The CNAME is printed for every site; the two Postmark records only when
+`--sender-email` is given. **Take those two values from the Postmark UI**
+(Sender Signatures → the domain → DKIM / Return-Path): Postmark's DKIM host is
+a timestamped selector ending `pm._domainkey`, and the Return-Path target has
+been `pm.mtasv.net` at every check — but read both off the console rather than
+assuming, and never invent them. Automating this through Postmark's Account API
+is a follow-up, not something the service does today.
 
 Until the sender's domain is verified in Postmark, mail from that site's
 documents **fails per recipient** rather than going out under the platform's
@@ -239,10 +328,21 @@ Assign documents with `drafter-axi docs create <slug> --site example …` or
 belongs to the default site, which is this deployment's own hostname, name and
 sender — nothing about existing documents changes.
 
-**Watch the ceiling.** Cloud Run enforces a per-project limit on domain
-mappings and each one is slow to provision. Check the current quota before
-promising a customer a hostname, and onboard in batches rather than one apply
-per signup.
+**Watch the ceiling.** It is not where it looks like it is:
+
+- **Domain mappings themselves have no published per-project cap**, and
+  `gcloud alpha services quota list --service=run.googleapis.com
+  --consumer=projects/community-drafter` lists no domain-mapping metric at all
+  (checked 2026-09-20), so there is no quota to read and none to raise. Current
+  usage is **1** mapping — `drafter.jarv.us` — from `gcloud beta run
+  domain-mappings list --project=community-drafter --region=us-east4`.
+- **The real ceiling is certificates: 50 per top domain per week**, documented
+  as a fixed limit that cannot be increased. Whitelabel hostnames under one of
+  our own domains (`*.signatories.app`) all share that one budget; hostnames on
+  customers' own domains each bring their own. Fifty whitelabel sites in a week
+  is the wall, and it is a wait, not an error to appeal.
+- Each certificate takes minutes. Onboard in batches rather than one apply per
+  signup.
 
 ### 8. Signing in: a human, the CLI, and a bot operator
 
