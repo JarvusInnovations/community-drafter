@@ -80,9 +80,12 @@ describe("host → site resolution and the canonical-host redirect", () => {
     expect(wrongHost.statusCode).toBe(302);
     expect(wrongHost.headers.location).toBe(`https://${A_HOST}/d/a-letter/history?from=1&to=2`);
 
+    // The JSON route rather than the SPA shell: the built web app is not
+    // present in this package's test run, and what is being checked here is
+    // that the canonical host does not redirect.
     const rightHost = await server.inject({
       method: "GET",
-      url: "/d/a-letter",
+      url: "/d/a-letter/api/bundle",
       headers: { host: A_HOST },
     });
     expect(rightHost.statusCode).toBe(200);
