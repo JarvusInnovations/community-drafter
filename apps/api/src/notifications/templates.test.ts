@@ -8,6 +8,7 @@ import {
   dispositionTemplate,
   finalPublishedTemplate,
   invitationTemplate,
+  listingChangedTemplate,
   reminderTemplate,
   reviewReceiptTemplate,
   revocationConfirmationTemplate,
@@ -61,6 +62,25 @@ function assertShape(result: { subject: string; text: string; html: string }): v
   expect(result.html).toContain("Or paste this link into your browser:");
   expect(result.html).not.toContain("<img");
   expect(result.text).not.toContain("Coalition Team <");
+  assertPreferenceFooter(result);
+}
+
+/**
+ * `specs/behaviors/notifications.md` § Content rules: "**Every message to a
+ * participant** ends with 'Manage how we contact you' ... and a one-click
+ * 'stop all optional messages' link" — transactional messages included.
+ * Both parts say the same words, and both URLs carry this recipient's own
+ * personal-link token.
+ */
+function assertPreferenceFooter(result: { text: string; html: string }): void {
+  const ctx = buildContext();
+  expect(result.text).toContain(`Manage how we contact you: ${ctx.prefsLink}`);
+  expect(result.text).toContain(`Stop optional messages: ${ctx.stopOptionalLink}`);
+  expect(result.html).toContain(`href="${ctx.prefsLink}"`);
+  expect(result.html).toContain(`href="${ctx.stopOptionalLink}"`);
+  // The token is what makes the links personal — a footer pointing at a
+  // token-less `/prefs` would land nobody anywhere.
+  expect(result.text).toContain("JANE-TOKEN-1234/prefs");
 }
 
 describe("notification templates", () => {
@@ -79,7 +99,6 @@ describe("notification templates", () => {
     const result = signatureConfirmationTemplate(ctx, { capacity: "official", conditional: false });
     expect(result.subject).toBe("Coalition Charter — you signed");
     expect(result.text).toContain("official");
-    expect(result.text).not.toContain(ctx.prefsLink);
     assertShape(result);
     assertNoLeakage(result);
   });
@@ -216,16 +235,37 @@ describe("notification templates", () => {
     assertNoLeakage(second);
   });
 
-  it("every subscription message includes the prefs link and the stop-optional link, in both parts", () => {
+  // The five messages sent unconditionally, whatever the preferences say
+  // (`specs/behaviors/notifications.md` § Messages). Carrying the footer does
+  // not make them optional; it is where a signer who keeps only the receipt
+  // goes looking for the controls.
+  const TRANSACTIONAL: Array<[string, () => { text: string; html: string }]> = [
+    ["invitation", () => invitationTemplate(ctx)],
+    [
+      "signature-confirmation",
+      () => signatureConfirmationTemplate(ctx, { capacity: "personal", conditional: false }),
+    ],
+    ["revocation-confirmation", () => revocationConfirmationTemplate(ctx, {})],
+    ["listing-changed", () => listingChangedTemplate(ctx, { listedAs: "Jane Doe", listed: true })],
+    ["review-receipt", () => reviewReceiptTemplate(ctx, { judgement: "sign", commentCount: 2 })],
+  ];
+
+  it.each(TRANSACTIONAL)("%s carries both preference links, in both parts", (_event, render) => {
+    assertPreferenceFooter(render());
+  });
+
+  it("subscription messages keep the two preference links", () => {
     const result = versionTemplate(ctx, {
       version: 1,
       summary: "First draft",
       compareLink: ctx.personalLink,
     });
-    expect(result.text).toContain(`Manage how we contact you: ${ctx.prefsLink}`);
-    expect(result.text).toContain(`Stop optional messages: ${ctx.stopOptionalLink}`);
-    expect(result.html).toContain(`href="${ctx.prefsLink}"`);
-    expect(result.html).toContain(`href="${ctx.stopOptionalLink}"`);
+    assertPreferenceFooter(result);
+  });
+
+  it("the footer is small print, not a second button", () => {
+    const result = signatureConfirmationTemplate(ctx, { capacity: "official", conditional: false });
+    expect(result.html.match(/display:inline-block;background:#2457f5/g)).toHaveLength(1);
   });
 
   it("omits the clock sentence when the document is not open", () => {
