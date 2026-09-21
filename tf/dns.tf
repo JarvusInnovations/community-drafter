@@ -44,3 +44,18 @@ output "signatories_app_name_servers" {
   description = "Set these as the name servers for signatories.app at the registrar."
   value       = google_dns_managed_zone.signatories_app.name_servers
 }
+
+# The one name every customer hostname CNAMEs to (specs/architecture.md
+# § Sites; specs/behaviors/sites.md § Onboarding a hostname, step 3). It is
+# an alias for Google's Cloud Run endpoint, and customers are handed it
+# instead of that endpoint so a change of target is one edit here rather
+# than a request to every customer's DNS administrator — which is also why
+# the TTL is low. Editing or deleting this record takes every whitelabel
+# hostname down at once.
+resource "google_dns_record_set" "sites_alias" {
+  name         = "sites.${google_dns_managed_zone.signatories_org.dns_name}"
+  managed_zone = google_dns_managed_zone.signatories_org.name
+  type         = "CNAME"
+  ttl          = 300
+  rrdatas      = ["ghs.googlehosted.com."]
+}

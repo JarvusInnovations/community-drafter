@@ -140,7 +140,7 @@ Messages carry no logo and no header image on any site (`notifications.md` § Sh
 
 Four steps, in order, described for an operator in `docs/operations.md`:
 
-1. **Verify the domain to the project** — the customer adds the verification record the provider prints, or the platform team verifies the domain in Search Console. Required before a mapping can be created at all.
+1. **Verify ownership of the domain** — the base domain is verified as a Search Console domain property by adding the `google-site-verification` TXT record it prints, and every identity that will create a mapping for it — the person applying `tf/` by hand and the CI service account alike — is listed as a verified owner of that property. Verification belongs to an account, not to a project, so the identity running the apply is the one that has to hold it. Required before a mapping can be created at all.
 2. **Map the hostname** — add it to the deployment's list of site hostnames and apply (`tf/`, `plans/site-hostnames.md`).
 3. **Point DNS at the service** — the customer adds the CNAME to `sites.signatories.org`, the platform's own alias for Google's endpoint. The certificate provisions on its own once the record resolves.
 4. **Create the site record** — `sites create`, which prints, in one block, every DNS record the customer must add: the CNAME for the hostname, and, when `--sender-email` is given, the two records the mail provider requires (a DKIM TXT record and a Return-Path CNAME), whose values come from the provider's console.

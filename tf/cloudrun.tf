@@ -206,3 +206,28 @@ resource "google_cloud_run_domain_mapping" "community_drafter" {
     route_name = google_cloud_run_v2_service.community_drafter.name
   }
 }
+
+# Customer site hostnames — one mapping each (specs/architecture.md § Sites;
+# specs/behaviors/sites.md § Onboarding a hostname). Kept separate from the
+# deployment's own mapping above rather than folded into the list: that one
+# is addressed by var.domain_mapping, and merging the two would churn state
+# for no gain.
+#
+# Every entry must already be verified to the identity running the apply, or
+# the create fails with "Caller is not authorized to administer the domain".
+# The customer's CNAME points at sites.signatories.org (tf/dns.tf), never at
+# Google's hostname directly.
+resource "google_cloud_run_domain_mapping" "sites" {
+  for_each = toset(var.site_hostnames)
+
+  name     = each.value
+  location = google_cloud_run_v2_service.community_drafter.location
+
+  metadata {
+    namespace = data.google_project.project.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.community_drafter.name
+  }
+}
