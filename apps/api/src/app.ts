@@ -7,6 +7,7 @@ import { ApiError } from "./errors.ts";
 import eventsPlugin from "./events/bus.ts";
 import { PhaseObserver } from "./events/phase-observer.ts";
 import gatewayPlugin from "./gateway/gateway.ts";
+import deliverablePlugin from "./deliverable/plugin.ts";
 import commentTimingPlugin from "./lib/comment-timing.ts";
 import idempotencyPlugin from "./lib/idempotency.ts";
 import requestContextPlugin from "./lib/request-context.ts";
@@ -69,6 +70,10 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   await fastify.register(renderingPlugin);
   await fastify.register(idempotencyPlugin);
   await fastify.register(commentTimingPlugin);
+  // The statement renderer (`specs/screens/deliverable.md`). Reads the
+  // render cache and the config; launches nothing until the first PDF is
+  // asked for, so an instance that never serves one pays nothing for it.
+  await fastify.register(deliverablePlugin);
 
   // 3. Storage: the data repo, read model, tracker, push daemon.
   await fastify.register(storagePlugin, opts.storage ?? {});
