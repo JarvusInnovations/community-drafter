@@ -5,7 +5,7 @@ public_url               = "https://signatories.app"
 mailer                   = "postmark"
 bootstrap_operator_email = "chris@jarv.us"
 # Postmark-verified sender on the platform domain (DKIM, Return-Path and DMARC in dns.tf).
-instance_from_email      = "hello@signatories.app"
+instance_from_email = "hello@signatories.app"
 
 # Raised for the simulated campaign run of 2026-09-20 (many operators signing in from one machine); return to 5 afterwards.
 auth_login_rate_limit = 500
