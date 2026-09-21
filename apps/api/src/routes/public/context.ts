@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
+import { findPublicDocument } from "../../lib/public-document.ts";
 import { derivePhase, type Phase } from "../../phase/phase.ts";
 import type { DocumentEntry } from "../../storage/read-model.ts";
 
@@ -23,25 +24,18 @@ export interface PublicContext {
 
 /**
  * Common preamble for every `/d/:slug/*` handler: resolve the document the
- * route's `:slug` param names, and gate it exactly as
- * `specs/screens/public-and-embed.md` requires — unknown slug, `state =
- * draft`, or `public_access = none` (the gitsheets schema default) all
- * throw the one shared `PUBLIC_NOT_FOUND` instance.
+ * route's `:slug` param names through the shared gate
+ * (`lib/public-document.ts`) and turn its `null` — unknown slug, `state =
+ * draft`, or `public_access = none` (the gitsheets schema default) alike —
+ * into the one shared `PUBLIC_NOT_FOUND` instance.
  */
 export function loadPublicDocument(
   fastify: FastifyInstance,
   request: FastifyRequest,
 ): PublicContext {
   const params = request.params as Record<string, string | undefined>;
-  const slug = params.slug;
-  if (!slug) throw PUBLIC_NOT_FOUND;
-
-  const document = fastify.storage.readModel.getDocument(slug);
+  const document = findPublicDocument(fastify, params.slug);
   if (!document) throw PUBLIC_NOT_FOUND;
-
-  const access = document.record.public_access ?? "none";
-  if (access === "none") throw PUBLIC_NOT_FOUND;
-  if (document.record.state === "draft") throw PUBLIC_NOT_FOUND;
 
   const phase = derivePhase(document.record, new Date());
   return { document, phase };
