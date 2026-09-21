@@ -90,3 +90,31 @@ resource "google_dns_record_set" "demo_site" {
   ttl          = 300
   rrdatas      = ["sites.signatories.org."]
 }
+
+# The product site (specs/screens/marketing-site.md) is GitHub Pages with
+# signatories.org as its custom domain: apex A/AAAA to GitHub's Pages
+# addresses, www as a CNAME to the org's Pages host. GitHub issues the
+# certificate once these resolve.
+resource "google_dns_record_set" "signatories_org_apex_a" {
+  name         = google_dns_managed_zone.signatories_org.dns_name
+  managed_zone = google_dns_managed_zone.signatories_org.name
+  type         = "A"
+  ttl          = 300
+  rrdatas      = ["185.199.108.153", "185.199.109.153", "185.199.110.153", "185.199.111.153"]
+}
+
+resource "google_dns_record_set" "signatories_org_apex_aaaa" {
+  name         = google_dns_managed_zone.signatories_org.dns_name
+  managed_zone = google_dns_managed_zone.signatories_org.name
+  type         = "AAAA"
+  ttl          = 300
+  rrdatas      = ["2606:50c0:8000::153", "2606:50c0:8001::153", "2606:50c0:8002::153", "2606:50c0:8003::153"]
+}
+
+resource "google_dns_record_set" "signatories_org_www" {
+  name         = "www.${google_dns_managed_zone.signatories_org.dns_name}"
+  managed_zone = google_dns_managed_zone.signatories_org.name
+  type         = "CNAME"
+  ttl          = 300
+  rrdatas      = ["jarvusinnovations.github.io."]
+}
