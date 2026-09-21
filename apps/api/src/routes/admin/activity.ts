@@ -42,6 +42,9 @@ const activityRoute: FastifyPluginAsync = async (fastify) => {
       };
 
       return entries.slice(0, limit).map((entry) => ({
+        // An `opened` entry is expanded from a `track` commit's `Opened`
+        // trailer, so several entries share one hash — the person is what
+        // makes each one distinct (`specs/api/admin.md` § Activity).
         commit: entry.commit,
         date: entry.at,
         subject: entry.subject,

@@ -187,4 +187,44 @@ describe("GET /admin/api/documents/:slug/activity", () => {
 
     await server.close();
   });
+
+  /**
+   * `specs/screens/admin-dashboard.md` § Recent activity: a person's first
+   * visit is an entry, and a return visit is not.
+   */
+  it("shows a first open as an `opened` entry, and shows nothing for a return visit", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-opens" });
+    await seedParticipant(server, {
+      document: "doc-opens",
+      person: "jane-doe",
+      token: "k".repeat(20),
+    });
+
+    server.storage.tracker.record("doc-opens", "jane-doe");
+    await server.storage.tracker.flush();
+
+    const read = async (): Promise<Array<Record<string, unknown>>> => {
+      const response = await server.inject({
+        method: "GET",
+        url: "/admin/api/documents/doc-opens/activity",
+        headers: adminHeaders(),
+      });
+      return response.json() as Array<Record<string, unknown>>;
+    };
+
+    const opens = (await read()).filter((entry) => entry.action === "opened");
+    expect(opens.length).toBe(1);
+    expect(opens[0]?.person).toBe("jane-doe");
+
+    // The same person again: tracked, but not an event.
+    server.storage.tracker.record("doc-opens", "jane-doe");
+    await server.storage.tracker.flush();
+    const after = await read();
+    expect(after.filter((entry) => entry.action === "opened").length).toBe(1);
+    expect(after.some((entry) => entry.action === "track")).toBe(false);
+
+    await server.close();
+  });
 });

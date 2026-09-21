@@ -390,7 +390,10 @@ export function DashboardScreen(): JSX.Element {
           <Card className="mt-2 p-0">
             <ul className="flex flex-col text-sm">
               {activity.map((entry) => (
-                <li key={entry.commit} className="border-b border-border px-4 py-2.5 last:border-0">
+                <li
+                  key={`${entry.commit}:${entry.person ?? ""}`}
+                  className="border-b border-border px-4 py-2.5 last:border-0"
+                >
                   <span className="text-muted-foreground">{formatAbsolute(entry.date)}</span> —{" "}
                   {entry.subject}
                   {entry.actor ? (

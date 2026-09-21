@@ -140,6 +140,13 @@ export interface Trailers {
   Signature?: SignatureTrailer;
   Disposed?: string;
   Deadlines?: string;
+  /**
+   * `specs/data-model.md`: on a `track` commit, the people whose **first**
+   * open it recorded, comma-separated. A `track` commit that only bumped
+   * `last_seen_at` and `opens` carries none — a return visit is not an
+   * event (`specs/screens/admin-dashboard.md` § Recent activity).
+   */
+  Opened?: string;
   Reason?: string;
   "Request-Id"?: string;
 }

@@ -112,7 +112,15 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
     log: (message) => fastify.log.info(message),
   });
 
-  const tracker = new OpenTracker(boundCommit, opts.trackerIntervalMs);
+  const tracker = new OpenTracker(
+    boundCommit,
+    opts.trackerIntervalMs,
+    // `specs/data-model.md` → `Opened`: whether the commit about to be
+    // written is recording this person's *first* open. The read model is
+    // refreshed after every commit and the tracker is the only writer of
+    // `first_opened_at`, so it is the same answer the transaction will see.
+    (document, person) => !readModel.getParticipation(document, person)?.record.first_opened_at,
+  );
   tracker.start();
 
   let pushDaemon: PushDaemon | null = null;
