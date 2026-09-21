@@ -34,7 +34,19 @@ const statementPdfRoute: FastifyPluginAsync = async (fastify) => {
       const { document } = loadPublicDocument(fastify, request);
       if ((document.record.audience ?? "closed") !== "public") throw PUBLIC_NOT_FOUND;
 
-      const pdf = await fastify.deliverable.pdf(document, { paper: paperFromQuery(request) });
+      // `specs/screens/deliverable.md` § Availability rules out a withdrawn
+      // document and one with no version, and says so with a message of its
+      // own. On this door that message would itself be a disclosure — it
+      // would tell an anonymous caller that the slug exists — so every
+      // not-found from behind here comes back as the one shared body
+      // (`specs/screens/public-and-embed.md`).
+      let pdf;
+      try {
+        pdf = await fastify.deliverable.pdf(document, { paper: paperFromQuery(request) });
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "not_found") throw PUBLIC_NOT_FOUND;
+        throw error;
+      }
       return sendPdf(reply, pdf);
     },
   );

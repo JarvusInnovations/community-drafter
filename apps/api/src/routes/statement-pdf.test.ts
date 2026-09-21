@@ -114,9 +114,13 @@ describe("GET /d/:slug/statement.pdf — the public door", () => {
       state: "withdrawn",
     });
 
+    const unknown = await server.inject({ url: "/d/never-created/statement.pdf" });
     for (const slug of ["private-doc", "draft-doc", "withdrawn-doc"]) {
       const response = await server.inject({ url: `/d/${slug}/statement.pdf` });
       expect(response.statusCode).toBe(404);
+      // Byte-identical to a slug that was never created — a withdrawn
+      // document saying so in its own words would disclose that it exists.
+      expect(response.body).toBe(unknown.body);
     }
   });
 
