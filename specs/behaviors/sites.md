@@ -43,7 +43,7 @@ The default site is not a record. Its fields are read from the deployment's conf
 | --- | --- |
 | `slug` | `default` |
 | `hostname` | the host of `PUBLIC_URL` |
-| `name` | `INSTANCE_NAME`, falling back to `Community Drafter` |
+| `name` | `INSTANCE_NAME`, falling back to `Signatories` |
 | `sender_email` | `INSTANCE_FROM_EMAIL` — the platform's verified address |
 | `reply_to` | `INSTANCE_FROM_EMAIL` |
 | `sender_name`, `logo_url`, `accent` | unset |

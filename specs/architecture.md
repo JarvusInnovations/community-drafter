@@ -89,7 +89,7 @@ apps/api/              Fastify server: routes, gateway, storage, rendering, mail
 apps/web/              React SPA
 packages/shared/       types, anchor + diff algorithms, block-id hashing
 packages/cli/          the admin AXI CLI source (axi-sdk-js)
-skills/drafter-axi/    the installable skill: SKILL.md, shim, committed bundled .mjs, SessionStart hook
+skills/signatories-axi/    the installable skill: SKILL.md, shim, committed bundled .mjs, SessionStart hook
 tf/                    OpenTofu
 scripts/               entrypoint and operational scripts
 .gitsheets/            sheet configs, copied into the data repo on init
