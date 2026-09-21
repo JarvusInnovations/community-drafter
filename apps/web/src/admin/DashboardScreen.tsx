@@ -10,6 +10,7 @@ import {
 } from "./api.ts";
 import { copy } from "./copy.ts";
 import { Card } from "./components/Card.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { DocumentOperatorsPanel } from "./components/DocumentOperatorsPanel.tsx";
 import { ExtendDeadlineDialog } from "./components/ExtendDeadlineDialog.tsx";
 import { FunnelBar, StatTile } from "./components/Funnel.tsx";
@@ -287,7 +288,7 @@ export function DashboardScreen(): JSX.Element {
             {copy.dashboard.publishCommand(document.slug)}
           </code>
         </p>
-        <Card className="mt-3 overflow-x-auto p-0">
+        <TableScroller className="mt-3">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -312,7 +313,7 @@ export function DashboardScreen(): JSX.Element {
               ))}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       </section>
 
       <section className="mt-6">

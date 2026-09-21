@@ -126,13 +126,13 @@ export function DocumentOperatorsPanel({ slug }: { slug: string }): JSX.Element 
         </Card>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="flex w-full min-w-0 flex-col gap-1 text-sm font-semibold text-muted-foreground sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           {copy.documentOperators.addLabel}
           <select
             value={selected}
             onChange={(event) => setSelected(event.target.value)}
-            className={selectClass}
+            className={`${selectClass} w-full sm:w-auto sm:max-w-[22rem]`}
           >
             <option value="">—</option>
             {available.map((operator) => (

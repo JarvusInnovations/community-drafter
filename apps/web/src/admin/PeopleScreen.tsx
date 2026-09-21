@@ -10,7 +10,7 @@ import {
   revokeLink,
   revokeSignature,
 } from "./api.ts";
-import { Card } from "./components/Card.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { Pill, type PillTone } from "./components/Pill.tsx";
 import { ReasonDialog } from "./components/ReasonDialog.tsx";
 import { copy } from "./copy.ts";
@@ -281,7 +281,7 @@ export function PeopleScreen(): JSX.Element {
       ) : null}
 
       {rows ? (
-        <Card className="mt-4 overflow-x-auto p-0">
+        <TableScroller className="mt-4">
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -396,7 +396,7 @@ export function PeopleScreen(): JSX.Element {
               })}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       ) : null}
 
       <ReasonDialog

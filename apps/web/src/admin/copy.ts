@@ -4,6 +4,11 @@ export const copy = {
   loading: "Loading…",
   genericError: "Something went wrong. Try again.",
 
+  // `specs/screens/admin-dashboard.md` § Design "Phone width": a table
+  // wider than its card scrolls inside the card and says so.
+  tableScrollHint: "Scroll sideways to see every column.",
+  tableScrollRegion: "Table — scrolls sideways",
+
   // `specs/screens/admin-dashboard.md` § Design "Frame": the top bar shows
   // the configured instance name, read from `GET /auth/session`'s
   // `instance_name`. This literal is only the fallback for a session that

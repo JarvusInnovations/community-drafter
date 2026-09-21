@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError, listDocuments } from "./api.ts";
-import { Card } from "./components/Card.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { copy } from "./copy.ts";
 import { useAdminSession } from "./SessionContext.tsx";
 import { type DocumentSummary } from "./types.ts";
@@ -72,7 +72,7 @@ export function DocumentListScreen(): JSX.Element {
       ) : null}
 
       {docs && docs.length > 0 ? (
-        <Card className="mt-4 overflow-x-auto p-0">
+        <TableScroller className="mt-4">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -107,7 +107,7 @@ export function DocumentListScreen(): JSX.Element {
               ))}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       ) : null}
     </main>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiError, listOperators, removeOperator, updateOperator } from "./api.ts";
-import { Card } from "./components/Card.tsx";
+import { TableScroller } from "./components/TableScroller.tsx";
 import { ConfirmDialog } from "./components/ConfirmDialog.tsx";
 import { OperatorFormDialog } from "./components/OperatorFormDialog.tsx";
 import { Pill } from "./components/Pill.tsx";
@@ -104,7 +104,7 @@ export function OperatorsScreen(): JSX.Element {
       ) : null}
 
       {operators && operators.length > 0 ? (
-        <Card className="mt-4 overflow-x-auto p-0">
+        <TableScroller className="mt-4">
           <table className="w-full min-w-[700px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -180,7 +180,7 @@ export function OperatorsScreen(): JSX.Element {
               ))}
             </tbody>
           </table>
-        </Card>
+        </TableScroller>
       ) : null}
 
       <OperatorFormDialog

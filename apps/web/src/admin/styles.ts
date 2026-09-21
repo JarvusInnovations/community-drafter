@@ -10,8 +10,14 @@
 export const inputClass =
   "w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground";
 
+/**
+ * `min-w-0 max-w-full` is load-bearing, not decoration: a `<select>` sizes
+ * itself to its longest option, so a picker listing people's names and
+ * addresses sets its column's width and pushes the page sideways at phone
+ * width (`specs/screens/admin-dashboard.md` § Design "Phone width", #56).
+ */
 export const selectClass =
-  "rounded-xl border border-border bg-card px-2.5 py-1.5 text-sm text-foreground";
+  "min-w-0 max-w-full rounded-xl border border-border bg-card px-2.5 py-1.5 text-sm text-foreground";
 
 export const labelClass = "flex flex-col gap-1 text-sm font-semibold text-muted-foreground";
 
