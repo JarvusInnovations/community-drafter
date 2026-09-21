@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: [83]
+pr: 93
 specs:
   - specs/screens/marketing-site.md
   - specs/screens/public-and-embed.md
@@ -41,12 +42,12 @@ Out: per-document rendered card images (a generic instance card is enough — a 
 
 ## Validation
 
-- [ ] `GET /d/<public-slug>` returns HTML whose `og:title` is the document title, whose `og:description` is the current version's summary, whose `og:url` is `<PUBLIC_URL>/d/<slug>`, and whose `og:type` is `article`.
-- [ ] `GET /d/<private-slug>`, `GET /d/<unknown-slug>`, `GET /i/<token>` and `GET /admin` return the generic instance tags — identical to each other but for the `noindex` the personal-link and admin pages add — with the document's title appearing nowhere.
-- [ ] The marketing site's card renders at 1200×630 from the site's own tokens and fonts, is served from `site/`, and the page makes no third-party request.
-- [ ] A whole added or removed list item in the compare view shows its marker and lines up with its unchanged neighbours (#83).
-- [ ] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test`; `apps/web` also `build` and `check:bundle-size` under 120 KB gzip.
-- [ ] #83 closed by the PR.
+- [x] `GET /d/<public-slug>` returns HTML whose `og:title` is the document title, whose `og:description` is the current version's summary, whose `og:url` is `<PUBLIC_URL>/d/<slug>`, and whose `og:type` is `article`. Asserted in `routes/static.test.ts` and curled against a throwaway data repo.
+- [x] `GET /d/<private-slug>`, `GET /d/<unknown-slug>`, `GET /i/<token>` and `GET /admin` return the generic instance tags — identical to each other but for the `noindex` the personal-link and admin pages add — with the document's title appearing nowhere. Asserted in `routes/static.test.ts` (the private and unknown heads compared tag by tag) and confirmed by `diff` over the curled heads.
+- [x] The marketing site's card renders at 1200×630 from the site's own tokens and fonts, is served from `site/`, and the page makes no third-party request. Card on PR #93; the page served over HTTP makes 10 requests, all same-origin.
+- [x] A whole added or removed list item in the compare view shows its marker and lines up with its unchanged neighbours (#83). Before/after screenshots on PR #93, taken against a throwaway data repo.
+- [x] Gates green in every touched package: `lint`, `format:check`, `typecheck`, `test` (api 202, web 101, shared 33, cli 44 — 0 fail, nothing rerun); `apps/web` `build` clean and `check:bundle-size` 106.04 KB gzip of a 120 KB budget.
+- [x] #83 closed by the PR (`Closes #83` in PR #93's body).
 
 ## Risks / unknowns
 
@@ -57,8 +58,14 @@ Out: per-document rendered card images (a generic instance card is enough — a 
 
 ## Notes
 
-(at closeout)
+- **The privacy rule is enforced by shape, not by a check.** `lib/public-document.ts` now holds the one gate every public surface asks — unknown slug, `public_access = none` and `state = draft` all return `null` without distinguishing themselves — and both `routes/public/context.ts` (which throws the shared `PUBLIC_NOT_FOUND`) and the preview resolver go through it. Document-specific tags are then reachable only from a path matching `/d/<slug>`, so a personal-link or admin path cannot grow one even if someone later adds a branch: it has no way to name a document.
+- **The SPA shell is read and spliced rather than `sendFile`d**, cached by mtime inside the plugin closure. The frame headers the route already set are unaffected, and the Vite-built script and stylesheet links survive the rewrite (asserted in the test, whose fixture `index.html` now has a realistic `<head>`).
+- **`PUBLIC_URL` decides every absolute URL; the request's own scheme and host is a development fallback only.** Open Graph has no relative URLs and a dev server has no configured address, so the fallback exists — but production always sets `PUBLIC_URL`, which takes precedence, so a `Host` header never decides a live preview.
+- **The card sources live in `scripts/og-cards/`, not beside what they render** as the Approach said. `site/` is the published GitHub Pages tree, and a card's source HTML published as a stray page there is noise; each source carries the `chrome-devtools-axi` command that regenerates it and where the output goes.
+- **The site's icons are the app's own mark.** Rendering the SVG through Inkscape dropped its blurred overlays (`mask-type` unsupported) and flattened it to one purple; the PNGs are Chrome screenshots of the real thing, downscaled with ImageMagick, so the site's icon and the app's favicon are the same image.
+- **The description falls back to the first sentence of the text, not the first line.** `firstSentence()` skips headings, block quotes, list markers, tables, rules and fenced code before taking a sentence, because a statement almost always opens with its own title as an `h1` and a description repeating the title tells a reader nothing.
 
 ## Follow-ups
 
-(at closeout)
+- **Deferred to a future plan — ordered-list numbering in the compare view.** A whole added or removed `<li>` shows a disc even when its list is ordered, because each block is injected alone outside any `<ol>` and the `ordered` flag the render pipeline already puts on the block never reaches `BlockDiff`. Threading it through is a diff-result change, which this plan's scope excluded; the bullet-versus-no-bullet regression #83 named is fixed.
+- **Issue-worthy but not filed — a per-instance card.** The generic card says "Community Drafter" because the image is static and `INSTANCE_NAME` is config. An instance that wanted its own wording would need either a rendered card or a configurable image path; nobody has asked, and the document's title and summary already carry the specific information in the preview's text.
