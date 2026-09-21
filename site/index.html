@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Community Drafter — draft it together, sign it by name</title>
+<title>Signatories — draft it together, sign it by name</title>
 <meta name="description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#2457f5">
@@ -17,19 +17,19 @@
   absolute URLs are required — Open Graph has no relative ones.
 -->
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Community Drafter">
-<meta property="og:title" content="Community Drafter — draft it together, sign it by name">
+<meta property="og:site_name" content="Signatories">
+<meta property="og:title" content="Signatories — draft it together, sign it by name">
 <meta property="og:description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
 <meta property="og:url" content="https://signatories.org/">
 <meta property="og:image" content="https://signatories.org/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Community Drafter: draft it together, sign it by name — community drafting and signing of collective statements.">
+<meta property="og:image:alt" content="Signatories: draft it together, sign it by name — community drafting and signing of collective statements.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Community Drafter — draft it together, sign it by name">
+<meta name="twitter:title" content="Signatories — draft it together, sign it by name">
 <meta name="twitter:description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
 <meta name="twitter:image" content="https://signatories.org/og.png">
-<meta name="twitter:image:alt" content="Community Drafter: draft it together, sign it by name — community drafting and signing of collective statements.">
+<meta name="twitter:image:alt" content="Signatories: draft it together, sign it by name — community drafting and signing of collective statements.">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="48x48">
@@ -42,7 +42,7 @@
 
 <header class="hero">
   <div class="wrap">
-    <p class="eyebrow">Community Drafter</p>
+    <p class="eyebrow">Signatories</p>
     <h1>Draft it together. Sign it by name.</h1>
     <p class="lede">Community drafting and signing of collective statements: open letters, coalition charters, position papers, anything a group needs to put its name to together.</p>
     <p class="sub">Everyone you invite gets a personal link. They open it, read it, and sign in one screen. Comments, revisions and the right to remove their name sit behind that first click, never in front of it.</p>
@@ -162,16 +162,16 @@
 <section class="wrap teams">
   <h2 class="section-title">Running one</h2>
   <p>Two surfaces, one account. The <strong>web console</strong> at <code>&lt;your-instance&gt;/admin</code> is where you read a document — progress, people, submissions, versions, view-as. The <strong>admin skill</strong> is where you write: a command-line tool that installs into the repository your team, or your team's agent, already works from. Import invitees from your own contact list, publish, open, export the feedback bundle for a revision round, and publish again.</p>
-<pre><code>npx skills add JarvusInnovations/community-drafter --skill drafter-axi
+<pre><code>npx skills add JarvusInnovations/community-drafter --skill signatories-axi
 
-drafter-axi docs create our-letter --title "…" --sender-name "…" --reply-to …
-drafter-axi versions publish our-letter --file draft.md --summary "Initial draft"
-drafter-axi docs open our-letter --comments-close 2026-10-01T21:00Z --signing-closes 2026-10-08T21:00Z
-drafter-axi people import our-letter invitees.ndjson
-drafter-axi people links our-letter --out links.csv
-drafter-axi feedback export our-letter --format md
-drafter-axi versions publish our-letter --file v2.md --summary "…" --dispositions d.json</code></pre>
-  <p>The installed skill is not on your <code>PATH</code>: run it as <code>scripts/drafter-axi …</code> from the skill's own directory.</p>
+signatories-axi docs create our-letter --title "…" --sender-name "…" --reply-to …
+signatories-axi versions publish our-letter --file draft.md --summary "Initial draft"
+signatories-axi docs open our-letter --comments-close 2026-10-01T21:00Z --signing-closes 2026-10-08T21:00Z
+signatories-axi people import our-letter invitees.ndjson
+signatories-axi people links our-letter --out links.csv
+signatories-axi feedback export our-letter --format md
+signatories-axi versions publish our-letter --file v2.md --summary "…" --dispositions d.json</code></pre>
+  <p>The installed skill is not on your <code>PATH</code>: run it as <code>scripts/signatories-axi …</code> from the skill's own directory.</p>
   <p>One instance serves any number of organizations and documents. There is no public homepage inside the product: a document is reachable only through the links made for it, plus an optional anyone-with-the-link read view and an embeddable signatory count for your own site.</p>
   <p class="cta"><a class="btn primary" href="https://github.com/JarvusInnovations/community-drafter">Read the code and the specs</a></p>
 </section>
