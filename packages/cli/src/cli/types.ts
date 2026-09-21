@@ -24,6 +24,10 @@ export interface SignatoryCounts {
 export interface DocumentSummary {
   slug: string;
   title: string;
+  /** `specs/behaviors/sites.md`: the site this document belongs to; `default` when it names none. */
+  site?: string;
+  /** The canonical origin this document's personal and public links are built on. */
+  site_url?: string;
   state: DocumentState;
   phase: Phase;
   opened_at?: string;
@@ -275,9 +279,53 @@ export interface WhoAmI {
   kind: "person" | "bot";
   expires_at: string;
   transport: "bearer" | "cookie";
+  /**
+   * `specs/api/admin-cli.md`: the site this credential belongs to — the
+   * same command against two profiles is two different tenants
+   * (`specs/behaviors/sites.md`).
+   */
+  site?: { slug: string; name: string; hostname?: string };
 }
 
-/** `specs/api/admin.md` § Operators — the global operator directory. */
+/** `specs/api/admin.md` § Sites — one site, whole. */
+export interface SiteDetail {
+  slug: string;
+  hostname?: string;
+  name: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to?: string;
+  logo_url?: string;
+  accent?: string;
+  operators: string[];
+  documents: number;
+  /** The From line mail from this site will actually use. */
+  from_line: string;
+  /** Observations, never promises: `null` is "not observed yet". */
+  hostname_verified: boolean;
+  sender_verified: boolean | null;
+  dns: DnsRecord[];
+  default: boolean;
+  commit?: string | null;
+}
+
+/** One DNS record the customer still has to add; the service never touches DNS. */
+export interface DnsRecord {
+  type: string;
+  name: string;
+  value: string;
+  purpose: string;
+}
+
+export interface SiteOperator {
+  email: string;
+  name: string;
+  kind: "person" | "bot";
+  active: boolean;
+  superadmin?: boolean;
+}
+
+/** `specs/api/admin.md` § Operators — the resolved site's operator group. */
 export interface OperatorRecord {
   email: string;
   name: string;

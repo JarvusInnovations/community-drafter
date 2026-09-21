@@ -26,6 +26,7 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   create: {
     positionals: 1,
     value: [
+      "--site",
       "--title",
       "--sender-name",
       "--reply-to",
@@ -45,7 +46,7 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
   show: { positionals: 1 },
   update: {
     positionals: 1,
-    value: ["--audience"],
+    value: ["--audience", "--site"],
     multi: ["--addressed-to"],
   },
   open: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
@@ -59,7 +60,7 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
 export const DOCS_HELP = `usage: drafter-axi docs <create|show|update|open|extend|close|reopen|withdraw|operators> ...
 
 create <slug> --title <text> --audience public|closed
-       --sender-name <text> --reply-to <email>
+       [--site <slug>] [--sender-name <text>] [--reply-to <email>]
        [--addressed-to "<name>"]... [--capacities personal,official]
        [--show-signatories list|count|none]
        [--revocation-window-hours <n>] [--tags a,b]
@@ -78,8 +79,15 @@ anyone with the link may read the WORKING draft; the two are independent, so a
 letter to a named body can be drafted in the open and a public statement can be
 drafted invitee-only.
 show <slug>
-update <slug> [--audience public|closed] [--addressed-to "<name>"]...
+update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]
        (settings only; --addressed-to replaces the recipients)
+
+--site names the site the document belongs to — the hostname every personal
+link, public link and message for it is built on. It defaults to the site
+this profile is signed in to, and \`update --site\` moves the document to
+another site you operate: the slug, tokens and history do not change, the
+hostname its participants are sent to does. --sender-name and --reply-to may
+be omitted, in which case the site's own are used.
 open <slug> --comments-close <when> --signing-closes <when>
 extend <slug> [--comments-close <when>] [--signing-closes <when>]
 close <slug>
@@ -93,20 +101,27 @@ operators <slug>
 operators add <slug> <email>
 operators remove <slug> <email>
 
-Every mutation prints the document's key fields and the commit subject. When the
-document's --public is not none, create/show/open also print public_url — the
-<instance>/d/<slug> address anyone with the link can read.`;
+Every mutation prints the document's key fields and the commit subject, plus
+the site and the canonical host its links are built on. When the document's
+--public is not none, create/show/open also print public_url — the
+https://<site hostname>/d/<slug> address anyone with the link can read.`;
 
 /**
  * `specs/api/admin-cli.md` § Output rules: a document whose `public_access`
  * is not `none` prints the address anyone with the link can read, so it
- * never has to be assembled by hand from the instance URL and the slug.
- * `none` prints no such field. The instance URL comes from the resolved
- * profile, already stripped of a trailing slash.
+ * never has to be assembled by hand. The host is the **document's site**
+ * (`specs/behaviors/sites.md`), which is the address its participants are
+ * actually sent — not the instance URL this profile happens to be signed in
+ * to. `none` prints no such field.
  */
 function publicUrl(doc: DocumentSummary, instanceUrl: string): string | undefined {
   if (!doc.public_access || doc.public_access === "none") return undefined;
-  return `${instanceUrl}/d/${doc.slug}`;
+  return `${canonicalHost(doc, instanceUrl)}/d/${doc.slug}`;
+}
+
+/** The origin this document's personal and public links are built on. */
+function canonicalHost(doc: DocumentSummary, instanceUrl: string): string {
+  return doc.site_url || instanceUrl;
 }
 
 function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string, unknown> {
@@ -115,6 +130,12 @@ function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string,
     title: doc.title,
     state: doc.state,
     phase: doc.phase,
+    // `specs/api/admin-cli.md` § Output rules: every document view prints
+    // its site and the canonical host its links are built on, because an
+    // operator handing out a link needs to read the address their
+    // participants will actually receive.
+    site: doc.site ?? "default",
+    site_url: canonicalHost(doc, instanceUrl),
     created_by: doc.created_by,
     operators: doc.operators,
     sender_name: doc.sender_name,
@@ -160,16 +181,12 @@ export async function docsCommand(args: string[]): Promise<string> {
       const body = {
         slug,
         title: requireStr(parsed, "--title", 'drafter-axi docs create <slug> --title "..." ...'),
-        sender_name: requireStr(
-          parsed,
-          "--sender-name",
-          'drafter-axi docs create <slug> --sender-name "..." ...',
-        ),
-        reply_to: requireStr(
-          parsed,
-          "--reply-to",
-          "drafter-axi docs create <slug> --reply-to <email> ...",
-        ),
+        // `specs/behaviors/sites.md`: the document is created on the site
+        // this profile is signed in to unless it names another the caller
+        // operates; the site supplies the sender the document omits.
+        site: str(parsed, "--site"),
+        sender_name: str(parsed, "--sender-name"),
+        reply_to: str(parsed, "--reply-to"),
         capacities: capacities.length > 0 ? capacities : undefined,
         // `specs/data-model.md` § Audience: `--audience` is required and is
         // stored as given. `--public` is the separate drafting-time read
@@ -234,16 +251,26 @@ export async function docsCommand(args: string[]): Promise<string> {
       // field the operator never mentioned.
       const audience = str(parsed, "--audience");
       const addressedTo = list(parsed, "--addressed-to");
-      if (audience === undefined && addressedTo === undefined) {
+      const site = str(parsed, "--site");
+      if (audience === undefined && addressedTo === undefined && site === undefined) {
         throw new AxiError("nothing to update", "USAGE", [
-          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."]`',
+          'Run `drafter-axi docs update <slug> --audience public|closed [--addressed-to "..."] [--site <slug>]`',
         ]);
       }
       const doc = await client.patch<DocumentSummary>(
         `/documents/${encodeURIComponent(slug)}`,
-        compact({ audience, addressed_to: addressedTo }),
+        compact({ audience, addressed_to: addressedTo, site }),
       );
-      return render(parsed, doc, () => renderObject(detailObject(doc, instanceUrl)));
+      return render(parsed, doc, () =>
+        joinBlocks(
+          renderObject(detailObject(doc, instanceUrl)),
+          site === undefined
+            ? ""
+            : renderHelp([
+                `${slug} now belongs to ${doc.site ?? "default"} — from the next message and the next redirect its participants are sent to ${canonicalHost(doc, instanceUrl)}`,
+              ]),
+        ),
+      );
     }
 
     case "open": {

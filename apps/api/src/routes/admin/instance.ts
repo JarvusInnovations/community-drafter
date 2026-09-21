@@ -71,6 +71,14 @@ const instanceRoute: FastifyPluginAsync = async (fastify) => {
       kind: principal.operatorKind,
       expires_at: new Date(principal.exp * 1000).toISOString(),
       transport: principal.transport,
+      // `specs/api/admin-cli.md`: `whoami` and the home view name the site
+      // this credential belongs to — the same command against two profiles
+      // is two different tenants (`specs/behaviors/sites.md`).
+      site: {
+        slug: request.site.slug,
+        name: request.site.name,
+        hostname: request.site.hostname,
+      },
     };
   });
 

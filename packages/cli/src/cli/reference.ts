@@ -26,16 +26,60 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       {
         usage: "login <email> [--url <instance>]",
         summary:
-          "Device-code sign-in: emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.",
+          "Device-code sign-in: the URL's hostname picks the site, and the resulting token is good on that host only. Emails a magic link, prints a code to approve, then waits and saves a 90-day token to the profile.",
       },
       { usage: "logout", summary: "Forget the stored token for this profile." },
-      { usage: "whoami", summary: "Show the signed-in operator and token expiry." },
+      {
+        usage: "whoami",
+        summary:
+          "Show the signed-in operator, the site this credential belongs to, and the token expiry.",
+      },
+    ],
+  },
+  {
+    group: "Sites",
+    commands: [
+      {
+        usage: "sites list",
+        summary:
+          "The caller's sites: hostname, name, the From address mail will actually use, operator and document counts, and whether the hostname and the sender are verified yet.",
+      },
+      {
+        usage: "sites show <slug>",
+        summary: "One site whole, with the DNS records it still needs.",
+      },
+      {
+        usage:
+          'sites create <slug> --hostname <host> --name "<text>" --reply-to <email> [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]',
+        summary:
+          "Create a site (superadmin). Prints the record, then every DNS record the customer must add — the CNAME for the hostname and, with --sender-email, the mail provider's DKIM and Return-Path records — and says plainly that creating the record routes nothing.",
+      },
+      {
+        usage:
+          'sites update <slug> [--name "<text>"] [--reply-to <email>] [--sender-name "<text>"] [--sender-email <email>] [--logo-url <https url>] [--accent <#rrggbb>]',
+        summary:
+          "Change a site's identity (superadmin); --hostname is deliberately absent — a site has exactly one hostname, and a new one is a new site.",
+      },
+      {
+        usage: "sites remove <slug>",
+        summary:
+          "Delete a site (superadmin); refused while any document names it, naming the documents.",
+      },
+      {
+        usage:
+          "sites operators <slug> | sites operators add <slug> <email> | sites operators remove <slug> <email>",
+        summary:
+          "The site's operator group; any operator of the site may change it, and remove drops the email from this site only.",
+      },
     ],
   },
   {
     group: "Operators",
     commands: [
-      { usage: "operators list", summary: "Every operator in the directory." },
+      {
+        usage: "operators list",
+        summary: "This site's operator group — not every operator on the instance.",
+      },
       {
         usage:
           'operators add <email> --name "<text>" [--kind person|bot] [--title "<text>"] [--org "<text>"]',
@@ -47,7 +91,11 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         summary:
           "Update or deactivate an operator; --superadmin is grantable only by another superadmin.",
       },
-      { usage: "operators remove <email>", summary: "Remove an operator." },
+      {
+        usage: "operators remove <email>",
+        summary:
+          "Delete an operator record outright (superadmin): removes them from every site and document. To take someone off one site, use `sites operators remove`.",
+      },
     ],
   },
   {
@@ -55,19 +103,20 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     commands: [
       {
         usage:
-          'docs create <slug> --title "<text>" --audience public|closed --sender-name "<text>" --reply-to <email> [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
+          'docs create <slug> --title "<text>" --audience public|closed [--site <slug>] [--sender-name "<text>"] [--reply-to <email>] [--addressed-to "<name>"]... [--capacities personal,official] [--show-signatories list|count|none] [--revocation-window-hours <n>] [--tags a,b]',
         summary:
-          "Create a document in draft; the caller becomes its first operator. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft.",
+          "Create a document in draft; the caller becomes its first operator. --site names the site it belongs to (default: the site this profile is signed in to), which decides the hostname its links and mail are built on; --sender-name and --reply-to fall back to the site's. --audience is required and says who the finished statement is for: public (published for anyone to read) or closed (delivered to the people and bodies it is addressed to). --addressed-to names one recipient and repeats; it is required with --audience closed. Neither touches --public, which is whether anyone with the link may read the working draft.",
       },
       {
         usage: "docs show <slug>",
         summary:
-          "Dashboard numbers, versions, and schedule; prints the audience, who the statement is addressed to, and public_url when the document is publicly readable.",
+          "Dashboard numbers, versions, and schedule; prints the site and the canonical host its links are built on, the audience, who the statement is addressed to, and public_url when the document is publicly readable.",
       },
       {
-        usage: 'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]...',
+        usage:
+          'docs update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]',
         summary:
-          "Change the audience and who the statement is addressed to, and nothing else. --addressed-to replaces the recipients.",
+          "Change the audience, who the statement is addressed to, and the site, and nothing else. --site moves the document to another site you operate: the slug, tokens and history do not change, the hostname its participants are sent to does. --addressed-to replaces the recipients.",
       },
       {
         usage: "docs open <slug> --comments-close <iso> --signing-closes <iso>",
@@ -89,7 +138,8 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
         usage: "docs operators add <slug> <email>",
-        summary: "Add an active operator to a document.",
+        summary:
+          "Add an operator to a document, drawing only from the document's site's operator group.",
       },
       {
         usage: "docs operators remove <slug> <email>",

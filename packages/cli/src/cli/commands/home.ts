@@ -84,6 +84,10 @@ export async function homeCommand(args: string[]): Promise<string> {
   const identity = renderObject({
     signed_in: `${who.name} <${who.email}>`,
     kind: who.kind,
+    // `specs/api/admin-cli.md` § Session hook: the identity line names the
+    // site the profile is signed in to, since the same command against two
+    // profiles is two different tenants.
+    site: who.site ? `${who.site.name} (${who.site.slug})` : "default",
     instance: config.url,
     profile: config.tokenSource === "env" ? "(DRAFTER_TOKEN from the environment)" : config.profile,
     token_expires: who.expires_at,

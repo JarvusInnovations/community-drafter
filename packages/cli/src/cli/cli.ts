@@ -17,6 +17,7 @@ import { notificationsCommand, NOTIFICATIONS_HELP } from "./commands/notificatio
 import { operatorsCommand, OPERATORS_HELP } from "./commands/operators.js";
 import { peopleCommand, PEOPLE_HELP } from "./commands/people.js";
 import { signaturesCommand, SIGNATURES_HELP } from "./commands/signatures.js";
+import { sitesCommand, SITES_HELP } from "./commands/sites.js";
 import { submissionsCommand, SUBMISSIONS_HELP } from "./commands/submissions.js";
 import { versionsCommand, VERSIONS_HELP } from "./commands/versions.js";
 import { exitCodeForCode } from "./errors.js";
@@ -32,6 +33,7 @@ const COMMAND_HELP: Record<string, string> = {
   logout: LOGOUT_HELP,
   whoami: WHOAMI_HELP,
   operators: OPERATORS_HELP,
+  sites: SITES_HELP,
   docs: DOCS_HELP,
   versions: VERSIONS_HELP,
   people: PEOPLE_HELP,
@@ -53,6 +55,7 @@ const COMMANDS: Record<string, AxiCliCommand<undefined>> = {
   logout: logoutCommand,
   whoami: whoamiCommand,
   operators: operatorsCommand,
+  sites: sitesCommand,
   docs: docsCommand,
   versions: versionsCommand,
   people: peopleCommand,
