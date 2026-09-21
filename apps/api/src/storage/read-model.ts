@@ -69,6 +69,7 @@ const OPERATOR_ACTIONS = new Set<Action>(["operator-add", "operator-update", "op
 const SITE_ACTIONS = new Set<Action>([
   "site-create",
   "site-update",
+  "site-remove",
   "site-operator-add",
   "site-operator-remove",
 ]);
@@ -306,7 +307,10 @@ export class ReadModel {
     // `operator-remove` drops the email from every site's group in the same
     // commit — both are cheap whole-sheet reloads (there are as many sites
     // as hostnames, not as many as documents).
-    if (SITE_ACTIONS.has(action) || action === "operator-remove") {
+    // A commit that carries a `Site` trailer may have joined an operator to
+    // a group in the same commit as the record it created
+    // (`specs/api/admin.md` § Operators).
+    if (SITE_ACTIONS.has(action) || action === "operator-remove" || trailers.Site) {
       await this.refreshSites();
     }
 

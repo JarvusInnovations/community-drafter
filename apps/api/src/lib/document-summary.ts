@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { computeSignatories } from "./signatories.ts";
 import { isSignatureBehind } from "./signature-view.ts";
 import { derivePhase } from "../phase/phase.ts";
+import { documentSiteSlug, siteForDocument } from "../sites/site.ts";
 import type { DocumentEntry } from "../storage/read-model.ts";
 
 /**
@@ -38,9 +39,18 @@ export function documentSummary(
   const submitted = submissions.filter((s) => s.record.state === "submitted").length;
   const draft = submissions.filter((s) => s.record.state === "draft").length;
 
+  const site = siteForDocument(fastify, entry.record);
+
   return {
     slug: entry.record.slug,
     title: entry.record.title,
+    // `specs/api/admin.md`: every document shape carries its site — the
+    // slug (`default` for a document that names none) and the origin its
+    // personal and public links are built on, so an operator reads the
+    // address their participants will actually receive rather than
+    // assembling it from the URL they happen to be signed in to.
+    site: documentSiteSlug(entry.record),
+    site_url: site.baseUrl,
     state: entry.record.state,
     phase,
     opened_at: entry.record.opened_at,

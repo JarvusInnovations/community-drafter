@@ -2,9 +2,15 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastif
 import fp from "fastify-plugin";
 
 import { findPublicDocument } from "../lib/public-document.ts";
-import { resolveSiteForHost, siteForDocument, type ResolvedSite } from "./site.ts";
+import { SiteObservations } from "./observations.ts";
+import { normalizeHost, resolveSiteForHost, siteForDocument, type ResolvedSite } from "./site.ts";
 
 declare module "fastify" {
+  interface FastifyInstance {
+    /** What this process has actually seen about hostnames and senders (`sites/observations.ts`). */
+    siteObservations: SiteObservations;
+  }
+
   interface FastifyRequest {
     /**
      * `specs/behaviors/sites.md` § Resolving a site from a request: every
@@ -95,9 +101,13 @@ const sitesPlugin: FastifyPluginAsync = async (fastify) => {
   // 5 refuses a shared reference default, and every request sets its own
   // in the hook below.
   fastify.decorateRequest("site");
+  fastify.decorate("siteObservations", new SiteObservations());
 
   fastify.addHook("onRequest", async (request, reply) => {
     request.site = resolveSiteForHost(fastify, request.headers.host);
+    // "Does this hostname route here?" is only ever answered by a request
+    // arriving on it (`sites/observations.ts`).
+    fastify.siteObservations.markHostSeen(normalizeHost(request.headers.host));
 
     const target = canonicalRedirectTarget(fastify, request);
     if (target) {

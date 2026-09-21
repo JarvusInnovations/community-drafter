@@ -5,12 +5,13 @@ import {
   type PublicAccess,
   type ShowSignatories,
 } from "@community-drafter/shared";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
 import type { DeadlineChange } from "../../events/bus.ts";
 import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts";
 import { documentSummary } from "../../lib/document-summary.ts";
+import { DEFAULT_SITE_SLUG, documentSiteSlug, isSiteOperator } from "../../sites/site.ts";
 import { versionListView } from "../../lib/versions.ts";
 import { invitationTemplate } from "../../notifications/templates.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
@@ -22,18 +23,20 @@ interface DocumentParams {
 interface CreateDocumentBody {
   slug: string;
   title: string;
+  site?: string;
   capacities?: Capacity[];
   audience: Audience;
   addressed_to?: string[];
   public_access?: PublicAccess;
   show_signatories?: ShowSignatories;
-  sender_name: string;
-  reply_to: string;
+  sender_name?: string;
+  reply_to?: string;
   revocation_window_hours?: number;
   tags?: string[];
 }
 
 interface PatchDocumentBody {
+  site?: string;
   title?: string;
   capacities?: Capacity[];
   audience?: Audience;
@@ -136,15 +139,40 @@ function assertAddressedTo(audience: Audience, addressedTo: string[] | undefined
   );
 }
 
+/**
+ * The site a document is created on or moved to: the caller's resolved site
+ * by default, or another site they belong to. Naming a site they do not
+ * operate answers 404, like any other cross-site read
+ * (`specs/behaviors/sites.md` § Operators and tenancy).
+ */
+function resolveTargetSite(request: FastifyRequest, named: string | undefined): string {
+  if (named === undefined) return request.site.slug;
+  const slug = named.trim() || DEFAULT_SITE_SLUG;
+  if (slug === request.site.slug) return slug;
+
+  const fastify = request.server;
+  const principal = request.principal;
+  const email = principal?.kind === "operator" ? principal.email : "";
+  const superadmin = principal?.kind === "operator" && principal.superadmin;
+  const exists = slug === DEFAULT_SITE_SLUG || Boolean(fastify.storage.readModel.getSite(slug));
+  if (!exists || (!superadmin && !isSiteOperator(fastify, slug, email))) {
+    throw new ApiError("not_found", `No site '${slug}'.`, { field: "site" });
+  }
+  return slug;
+}
+
 const documentsRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/documents", { config: OPERATOR_ROUTE }, async (request) => {
     const principal = request.principal!;
     const email = principal.kind === "operator" ? principal.email : "";
-    // `specs/api/admin.md`: "List documents → returns only the caller's
-    // documents"; a superadmin sees every document (`behaviors/operators.md`).
+    // `specs/api/admin.md`: "`GET /documents` → the caller's documents **on
+    // the resolved site**. A superadmin on the default site's host gets
+    // every document on every site, each carrying its `site`."
     const superadmin = principal.kind === "operator" && principal.superadmin;
+    const everySite = superadmin && request.site.isDefault;
     return fastify.storage.readModel
       .listDocuments()
+      .filter((entry) => everySite || documentSiteSlug(entry.record) === request.site.slug)
       .filter((entry) => superadmin || entry.record.operators?.includes(email))
       .map((entry) => documentSummary(fastify, entry));
   });
@@ -156,10 +184,11 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       schema: {
         body: {
           type: "object",
-          required: ["slug", "title", "audience", "sender_name", "reply_to"],
+          required: ["slug", "title", "audience"],
           properties: {
             slug: { type: "string" },
             title: { type: "string", minLength: 1 },
+            site: { type: "string" },
             capacities: {
               type: "array",
               items: { type: "string", enum: ["personal", "official"] },
@@ -190,6 +219,10 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       // document. The creator becomes its first operator
       // (`documents.created_by`) and is listed in `documents.operators`."
       const callerEmail = actor.kind === "operator" ? actor.email : "";
+      // `specs/api/admin.md`: "`site` defaults to the resolved site; naming
+      // a site the caller does not belong to is 404 `not_found`, like any
+      // other cross-site read."
+      const site = resolveTargetSite(request, body.site);
 
       const result = await fastify.storage.commit(
         "create",
@@ -197,6 +230,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
           actor,
           subject: `create: ${body.slug}`,
           document: body.slug,
+          site: site === DEFAULT_SITE_SLUG ? undefined : site,
           requestId: request.requestId,
         },
         async (tx) => {
@@ -204,6 +238,9 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
             slug: body.slug,
             title: body.title,
             state: "draft",
+            // The default site is derived, not a record: a document that
+            // belongs to it names no site at all.
+            site: site === DEFAULT_SITE_SLUG ? undefined : site,
             capacities: body.capacities,
             audience: body.audience,
             addressed_to: body.addressed_to,
@@ -256,6 +293,14 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         request.body.addressed_to ?? entry.record.addressed_to,
       );
 
+      // `specs/api/admin.md` § Documents: `PATCH` accepts `site`, moving the
+      // document to another site the caller belongs to (404 otherwise). The
+      // slug, tokens and history are untouched; only the hostname its
+      // participants are sent to changes, from the next message and the
+      // next redirect.
+      const movedTo =
+        request.body.site === undefined ? undefined : resolveTargetSite(request, request.body.site);
+
       const allowedKeys = [
         "title",
         "capacities",
@@ -272,6 +317,9 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
       for (const key of allowedKeys) {
         if (request.body[key] !== undefined) patch[key] = request.body[key];
       }
+      // RFC 7396: `null` deletes the field, which is how a document moves
+      // back to the derived default site (which is not a record).
+      if (movedTo !== undefined) patch.site = movedTo === DEFAULT_SITE_SLUG ? null : movedTo;
 
       const result = await fastify.storage.commit(
         "settings",
@@ -279,6 +327,7 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
           actor: adminActor(request),
           subject: `settings: ${slug} updated`,
           document: slug,
+          site: movedTo ?? (entry.record.site || undefined),
           requestId: request.requestId,
         },
         async (tx) => {

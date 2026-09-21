@@ -1,5 +1,5 @@
 import type { Capacity } from "@community-drafter/shared";
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
@@ -10,7 +10,9 @@ import { buildPrefsView } from "../../lib/prefs.ts";
 import { buildSignatureView } from "../../lib/signature-view.ts";
 import { uniqueSlug } from "../../lib/slug.ts";
 import { mintUniqueToken } from "../../lib/tokens.ts";
+import { personalLink } from "../../notifications/links.ts";
 import { invitationTemplate, reminderTemplate } from "../../notifications/templates.ts";
+import { siteForDocument } from "../../sites/site.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -78,9 +80,17 @@ function parseMinAgeHours(value: unknown): number {
   return value;
 }
 
-function publicLink(fastify: { config: { PUBLIC_URL?: string } }, token: string): string {
-  const base = fastify.config.PUBLIC_URL ?? "";
-  return `${base}/i/${token}`;
+/**
+ * `specs/behaviors/access-and-identity.md` § Personal links: a personal
+ * link is built on the **document's site** hostname, never on the host this
+ * admin request happened to arrive at (`specs/behaviors/sites.md`).
+ */
+function personalLinkFor(
+  fastify: FastifyInstance,
+  document: { site?: string },
+  token: string,
+): string {
+  return personalLink(siteForDocument(fastify, document).baseUrl, token);
 }
 
 function parseImportRows(request: FastifyRequest): ImportRow[] {
@@ -445,7 +455,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
               personRecord?.name ?? entry.record.person,
               personRecord?.email ?? "",
               `[${document.record.title}] — You're invited to review`,
-              publicLink(fastify, entry.record.token),
+              personalLinkFor(fastify, document.record, entry.record.token),
             ];
           });
         response.csv = toCsv(["name", "email", "subject", "link"], rows);
@@ -477,7 +487,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           entry.record.person,
           personRecord?.name ?? "",
           personRecord?.email ?? "",
-          publicLink(fastify, entry.record.token),
+          personalLinkFor(fastify, document.record, entry.record.token),
         ]);
       }
 
@@ -576,7 +586,10 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      return { link: publicLink(fastify, token), commit: result.commitHash };
+      return {
+        link: personalLinkFor(fastify, document.record, token),
+        commit: result.commitHash,
+      };
     },
   );
 

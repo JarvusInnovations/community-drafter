@@ -50,6 +50,7 @@ export const ACTIONS = [
   // and its operator group are both ordinary admin actions, each one commit.
   "site-create",
   "site-update",
+  "site-remove",
   "site-operator-add",
   "site-operator-remove",
 ] as const;

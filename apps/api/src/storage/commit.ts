@@ -26,6 +26,12 @@ export interface CommitInput {
   actor: Actor;
   subject: string;
   document?: string;
+  /**
+   * `specs/data-model.md` → `Site` trailer: every commit about a site, and
+   * every commit about a document that belongs to one. A document on the
+   * derived default site names no site, here or on the record.
+   */
+  site?: string;
   person?: string;
   version?: number;
   summary?: string;
@@ -62,6 +68,7 @@ function buildTrailers(action: Action, input: CommitInput): Trailers {
     Actor: actorTrailerValue(input.actor),
   };
   if (input.document !== undefined) trailers.Document = input.document;
+  if (input.site !== undefined) trailers.Site = input.site;
   if (input.person !== undefined) trailers.Person = input.person;
   if (input.version !== undefined) trailers.Version = input.version;
   if (input.summary !== undefined) trailers.Summary = input.summary;

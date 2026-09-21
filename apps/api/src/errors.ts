@@ -28,6 +28,8 @@ export type ErrorCode =
   | "already_sent"
   | "has_activity"
   | "last_operator"
+  | "hostname_taken"
+  | "site_in_use"
   | "refresh_busy"
   | "refresh_diverged"
   | "device_pending"
@@ -53,6 +55,13 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   unsaved_items: 409,
   no_change: 409,
   last_operator: 409,
+  // `specs/api/admin.md` § Sites: another site (or the deployment itself)
+  // already claims this hostname, and hostname ↔ site is a bijection.
+  hostname_taken: 409,
+  // `specs/api/admin.md` § Sites: a site with documents cannot be deleted —
+  // doing so would silently move them to the default site and change the
+  // hostname their participants were already sent.
+  site_in_use: 409,
   refresh_busy: 409,
   refresh_diverged: 409,
   device_pending: 409,
