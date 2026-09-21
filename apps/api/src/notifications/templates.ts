@@ -61,6 +61,13 @@ function preferenceLinks(ctx: RecipientContext): EmailLink[] {
   ];
 }
 
+/**
+ * The one body every participant message renders through. The two wrappers
+ * below delegate to it unchanged, on purpose: whether a message is
+ * transactional decides *if* it is sent (`lib/notify.ts`), never what it
+ * contains. They stay separate so this file still says which kind each
+ * message is.
+ */
 function participantMessage(
   ctx: RecipientContext,
   subject: string,
@@ -79,13 +86,7 @@ function participantMessage(
   return { subject, ...rendered };
 }
 
-/**
- * Sent unconditionally, whatever the participation's preferences say. The
- * two wrappers below render identically on purpose: whether a message is
- * transactional decides *if* it is sent (`lib/notify.ts`), never what it
- * contains. They stay separate so this file still says which kind each
- * message is.
- */
+/** Sent unconditionally, whatever the participation's preferences say. */
 function transactional(
   ctx: RecipientContext,
   subject: string,
