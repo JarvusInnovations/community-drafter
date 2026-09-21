@@ -144,3 +144,22 @@ resource "google_dns_record_set" "signatories_app_apex_aaaa" {
   ttl          = 300
   rrdatas      = local.platform_aaaa
 }
+
+# Postmark sender-domain verification for signatories.app (the platform's
+# default mail sender; specs/behaviors/sites.md § Mail): DKIM signing key
+# and the custom Return-Path used for bounces. Values are Postmark's.
+resource "google_dns_record_set" "signatories_app_postmark_dkim" {
+  name         = "20260921030712pm._domainkey.${google_dns_managed_zone.signatories_app.dns_name}"
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "TXT"
+  ttl          = 300
+  rrdatas      = ["\"k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC8Tx+7uoF6DOSNcCACR72ktE1BcFqIBx8oVvuvLGq4BsA1KlwQ5eWaj7PUjK30XunDX+skXEQOM5UCivMF5AwQrVXDCw/dnZrqsA+wc3sqNrTYYfVjnrBWyGYs7r0uW50r2cp8KN5kKoDERqyN63cqGYY+C3nwv72SDWk+QsSr0wIDAQAB\""]
+}
+
+resource "google_dns_record_set" "signatories_app_postmark_return_path" {
+  name         = "pm-bounces.${google_dns_managed_zone.signatories_app.dns_name}"
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "CNAME"
+  ttl          = 300
+  rrdatas      = ["pm.mtasv.net."]
+}
