@@ -25,13 +25,13 @@ One record per hostname in the `sites` sheet (`data-model.md`). Managed only thr
 | `sender_email` | email? | the address mail is sent **From**, when the operator has verified it with the mail provider; absent means the platform's own verified address is used (§ Mail) |
 | `reply_to` | email | default Reply-To for this site's documents |
 | `logo_url` | https URL? | shown on this site's web surfaces in place of the site name (§ Identity on a surface) |
-| `accent` | color token? | overrides the accent color of `screens/document.md` § Design and nothing else **[decide]** — one token, or a small set (accent, accent tint, organization avatar)? |
+| `accent` | color token? | the site's primary color: **one token**, overriding the accent color of `screens/document.md` § Design and nothing else. Not a theme object; a site that wants more than one color wants a design pass, not a field |
 | `operators` | array of email | the site's operator group; never empty |
 | `created_by` | email | the operator who created the site |
 
 Who created or changed a site, and when, is the history of the record (`Action: site-create`, `site-update`, `site-operator-add`, `site-operator-remove`, with a `Site` trailer).
 
-**[decide]** One site is one hostname here. Whether a site may hold several (a customer who wants both `letters.example.org` and `example-letters.org`, one of them canonical) is unresolved; if it may, `hostname` becomes a list whose first entry is canonical and § The document's site is canonical redirects to that first entry. Nothing else in this spec changes either way.
+**A site has exactly one hostname.** A customer who owns two domains gets one site on the one they want their signers to read, and points the other wherever they like outside this service; nothing here mints a link on a second host, and nothing has to decide which of two names is the real one. Two sites may not claim the same hostname either, so hostname and site are a bijection and resolution never has an order to get wrong.
 
 A site record carries no DNS, no certificate and no deployment state. It is the identity; the hostname is routed to the service separately (§ Onboarding a hostname).
 
@@ -51,7 +51,7 @@ The default site is not a record. Its fields are read from the deployment's conf
 
 It is the site of every document whose `site` field is absent, and the site of any request whose host matches no record. It cannot be created, renamed or deleted through the API; it changes when the deployment's configuration changes.
 
-The default site is the **platform's own site**: its hostname is the platform domain, written `<platform-domain>` throughout these specs **[decide]** — the platform's name and domain are not chosen yet, and nothing in the desired state depends on which they turn out to be. A customer's site is never the default site.
+The default site is the **platform's own site**. The platform is **Signatories**, at `signatories.org`; the marketing site lives there, and the service's own hostname is the default site's. A customer's site is never the default site, and a customer hostname CNAMEs to `sites.signatories.org`, an alias the platform maintains in its own zone (`docs/operations.md` § Onboarding a site).
 
 Its operator group is derived, not stored, and that derivation is what closes the instance-wide operators directory (issue #50) with no migration: on an instance with no sites, every operator is in the default group, which is today's behavior exactly; the moment an operator is added to a site's group they leave the default group and the two groups stop seeing each other.
 
@@ -64,6 +64,8 @@ Every request resolves to exactly one site, before routing:
 3. No match → the default site.
 
 Two records claiming one hostname is a validation failure on write, never a resolution order.
+
+Resolution trusts the host the request was addressed to, and deliberately does no more: a forged `Host` on the service's own bare URL changes which name and color are drawn and nothing else, because a token is still rejected unless its `site` matches and a document still redirects to its own hostname before it renders (§ Operators and tenancy, § The document's site is canonical).
 
 Everything that reads `PUBLIC_URL` or `INSTANCE_NAME` today reads the resolved site instead — with one exception that matters more than the rule: **a personal or public link is always minted on the document's site**, never on the site the request arrived at (§ The document's site is canonical). A send triggered from the admin of one host still mails links on the document's own host.
 
@@ -94,6 +96,7 @@ No surface carries the platform's name, domain, logo or a "powered by" line. The
 
 This section replaces the instance-wide operators directory and closes issue #50. An operator **record** stays one per email, instance-wide; the **group** is a list on the site, exactly as a document's operators are a list on the document.
 
+- **Creating a site, changing its identity and deleting it are superadmin actions**, because each is tied to infrastructure the platform team has to provision anyway (§ Onboarding a hostname). Managing a site's **operator group** is not: any operator of the site may add or remove members of it.
 - `sites.operators` is the site's operator group. One person may be in several groups; a superadmin is in every group.
 - The operators directory — `GET /operators`, `/admin/operators`, `operators list` — returns the resolved site's group and nothing else.
 - Creating an operator adds the email to the resolved site's group in the same commit, creating the record if the email is new (`Action: operator-add` plus `site-operator-add`).
@@ -139,7 +142,7 @@ Four steps, in order, described for an operator in `docs/operations.md`:
 
 1. **Verify the domain to the project** — the customer adds the verification record the provider prints, or the platform team verifies the domain in Search Console. Required before a mapping can be created at all.
 2. **Map the hostname** — add it to the deployment's list of site hostnames and apply (`tf/`, `plans/site-hostnames.md`).
-3. **Point DNS at the service** — the customer adds the CNAME. The certificate provisions on its own once the record resolves.
+3. **Point DNS at the service** — the customer adds the CNAME to `sites.signatories.org`, the platform's own alias for Google's endpoint. The certificate provisions on its own once the record resolves.
 4. **Create the site record** — `sites create`, which prints, in one block, every DNS record the customer must add: the CNAME for the hostname, and, when `--sender-email` is given, the two records the mail provider requires (a DKIM TXT record and a Return-Path CNAME), whose values come from the provider's console.
 
 Steps 2 and 4 are deliberately separate systems. The record is data an API key may write; the mapping and the certificate are infrastructure it may not ([A site record never moves DNS](#principles), below).
@@ -154,7 +157,7 @@ Steps 2 and 4 are deliberately separate systems. The record is data an API key m
 
 **Local**
 
-- **A site is the only identity a participant ever sees.** Every word, address and link on a participant or public surface belongs to the document's site: the name in the top bar, the From line, the Reply-To, the hostname in the URL, the footer. The platform's own name, domain and default sender exist for operators and for the platform's own site; they never appear on another site's surface. This rules out a "powered by" line, a platform logo in a message, a link back to the platform domain, a cross-site link of any kind, and — the one an implementer will reach for without noticing — a personal link minted on whichever host the request happened to arrive at.
+- **A site is the only identity a participant ever sees.** Every word, address and link on a participant or public surface belongs to the document's site: the name in the top bar, the From line, the Reply-To, the hostname in the URL, the footer. The platform's own name, domain and default sender exist for operators and for the platform's own site; they never appear on another site's surface. This rules out a "powered by" line, a platform logo in a message, a link back to `signatories.org`, a cross-site link of any kind, and — the one an implementer will reach for without noticing — a personal link minted on whichever host the request happened to arrive at.
 
   *Why:* a coalition asks people to put their name on a statement. A name they do not recognize anywhere in that transaction is a reason to close the tab, and a second name beside the first is a reason to wonder who is really collecting this.
 

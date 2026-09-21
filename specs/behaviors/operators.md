@@ -29,7 +29,8 @@ Every `/admin/*` and `/auth/*` route, the admin CLI, the admin dashboard, the `A
 | Add/remove operators on a document | a current operator of that document |
 | List documents | returns only the caller's documents **on the resolved site** |
 | Read the operators directory | any active operator; returns the resolved site's group |
-| Create a site, change its identity, add or remove its operators | an operator of that site (creating a site: a superadmin — `behaviors/sites.md`) |
+| Create a site, change its identity, delete it | a superadmin (`behaviors/sites.md`) |
+| Add or remove a site's operators | an operator of that site |
 | Create or update an operator | an operator of a site the target belongs to, or a site the new operator is being added to |
 | Delete an operator record outright | a superadmin |
 | `refresh` the data repository from its remote | the webhook secret, not an operator |

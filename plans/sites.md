@@ -51,7 +51,7 @@ A hostname does not reach this service until `site-hostnames` lands, so everythi
 5. **Tenancy.** Scope `GET /documents`, `GET /operators`, `POST /operators`, `PATCH /operators/:email` and the document-operator picker to the resolved site's group; make `DELETE /operators/:email` superadmin-only; add the `/sites` endpoints, each committing with a `Site` trailer. The group-emptying and last-operator refusals live beside the existing `last_operator` check.
 6. **Mail.** One `resolveSender(document, site)` used by every send: From address, display name, Reply-To, tag. No fallback from a declared-but-unverified sender — the provider's rejection travels the existing failure path untouched.
 7. **Web.** The site bar (logo or name), the accent token bound from the site, the admin Sites page, the per-site operators page, and the Site line on the dashboard. The accent is a CSS custom property set on the document element from the bundle/session; nothing else in the token set moves.
-8. **CLI.** `sites list|show|create|update|operators`, `--site` on `docs create` and `docs update`, the site and canonical host in every document view, the DNS block printed by `sites create`, the home view's identity line naming the site, and the generated `SKILL.md` Sites section. Rebuild the bundle in its own commit per `axi-skills`.
+8. **CLI.** `sites list|show|create|update|remove|operators` (the site itself superadmin-gated, the operator group not), `--site` on `docs create` and `docs update`, the site and canonical host in every document view, the DNS block printed by `sites create`, the home view's identity line naming the site, and the generated `SKILL.md` Sites section. Rebuild the bundle in its own commit per `axi-skills`.
 9. **Tests.** Resolution, redirects, scoping, sender selection, and the default-site fallbacks (an instance with no `sites` records must behave exactly as it does today) — the last is the regression that matters most.
 
 ## Validation
@@ -68,9 +68,9 @@ A hostname does not reach this service until `site-hostnames` lands, so everythi
 
 ## Risks / unknowns
 
-- **`Host` spoofing.** Resolution trusts the host the request was addressed to. Behind Cloud Run that is the mapped hostname, but a direct request to the service's own `run.app` URL with a forged `Host` would resolve to a site. It grants no authority — a token from another site is still rejected and a document still redirects to its canonical host — but the identity shown could be wrong; decide during implementation whether to pin resolution to the set of mapped hostnames.
+- **`Host` spoofing.** Resolution trusts the host the request was addressed to, which is settled (`specs/behaviors/sites.md` § Resolving a site from a request): exact match, unknown host → default site, no pinning to the mapped set. A forged `Host` on the service's own bare URL changes which name and color are drawn and nothing else, because the token check and the canonical-host redirect both run anyway. The thing to watch in implementation is that those two really do run before anything renders — not the resolution rule itself.
 - **Default-group derivation.** "Every active operator in no other site's group" is cheap to compute and has no migration, but it means adding someone to their first site silently removes them from the default directory. That is the intent; it will still surprise someone the first time.
-- **`accent` as one token.** If the spec's `[decide]` resolves toward a small theme instead of one color, the web work in step 7 grows; nothing else does.
+- **`accent` is one token, by decision.** A site gets its primary color and nothing else. Expect a request for a second color from the first customer with a brand guide; that is a design pass and a spec change, not a field to widen quietly.
 - **Scoping regressions are invisible.** A missed scope check does not fail loudly — it shows another tenant's data. Every list endpoint needs a two-tenant test, not a single-tenant one.
 - **Bundle drift.** The CLI bundle must be rebuilt and committed separately, or CI's drift gate fails the PR.
 

@@ -153,15 +153,21 @@ gcloud run domain-mappings describe --domain=drafter.jarv.us \
 This is out of `tf/`'s scope (the DNS zone is a different GCP
 project/registrar) — add the printed CNAME (`drafter` →
 `ghs.googlehosted.com.` at last check) by hand. Additional customer hostnames
-follow the same path through `var.site_hostnames`; see step 7. Certificate provisioning
+follow the same path through `var.site_hostnames`, except that customers are
+given the `sites.signatories.org` alias rather than Google's hostname; see
+step 7. Certificate provisioning
 finishes automatically once the record resolves; no further `tofu apply`
 needed.
 
 ### 7. Onboarding a site (a customer hostname)
 
 One deployment answers on many hostnames; each is a **site** with its own name,
-sender and operator group (`specs/behaviors/sites.md`). Four steps, in this
-order. Steps 1–3 are infrastructure and DNS; only step 4 is data.
+sender and operator group (`specs/behaviors/sites.md`). The platform itself is
+**Signatories** at `signatories.org` — the default site, the marketing site and
+the `sites.signatories.org` alias customers point their DNS at all live in that
+zone. Four steps, in this order. Steps 1–3 are infrastructure and DNS; only
+step 4 is data. Creating, changing or deleting a site is a superadmin action;
+managing a site's operator group is not.
 
 **1. Verify the domain to the GCP project.** Google refuses to create a domain
 mapping for a domain the project has not been verified for. Either have the
@@ -187,10 +193,21 @@ gcloud run domain-mappings describe --domain=letters.example.org \
 The mapping is created before DNS exists; Cloud Run reports
 `CertificatePending` and waits.
 
-**3. Point DNS at the service.** The customer adds the CNAME the previous
-command printed (`letters` → `ghs.googlehosted.com.` at last check) in their
-own zone. The certificate provisions automatically once the record resolves —
-usually minutes, occasionally longer. No further apply.
+**3. Point DNS at the service.** The customer adds a CNAME in their own zone
+pointing the hostname at **`sites.signatories.org`**:
+
+```
+letters.example.org.   CNAME   sites.signatories.org.
+```
+
+`sites.signatories.org` is an alias the platform maintains in the
+`signatories.org` zone; it resolves to `ghs.googlehosted.com.`, which is what
+`domain-mappings describe` prints. Hand customers the platform alias, never
+Google's hostname directly: it is one name we control, so if the target ever
+changes we edit one record instead of asking every customer to edit theirs.
+
+The certificate provisions automatically once the record resolves — usually
+minutes, occasionally longer. No further apply.
 
 **4. Create the site record.**
 
