@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import Fastify from "fastify";
 
 import { app } from "../app.ts";
+import { GENERIC_DESCRIPTION } from "../lib/share-preview.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 import { seedDocument, seedParticipant, TEST_ACTOR } from "./test-support.ts";
 
@@ -138,6 +139,62 @@ describe("static SPA serving", () => {
     });
     expect(post.statusCode).toBe(404);
     expect(post.json().error).toBe("not_found");
+
+    await server.close();
+  });
+
+  /**
+   * `specs/api/conventions.md` § URL scheme: "a path under one of the API
+   * prefixes above that matches no route is a 404 like any other unrouted
+   * path, and never the app's shell with a 200" (#98) — the `/admin/*`,
+   * `/i/*` and `/d/*` wildcards used to swallow a mistyped endpoint and
+   * answer HTML.
+   */
+  it("404s an unknown path under an API prefix instead of serving the SPA shell", async () => {
+    process.env.NODE_ENV = "test";
+    const { dataDir, cleanup: cleanupData } = await createTestDataRepo();
+    cleanups.push(cleanupData);
+    const { root, cleanup: cleanupDist } = buildFixtureDist();
+    cleanups.push(cleanupDist);
+
+    const server = Fastify();
+    await server.register(app, {
+      storage: { dataDir, trackerIntervalMs: 3_600_000 },
+      disablePhaseObserver: true,
+      static: { root },
+    });
+    await server.ready();
+
+    const unknownApiPaths = [
+      "/admin/api/documents/x/schedul",
+      "/admin/api/nope",
+      "/i/some-token/api/nope",
+      "/d/some-slug/api/nope",
+    ];
+    for (const url of unknownApiPaths) {
+      const json = await server.inject({
+        method: "GET",
+        url,
+        headers: { accept: "application/json" },
+      });
+      expect(json.statusCode).toBe(404);
+      expect(json.json().error).toBe("not_found");
+
+      // Even a browser's Accept header never gets a 200 here.
+      const html = await server.inject({
+        method: "GET",
+        url,
+        headers: { accept: "text/html,application/xhtml+xml" },
+      });
+      expect(html.statusCode).toBe(404);
+    }
+
+    // The client routes that live under the same prefixes still get the shell.
+    for (const url of ["/admin", "/admin/api-keys", "/i/some-token/history", "/d/some-slug"]) {
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("text/html");
+    }
 
     await server.close();
   });
@@ -291,7 +348,10 @@ describe("share preview metadata", () => {
 
     expect(metaContent(html, "og:title")).toBe("Keep the Museum Open");
     expect(metaContent(html, "og:type")).toBe("article");
-    expect(metaContent(html, "og:description")).toBe("Named the three galleries at risk.");
+    // The statement's own first sentence, not the version's changelog line.
+    expect(metaContent(html, "og:description")).toBe(
+      "The board voted in March to close three galleries.",
+    );
     expect(metaContent(html, "og:url")).toBe("https://drafter.example.org/d/keep-the-museum-open");
     expect(metaContent(html, "og:site_name")).toBe("Example Drafter");
     expect(metaContent(html, "og:image")).toBe("https://drafter.example.org/og.png");
@@ -306,14 +366,17 @@ describe("share preview metadata", () => {
     expect(html).toContain('<div id="root">');
   });
 
-  it("falls back to the first sentence of the text when the version has no summary", async () => {
+  it("falls back to the version summary, then the generic line, when the text yields no sentence", async () => {
     const server = await buildShellServer();
+
+    // A body that is all furniture — a heading and a list, no prose line.
+    const furniture = "## Gallery Letter\n\n- a list item\n- another list item\n";
 
     await seedDocument(server, {
       slug: "gallery-letter",
       title: "Gallery Letter",
       public_access: "read",
-      body: "## Gallery Letter\n\n- a list item\n\nWe write as neighbours of the museum. We have three asks.",
+      body: "## Gallery Letter\n\nA first draft that still had a sentence in it.",
     });
     await server.storage.commit(
       "publish",
@@ -322,19 +385,72 @@ describe("share preview metadata", () => {
         subject: "publish: gallery-letter v2",
         document: "gallery-letter",
         version: 2,
+        summary: "Named the three galleries at risk.",
+      },
+      async (tx) => {
+        await tx.documents.patch({ slug: "gallery-letter" }, { body: furniture });
+      },
+    );
+
+    const summarised = await server.inject({ method: "GET", url: "/d/gallery-letter" });
+    expect(metaContent(summarised.body, "og:description")).toBe(
+      "Named the three galleries at risk.",
+    );
+
+    // Neither source yields anything: the generic instance line.
+    await seedDocument(server, {
+      slug: "quiet-letter",
+      title: "Quiet Letter",
+      public_access: "read",
+      body: "## Quiet Letter\n\nA first draft that still had a sentence in it.",
+    });
+    await server.storage.commit(
+      "publish",
+      {
+        actor: TEST_ACTOR,
+        subject: "publish: quiet-letter v2",
+        document: "quiet-letter",
+        version: 2,
         summary: "",
       },
       async (tx) => {
+        await tx.documents.patch({ slug: "quiet-letter" }, { body: furniture });
+      },
+    );
+
+    const generic = await server.inject({ method: "GET", url: "/d/quiet-letter" });
+    expect(metaContent(generic.body, "og:description")).toBe(GENERIC_DESCRIPTION);
+  });
+
+  it("prefers the first sentence of the text over the version summary", async () => {
+    const server = await buildShellServer();
+
+    await seedDocument(server, {
+      slug: "neighbours-letter",
+      title: "Neighbours Letter",
+      public_access: "read",
+      body: "## Neighbours Letter\n\n- a list item\n\nWe write as neighbours of the museum. We have three asks.",
+    });
+    await server.storage.commit(
+      "publish",
+      {
+        actor: TEST_ACTOR,
+        subject: "publish: neighbours-letter v2",
+        document: "neighbours-letter",
+        version: 2,
+        summary: "Tightened the second ask.",
+      },
+      async (tx) => {
         await tx.documents.patch(
-          { slug: "gallery-letter" },
+          { slug: "neighbours-letter" },
           {
-            body: "## Gallery Letter\n\n- a list item\n\nWe write as **neighbours** of the museum. We have three asks.",
+            body: "## Neighbours Letter\n\n- a list item\n\nWe write as **neighbours** of the museum. We have three asks.",
           },
         );
       },
     );
 
-    const response = await server.inject({ method: "GET", url: "/d/gallery-letter" });
+    const response = await server.inject({ method: "GET", url: "/d/neighbours-letter" });
     expect(metaContent(response.body, "og:description")).toBe(
       "We write as neighbours of the museum.",
     );

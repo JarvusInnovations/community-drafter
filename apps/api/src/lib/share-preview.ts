@@ -70,11 +70,13 @@ function stripInlineMarkdown(line: string): string {
 }
 
 /**
- * The first sentence of a document's text, for the description when the
- * version carries no `summary`. Skips the furniture a statement opens with
- * — headings, block quotes, list markers, tables, rules, fenced code — and
- * takes the first real prose line, because a title repeated as the
- * description tells a reader nothing the title did not.
+ * The first sentence of a document's text: the description a share preview
+ * leads with, because a preview should say what the statement says. Skips
+ * the furniture a statement opens with — headings, block quotes, list
+ * markers, tables, rules, fenced code — and takes the first real prose
+ * line, because a title repeated as the description tells a reader nothing
+ * the title did not. Returns `undefined` when the body is all furniture,
+ * which is when the version's `summary` takes over.
  */
 export function firstSentence(body: string): string | undefined {
   let inFence = false;
@@ -177,10 +179,15 @@ export function resolvePreview(
   const document = findPublicDocument(fastify, slug);
   if (!document) return generic;
 
+  // `specs/screens/public-and-embed.md` § Share Preview: the text leads and
+  // `summary` is the fallback. A version's `summary` is the one-line
+  // changelog of what *changed* in that version — it describes an edit, and
+  // to someone meeting the document for the first time in a group chat it
+  // describes nothing at all.
   const current = document.versions[document.versions.length - 1];
-  const description = current?.summary?.trim()
-    ? condense(current.summary)
-    : (current && firstSentence(current.body)) || GENERIC_DESCRIPTION;
+  const description =
+    (current && firstSentence(current.body)) ||
+    (current?.summary?.trim() ? condense(current.summary) : GENERIC_DESCRIPTION);
 
   return {
     ...generic,
