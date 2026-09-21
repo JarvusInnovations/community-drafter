@@ -29,9 +29,11 @@ Document (title, phase, deadlines, `show_signatories`, `reply_to`), the document
 
 **Embed**: title, version label (with "see what changed" linking to the public history in a new tab), the document text, a footer line "Read the full page" linking to `/d/<slug>` in a new tab. No signatory list, no clock (the host page owns that context). Height reported to the parent via `postMessage` so hosts can size the frame.
 
-**Signatories page/fragment**: the counts line, then organizations, then individuals, per `behaviors/signatures.md`; "and N others who asked not to be listed"; last updated time. Honors `show_signatories`.
+**Signatories page/fragment**: the counts line, then organizations, then individuals, per `behaviors/signatures.md`; "and N others who asked not to be listed"; last updated time. Honors `show_signatories`. Minimal chrome does not mean unstyled: it carries the design's card, type and signatory chips (`screens/document.md` § Design, "Signatories card") without the frame, so it reads as part of the same statement whether it is opened on its own or framed on the organization's site.
 
 **Widget**: renders into `<div data-drafter-doc="<slug>"></div>` the counts sentence and, optionally by attribute, the list; polls every 5 minutes; degrades to nothing if the JSON is unavailable. Under 3 KB.
+
+**Browser tab**: every public page's document title names the document and then the instance — "Charter of the Save the Academy Coalition · Save the Academy Coalition Drafter" — so a shared link is identifiable in a tab strip, a bookmark and a history entry. The participant and admin document screens do the same with their own document.
 
 **Personal links are never frameable** and never referenced from any public surface.
 

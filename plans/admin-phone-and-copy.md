@@ -4,6 +4,8 @@ depends: []
 issues: [56, 60]
 specs:
   - specs/screens/admin-dashboard.md
+  - specs/api/conventions.md
+  - specs/behaviors/review-and-judgement.md
   - specs/screens/document.md
   - specs/screens/public-and-embed.md
   - specs/screens/version-history.md
