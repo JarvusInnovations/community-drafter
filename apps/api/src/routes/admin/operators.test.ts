@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { mintOperatorToken } from "../../auth/tokens.ts";
+import { FakeMailer } from "../../lib/mailer/index.ts";
 import {
   adminHeaders,
   buildTestServer,
@@ -368,6 +369,152 @@ describe("document operators sub-resource", () => {
     });
     expect(response.statusCode).toBe(404);
     expect(response.json().error).toBe("not_found");
+
+    await server.close();
+  });
+});
+
+/** `specs/behaviors/notifications.md` § Messages + § Operator mail. */
+describe("operator mail", () => {
+  it("operator-added tells the new operator the instance, who added them and where to sign in", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({
+      mailer,
+      env: { INSTANCE_NAME: "Save the Academy", PUBLIC_URL: "https://drafter.example.org" },
+    });
+    cleanups.push(cleanup);
+
+    const create = await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "newcomer@example.org", name: "Nina Newcomer" },
+    });
+    expect(create.statusCode).toBe(201);
+
+    const message = mailer.sent.find((m) => m.to.email === "newcomer@example.org");
+    expect(message).toBeDefined();
+    expect(message!.subject).toBe("You're an operator on Save the Academy");
+    expect(message!.text).toContain("Hi Nina,");
+    // The instance, who did it, the sign-in address, and that there is no password.
+    expect(message!.text).toContain("Save the Academy");
+    expect(message!.text).toContain(TEST_ACTOR.email);
+    expect(message!.text).toContain("https://drafter.example.org/admin");
+    expect(message!.text).toContain("There is no password");
+    // An operator message carries no personal-link token and no preference links.
+    expect(message!.text).not.toContain("/i/");
+    expect(message!.text).not.toContain("Manage how we contact you");
+    expect(message!.personalLink).toBeUndefined();
+
+    // An actor whose record carries a name is named, not emailed at.
+    mailer.sent.length = 0;
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: await bearerFor(server, "newcomer@example.org"),
+      payload: { email: "third@example.org", name: "Theo Third" },
+    });
+    const second = mailer.sent.find((m) => m.to.email === "third@example.org");
+    expect(second).toBeDefined();
+    expect(second!.text).toContain("Nina Newcomer added you as an operator");
+
+    await server.close();
+  });
+
+  it("operator-added-to-document names the document and links its dashboard", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({
+      mailer,
+      env: { INSTANCE_NAME: "Save the Academy", PUBLIC_URL: "https://drafter.example.org" },
+    });
+    cleanups.push(cleanup);
+
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "colleague@example.org", name: "Cass Colleague" },
+    });
+    await seedDocument(server, {
+      slug: "mail-doc",
+      title: "Coalition Charter",
+      operators: [TEST_ACTOR.email],
+    });
+    mailer.sent.length = 0;
+
+    const add = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/mail-doc/operators",
+      headers: adminHeaders(),
+      payload: { email: "colleague@example.org" },
+    });
+    expect(add.statusCode).toBe(200);
+
+    const message = mailer.sent.find((m) => m.to.email === "colleague@example.org");
+    expect(message).toBeDefined();
+    expect(message!.subject).toBe("Coalition Charter — you were added as an operator");
+    expect(message!.text).toContain("Hi Cass,");
+    expect(message!.text).toContain("Coalition Charter");
+    expect(message!.text).toContain(TEST_ACTOR.email);
+    expect(message!.text).toContain("https://drafter.example.org/admin/d/mail-doc");
+
+    // Adding someone already on the document changes nothing and mails nobody.
+    mailer.sent.length = 0;
+    const again = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/mail-doc/operators",
+      headers: adminHeaders(),
+      payload: { email: "colleague@example.org" },
+    });
+    expect(again.json().added).toBe(false);
+    expect(mailer.sent).toHaveLength(0);
+
+    await server.close();
+  });
+
+  it("never mails the operator about their own action", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+
+    // The bootstrap operator is a superadmin, so they can add themselves to
+    // a document they don't run — the one reachable self-add.
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "owner@example.org", name: "Olive Owner" },
+    });
+    await seedDocument(server, { slug: "someone-elses", operators: ["owner@example.org"] });
+    mailer.sent.length = 0;
+
+    const add = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/someone-elses/operators",
+      headers: adminHeaders(),
+      payload: { email: TEST_ACTOR.email },
+    });
+    expect(add.statusCode).toBe(200);
+    expect(add.json().added).toBe(true);
+    expect(mailer.sent).toHaveLength(0);
+
+    await server.close();
+  });
+
+  it("a mailer that refuses does not fail the action that was already committed", async () => {
+    const mailer = new FakeMailer();
+    mailer.failNextFor("unreachable@example.org", 5);
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+
+    const create = await server.inject({
+      method: "POST",
+      url: "/admin/api/operators",
+      headers: adminHeaders(),
+      payload: { email: "unreachable@example.org", name: "Una Unreachable" },
+    });
+    expect(create.statusCode).toBe(201);
+    expect(server.storage.readModel.getOperatorByEmail("unreachable@example.org")).toBeDefined();
 
     await server.close();
   });

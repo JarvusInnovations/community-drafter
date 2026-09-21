@@ -199,6 +199,11 @@ export interface RevokeLinkResult {
   commit?: string | null;
 }
 
+/** `POST .../invitations/:person/expire` — the instant the API stored. */
+export interface ExpireLinkResult {
+  expires_at: string;
+}
+
 export interface RemindResult {
   dry_run: boolean;
   /** Dry run only: how many would be reminded. */

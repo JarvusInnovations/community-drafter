@@ -63,7 +63,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 ## Operators
 
 - `GET /operators` → every operator (email, name, kind, active, superadmin, title, org); any active operator may read the list, because adding someone to a document requires choosing from it.
-- `POST /operators` `{ email, name, kind?, title?, org?, notes? }` → creates (`Action: operator-add`); 409 when the email exists.
+- `POST /operators` `{ email, name, kind?, title?, org?, notes? }` → creates (`Action: operator-add`); 409 when the email exists. Mails the new operator (`behaviors/notifications.md` → `operator-added`) after the commit; a mailer that refuses is logged and does not fail the request, which reports the record that was written either way. Adding an operator to a document (`POST /documents/:slug/operators`) mails them the same way (`operator-added-to-document`).
 - `PATCH /operators/:email` `{ name?, active?, superadmin?, title?, org?, notes? }` → updates (`Action: operator-update`). Deactivating yourself is refused (422). `superadmin` may be set only by a superadmin (403 `forbidden` otherwise) and never on yourself (422).
 - `DELETE /operators/:email` → removes the record (`Action: operator-remove`) and drops the email from every document's `operators` list in the same commit; 409 `last_operator` when that would leave any document with none.
 

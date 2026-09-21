@@ -157,6 +157,7 @@ every-session use instead.
 - `scripts/drafter-axi people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]` — Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless).
 - `scripts/drafter-axi people revoke-link <slug> <person>` — Revoke one person's link.
 - `scripts/drafter-axi people reissue-link <slug> <person>` — Reissue one person's link (prints it once).
+- `scripts/drafter-axi people expire <slug> <person> --expires-at <when>` — Set when one person's link stops working; <when> takes the same grammar as docs open (ISO 8601 with a zone, or a zone-less time read locally) and the resolved instant is printed back.
 
 ### Signatures
 

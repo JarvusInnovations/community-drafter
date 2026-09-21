@@ -152,6 +152,11 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         usage: "people reissue-link <slug> <person>",
         summary: "Reissue one person's link (prints it once).",
       },
+      {
+        usage: "people expire <slug> <person> --expires-at <when>",
+        summary:
+          "Set when one person's link stops working; <when> takes the same grammar as docs open (ISO 8601 with a zone, or a zone-less time read locally) and the resolved instant is printed back.",
+      },
     ],
   },
   {

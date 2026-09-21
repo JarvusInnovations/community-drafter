@@ -15,6 +15,7 @@ Every `/admin/*` and `/auth/*` route, the admin CLI, the admin dashboard, the `A
 - **Any current operator of a document may add or remove operators on it**, drawing only from active operators in the sheet. A document always keeps at least one operator; removing the last one is refused.
 - **Bots are operators.** An unattended agent gets its own operator record (`kind: bot`) with its own mailbox, signs in once by a human clicking its magic link, and thereafter acts under its own identity. Nothing acts "as" a person through a label header.
 - **Operator management is a normal admin action**: create, update (name, title, org, notes, `active`), and remove go through the admin API and CLI so the service stays the single writer of the data repository. Every change is a commit (`Action: operator-add | operator-update | operator-remove`, `Actor` = the operator who did it). Only the instance owner or an existing operator may create operators; there is no self-registration.
+- **A new operator is told they exist.** Creating an operator record mails that person, naming the instance, who created the account, and the `/admin` address they sign in at; adding an operator to a document mails them the document and its dashboard address (`notifications.md` § Messages, `operator-added` and `operator-added-to-document`, and § Operator mail for what those messages are and are not). Neither is sent to the operator who performed the action. Access arrives with an address to use it at, or the person has to be told out of band and the instance URL travels by word of mouth.
 - **Deactivating** an operator (`active = false`) or removing them ends their access everywhere at the next request, because authorization is resolved from the record, not from the token.
 - **Bootstrap.** When the `operators` sheet is empty at boot and `BOOTSTRAP_OPERATOR_EMAIL` is set, the service creates that operator (`kind: person`, `active: true`) in a commit attributed to `system`. The variable is otherwise ignored. This is the only way the first operator comes into existence.
 
@@ -65,9 +66,11 @@ Because the service is the data repository's single writer, changes pushed to th
 ## Principles
 
 **Inherited**
+
 - [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): document lists are scoped to the caller; cross-operator lookups 404.
 - [The record is a git repo the team can read without the app](../principles.md#the-record-is-a-git-repo-the-team-can-read-without-the-app): operators and their document memberships are records; every change to them is a commit with an honest `Actor`.
 
 **Local**
+
 - **Authorization comes from the record, never from the token.** A token proves who is asking; whether they may act is read from `operators` and `documents.operators` on every request. Nothing about permissions is cached in a claim.
 - **Bots are people-shaped in the record.** An agent has its own operator record and email so that attribution, revocation and document membership work identically for humans and bots.
