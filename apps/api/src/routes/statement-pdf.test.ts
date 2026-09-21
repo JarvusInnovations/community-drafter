@@ -16,11 +16,25 @@ import {
 
 type TestServer = Awaited<ReturnType<typeof buildTestServer>>["server"];
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
+/**
+ * Every case closes its server, not just its data repo. The renderer's
+ * browser is shut down by the app's `onClose` hook (`deliverable/plugin.ts`),
+ * so a suite that only cleaned up the repo would leave a Chromium process
+ * running after `bun test` returned — orphaned, holding the run's stdout
+ * open, and invisible until something waits on it.
+ */
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => {
   statementPdfLimiter.reset();
-  while (cleanups.length) cleanups.pop()?.();
+  while (cleanups.length) await cleanups.pop()?.();
 });
+
+function closing(harness: Awaited<ReturnType<typeof buildTestServer>>): () => Promise<void> {
+  return async () => {
+    await harness.server.close();
+    harness.cleanup();
+  };
+}
 
 const TOKEN = "a".repeat(20);
 
@@ -75,8 +89,9 @@ async function signAs(
 
 describe("GET /d/:slug/statement.pdf — the public door", () => {
   it("404s for audience = closed, with the body an unknown slug gets", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, {
       slug: "letter-to-the-board",
       audience: "closed",
@@ -98,8 +113,9 @@ describe("GET /d/:slug/statement.pdf — the public door", () => {
   });
 
   it("404s for public_access = none, for a draft, and for a withdrawn document", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, { slug: "private-doc", audience: "public", public_access: "none" });
     await seedDocument(server, {
       slug: "draft-doc",
@@ -125,8 +141,9 @@ describe("GET /d/:slug/statement.pdf — the public door", () => {
   });
 
   it("is rate-limited per source address", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
 
     // An unknown slug still costs a slot: the limiter runs before anything
     // is looked up, which is what keeps the route's cost bounded whether or
@@ -143,8 +160,9 @@ describe("GET /d/:slug/statement.pdf — the public door", () => {
 
 describe("GET /admin/api/documents/:slug/statement.pdf — the operator door", () => {
   it("is document-scoped: a non-operator gets the unknown-slug 404", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, { slug: "scoped-doc", operators: ["owner@example.org"] });
     await seedOperator(server, { email: "owner@example.org" });
     await seedOperator(server, { email: "outsider@example.org" });
@@ -167,8 +185,9 @@ describe("GET /admin/api/documents/:slug/statement.pdf — the operator door", (
   });
 
   it("404s a document with no version yet", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await server.storage.commit(
       "create",
       { actor: { kind: "operator", email: "team@example.org" }, subject: "create: bodiless" },
@@ -196,8 +215,9 @@ describe("GET /admin/api/documents/:slug/statement.pdf — the operator door", (
 
 describe("draft and clean", () => {
   it("is a draft until a final version and a closed signing phase, and clean after", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, {
       slug: "charter",
       title: "Charter of the Coalition",
@@ -236,8 +256,9 @@ describe("draft and clean", () => {
   });
 
   it("lets an operator force the watermark back on, and offers no flag the other way", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, { slug: "charter2", body: "Text." });
     await server.inject({
       method: "POST",
@@ -264,8 +285,9 @@ describe("draft and clean", () => {
 
 describe("what reaches the page", () => {
   it("names signatories from their signature and nothing from the people sheet", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, {
       slug: "charter4",
       title: "Charter",
@@ -315,8 +337,9 @@ describe("what reaches the page", () => {
 
 describe.if(chromiumAvailable)("the rendered PDF", () => {
   it("is a PDF of at least one page carrying the title and a signatory", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, {
       slug: "golden-charter",
       title: "Charter of the Save the Academy Coalition",
@@ -359,8 +382,9 @@ describe.if(chromiumAvailable)("the rendered PDF", () => {
   }, 60_000);
 
   it("serves the same document to a personal link, closed audience and all", async () => {
-    const { server, cleanup } = await buildTestServer();
-    cleanups.push(cleanup);
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
     await seedDocument(server, {
       slug: "closed-letter",
       title: "Letter to the Board",
