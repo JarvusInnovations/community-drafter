@@ -4,7 +4,7 @@ A static homepage for the platform, published from this repository to GitHub Pag
 
 ## Route
 
-`https://jarvusinnovations.github.io/community-drafter/` (and any custom domain later), built from `site/` by a workflow on pushes to `develop` that touch `site/**`.
+`https://signatories.org/` (the platform domain; GitHub Pages with a custom domain, so `https://jarvusinnovations.github.io/community-drafter/` redirects there), built from `site/` by a workflow on pushes to `develop` that touch `site/**`. The canonical link, share-preview URLs and image URL all name `signatories.org`.
 
 ## Data Requirements
 
