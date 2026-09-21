@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import fastifyStatic from "@fastify/static";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 
 import { PUBLIC_ROUTE } from "../gateway/gateway.ts";
 import {
@@ -93,6 +93,21 @@ function notFound(reply: { code: (n: number) => { send: (body: unknown) => unkno
   return reply.code(404).send({ error: "not_found", message: "Not found.", details: {} });
 }
 
+/**
+ * `specs/api/conventions.md` § URL scheme: the API lives under `/i/:token/api`,
+ * `/d/:slug/api` and `/admin/api`, and "a path under one of the API prefixes
+ * above that matches no route is a 404 like any other unrouted path, and never
+ * the app's shell with a 200". The shell wildcards below (`/i/*`, `/d/*`,
+ * `/admin/*`) would otherwise swallow a mistyped endpoint — a real API route
+ * still wins over a wildcard (find-my-way ranks static and parametric segments
+ * above it), so only the mistyped ones land here (#98).
+ */
+const API_PATH = /^(?:\/admin\/api(?:\/|$)|\/(?:i|d)\/[^/]+\/api(?:\/|$))/u;
+
+function isApiPath(path: string): boolean {
+  return API_PATH.test(path);
+}
+
 export interface StaticRoutesOptions {
   /** Test-only override for where the built SPA lives; defaults to `apps/web/dist`. */
   root?: string | URL;
@@ -151,12 +166,36 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
     return cachedShell.html;
   }
 
+  /**
+   * `specs/api/conventions.md`: a path that matches no route is a 404, and a
+   * request that accepts HTML is answered with the app's own "this isn't
+   * available" page rather than a JSON error body (#60: the gateway's
+   * default-deny used to turn these into a raw JSON 403). A client that asked
+   * for JSON, and every non-`GET`, still gets the JSON 404, so an API caller
+   * is never handed a page to parse. Shared by the framework's not-found
+   * handler and by the SPA wildcards, which hand it every unknown API path
+   * rather than answering one with the shell (#98).
+   */
+  function respondNotFound(request: FastifyRequest, reply: FastifyReply): unknown {
+    const accept = request.headers.accept ?? "";
+    const wantsHtml = request.method === "GET" && accept.includes("text/html");
+    const found = wantsHtml ? safeFile("index.html") : null;
+    if (!found) return notFound(reply);
+    setFrameHeaders(reply, request.url.split("?")[0] ?? request.url);
+    reply.code(404);
+    return reply.sendFile(found);
+  }
+
   for (const prefix of [...SPA_SHELL_PREFIXES, "/"]) {
     fastify.get(prefix, { config: PUBLIC_ROUTE }, (request, reply) => {
+      const path = request.url.split("?")[0] ?? request.url;
+      // An API path that reached a shell wildcard is a mistyped endpoint, not
+      // a client route: 404 it instead of answering HTML with a 200 (#98).
+      if (isApiPath(path)) return respondNotFound(request, reply);
+
       const found = safeFile("index.html");
       if (!found) return notFound(reply);
 
-      const path = request.url.split("?")[0] ?? request.url;
       setFrameHeaders(reply, path);
 
       const preview = resolvePreview(fastify, request, resolveBaseUrl(request), path);
@@ -166,27 +205,14 @@ const staticRoutes: FastifyPluginAsync<StaticRoutesOptions> = async (fastify, op
   }
 
   /**
-   * `specs/api/conventions.md`: a `GET` for a path that matches nothing at
-   * all — `/login`, `/sign-in`, a mistyped personal link — is a 404, and a
-   * request that accepts HTML is answered with the app's own "this isn't
-   * available" page rather than a JSON error body (#60: the gateway's
-   * default-deny used to turn these into a raw JSON 403). A client that
-   * asked for JSON, and every non-`GET`, still gets the JSON 404, so an
-   * API caller is never handed a page to parse.
+   * Every path that matches nothing at all — `/login`, `/sign-in`, a
+   * mistyped personal link — lands here.
    *
-   * No `config.capability` here: `setNotFoundHandler` takes no route
-   * config, and it needs none — the gateway hook lets an unmatched request
-   * through precisely because there is no route to have declared one.
+   * No `config.capability`: `setNotFoundHandler` takes no route config, and
+   * it needs none — the gateway hook lets an unmatched request through
+   * precisely because there is no route to have declared one.
    */
-  fastify.setNotFoundHandler((request, reply) => {
-    const accept = request.headers.accept ?? "";
-    const wantsHtml = request.method === "GET" && accept.includes("text/html");
-    const found = wantsHtml ? safeFile("index.html") : null;
-    if (!found) return notFound(reply);
-    setFrameHeaders(reply, request.url.split("?")[0] ?? request.url);
-    reply.code(404);
-    return reply.sendFile(found);
-  });
+  fastify.setNotFoundHandler(respondNotFound);
 };
 
 export default staticRoutes;

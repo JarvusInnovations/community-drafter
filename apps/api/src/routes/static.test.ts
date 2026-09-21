@@ -143,6 +143,62 @@ describe("static SPA serving", () => {
     await server.close();
   });
 
+  /**
+   * `specs/api/conventions.md` § URL scheme: "a path under one of the API
+   * prefixes above that matches no route is a 404 like any other unrouted
+   * path, and never the app's shell with a 200" (#98) — the `/admin/*`,
+   * `/i/*` and `/d/*` wildcards used to swallow a mistyped endpoint and
+   * answer HTML.
+   */
+  it("404s an unknown path under an API prefix instead of serving the SPA shell", async () => {
+    process.env.NODE_ENV = "test";
+    const { dataDir, cleanup: cleanupData } = await createTestDataRepo();
+    cleanups.push(cleanupData);
+    const { root, cleanup: cleanupDist } = buildFixtureDist();
+    cleanups.push(cleanupDist);
+
+    const server = Fastify();
+    await server.register(app, {
+      storage: { dataDir, trackerIntervalMs: 3_600_000 },
+      disablePhaseObserver: true,
+      static: { root },
+    });
+    await server.ready();
+
+    const unknownApiPaths = [
+      "/admin/api/documents/x/schedul",
+      "/admin/api/nope",
+      "/i/some-token/api/nope",
+      "/d/some-slug/api/nope",
+    ];
+    for (const url of unknownApiPaths) {
+      const json = await server.inject({
+        method: "GET",
+        url,
+        headers: { accept: "application/json" },
+      });
+      expect(json.statusCode).toBe(404);
+      expect(json.json().error).toBe("not_found");
+
+      // Even a browser's Accept header never gets a 200 here.
+      const html = await server.inject({
+        method: "GET",
+        url,
+        headers: { accept: "text/html,application/xhtml+xml" },
+      });
+      expect(html.statusCode).toBe(404);
+    }
+
+    // The client routes that live under the same prefixes still get the shell.
+    for (const url of ["/admin", "/admin/api-keys", "/i/some-token/history", "/d/some-slug"]) {
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("text/html");
+    }
+
+    await server.close();
+  });
+
   it("404s for an unknown asset path instead of falling back to index.html", async () => {
     process.env.NODE_ENV = "test";
     const { dataDir, cleanup: cleanupData } = await createTestDataRepo();
