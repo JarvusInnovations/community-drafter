@@ -42,7 +42,7 @@ Chris's correction of 2026-09-20 to `audience-and-consent` (PR #87): the audienc
 
 - [x] A closed letter addressed to "St. Brigid Parish Council" with `public_access = read` shows the closed sentence naming the council, and `docs show` prints `audience: closed`, `addressed_to`, and `public_access: read` side by side. Checked in a browser at 390 and 1280 against a throwaway data repo (screenshots on PR #89), and asserted in `packages/cli/src/e2e.test.ts`.
 - [x] `docs create` without `--audience` is refused with the flag named; `docs update` changes it and the sign card follows. `e2e.test.ts` covers the refusal (exit 2, message names `--audience`) and the `docs update` round-trip; `SignForm.test.tsx` covers the sentence per (`audience`, `addressed_to`, `show_signatories`).
-- [ ] The demo document `keep-the-museum-open` on the live instance reads as `closed` until updated, then `docs update keep-the-museum-open --audience public` makes it public. **Coordinator's, after deploy** — not run by the agent, which never touches the real data repo or production.
+- [x] The demo document `keep-the-museum-open` on the live instance reads as `closed` until updated, then `docs update keep-the-museum-open --audience public` makes it public. Run by the coordinator after deploying `sha-f955240`: read `closed`, updated (commit 6648981), reads `public`; the data repo's `documents` sheet config carried `audience` and `addressed_to` after boot.
 - [x] #88 closed by the PR (`Closes #88` in PR #89's body).
 
 ## Risks / unknowns
