@@ -127,3 +127,21 @@ resource "google_project_iam_member" "github_actions_serviceusage_admin" {
   role    = "roles/serviceusage.serviceUsageAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
+
+# Update 2026-09-21: the state now holds the platform's Cloud DNS zones
+# (dns.tf) and the Workload Identity pool above, and the restored PR plan
+# gate (#8) refreshes all of it under this account. Without these two the
+# plan — and the release apply — 403 on the zones and the pool. The
+# operator authorized every grant the deployment and its CI need (#92);
+# applied from an operator session, like the grants above.
+resource "google_project_iam_member" "github_actions_dns_admin" {
+  project = var.project_id
+  role    = "roles/dns.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_wif_pool_admin" {
+  project = var.project_id
+  role    = "roles/iam.workloadIdentityPoolAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
