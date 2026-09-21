@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: []
+pr: 104
 specs:
   - specs/README.md
   - specs/architecture.md
@@ -109,22 +110,28 @@ never appears in output.
 
 ## Validation
 
-- [ ] `bun run lint`, `bun run format:check`, `bun run typecheck` and `bun test` pass at the root
+- [x] `bun run lint`, `bun run format:check`, `bun run typecheck` and `bun test` pass at the root
       (every workspace package), and `apps/web` additionally passes `bun run build` and
-      `bun run check:bundle-size`.
-- [ ] `cd packages/cli && bun run build` is a no-op against the committed bundle and SKILL.md —
+      `bun run check:bundle-size`. 421 tests pass, 0 fail (api 232, web 103, shared 35, cli 51);
+      the web bundle is 106.63 KB gzip against a 120 KB budget. Lint reports only the warnings that
+      were already there. Re-run after the rebase onto `4d40e06`.
+- [x] `cd packages/cli && bun run build` is a no-op against the committed bundle and SKILL.md —
       the drift gate (`bun test` in `packages/cli`) passes with the renamed paths.
-- [ ] A profile written to `~/.config/signatories/` is read back; a profile present only in
+      `build-cli.ts --check` and `build-skill.ts --check` both report "up to date".
+- [x] A profile written to `~/.config/signatories/` is read back; a profile present only in
       `~/.config/drafter/` is still read, with one line on stderr saying so; `DRAFTER_URL` and
       `DRAFTER_TOKEN` still resolve when `SIGNATORIES_*` are unset. Covered by tests that sandbox
-      `$HOME`, never a real config directory.
-- [ ] The grep sweep for `drafter-axi`, `Community Drafter` and `DRAFTER_` over tracked source,
+      `$HOME`, never a real config directory (`packages/cli/src/cli/config.test.ts`, six cases).
+      Also proved against the built bundle under a temporary `$HOME`: the note names the old file
+      and the new directory, and the command then proceeds normally.
+- [x] The grep sweep for `drafter-axi`, `Community Drafter` and `DRAFTER_` over tracked source,
       markdown, HTML, TOML and JSON returns only deliberate leftovers: the compatibility paths, the
       `README.md` "formerly" line, the out-of-scope infrastructure identifiers, and closed plan
-      files that are historical record.
-- [ ] The site's hero reads "Signatories" at 1280 and at 390 with no horizontal scroll, and
-      `site/og.png` shows the new name.
-- [ ] Nothing in `tf/` changes except the `instance_name` default; `tf/terraform.tfvars` is
+      files that are historical record. The full list is in PR #104.
+- [x] The site's hero reads "Signatories" at 1280 and at 390 with no horizontal scroll, and
+      `site/og.png` shows the new name. `document.scrollWidth` equals `clientWidth` at both widths;
+      screenshots are in PR #104 and the `.verification/` directory is removed by this commit.
+- [x] Nothing in `tf/` changes except the `instance_name` default; `tf/terraform.tfvars` is
       untouched.
 
 ## Risks / unknowns
@@ -146,4 +153,47 @@ never appears in output.
 
 ## Notes
 
+**The workspace package rename stayed mechanical**, so scope item 4 went ahead: four `name`
+fields, two `workspace:*` references, every import, and the package matrices in `lint.yml` and
+`test.yml`. Nothing in the tsconfig project references or the Vite config named a package, which
+is what would have made it a rabbit hole. The shorter name changes where a few import lines wrap,
+so `oxfmt` reflowed two files; that is in its own `style(web)` commit.
+
+**Two identifiers were found mid-rename and deliberately left alone**: the public embed attribute
+`data-drafter-doc` (`specs/screens/public-and-embed.md`) and the CSRF header value
+`X-Requested-With: drafter` (`specs/api/admin.md`). Both are wire identifiers that a deployed
+embed or a signed-in browser depends on, and neither is a name a person reads. Renaming them is a
+breaking change that would have to be staged, not folded into a rename pass.
+
+**The data repo's own git identities moved** (`bootstrap@`, `participant@`, `system@` are now
+`…@signatories.local`). Nothing keys on them — they are commit author fields — so a data repo will
+simply carry both spellings across the boundary, which is exactly what its history should show.
+
+**`hook install` had to learn to replace, not add.** The SDK's `computeSessionStartHookUpdate`
+matches on a marker, so installing under the new name beside an existing `drafter-axi` hook would
+have left two SessionStart entries, one of them pointing at a skill directory that no longer
+exists. Install now strips the legacy marker first and reports `replaced`; uninstall removes
+either. Stripping only the *legacy* marker matters: stripping both would break the idempotent
+"already up to date" answer.
+
+**The branch was rebased onto `origin/develop` at `4d40e06`** partway through, picking up nine
+commits (PR #103 and the deploy that followed). No conflicts, and every gate was re-run after.
+
 ## Follow-ups
+
+- **Rename the GitHub repository and update the Workload Identity binding** (`var.github_repo` and
+  the `principalSet` condition in `tf/iam.tf`). The coordinator's, deliberately out of this plan's
+  scope. Until it happens `JarvusInnovations/community-drafter` is correct in the install line, the
+  site's repo links and `specs/screens/marketing-site.md`; after it, GitHub redirects.
+- **Pin `instance_name = "Signatories"` in `tf/terraform.tfvars` and apply.** This plan moved only
+  the variable's default, and the tfvars pin wins. Until the apply, the deployed instance still
+  serves the old name.
+- **Nothing is required of anyone with `~/.config/drafter/`.** The next `login` moves the profile.
+  Someone who wants it moved now can `mv ~/.config/drafter ~/.config/signatories`.
+- **The one adopting repo that installed `drafter-axi`** gets a second skill, not a rename, on its
+  next `npx skills add`. Remove the old directory there, then run `signatories-axi hook install`,
+  which clears the stale hook as part of installing.
+- **A per-instance share card** stays unfiled, as `share-previews` left it: the generic card now
+  says "Signatories" instead of "Community Drafter", and an instance wanting its own wording still
+  needs a rendered card or a configurable image path. Nobody has asked.
+- No downstream plan absorbs anything from this one.
