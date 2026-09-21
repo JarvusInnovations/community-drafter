@@ -45,14 +45,47 @@ function quoted(ctx: RecipientContext): string {
   return `"${ctx.documentTitle}"`;
 }
 
-/** Every subscription (non-transactional) message ends with these two links. */
-function subscriptionLinks(ctx: RecipientContext): EmailLink[] {
+/**
+ * `specs/behaviors/notifications.md` § Content rules: "**Every message to a
+ * participant** ends with 'Manage how we contact you' ... and a one-click
+ * 'stop all optional messages' link". Transactional messages carry them
+ * too — the signing receipt is the one message from a campaign people keep,
+ * so it is where someone goes looking for the controls. Operator mail
+ * (`operator-mail.ts`, `auth/routes.ts`) renders no footer links at all
+ * (§ Operator mail).
+ */
+function preferenceLinks(ctx: RecipientContext): EmailLink[] {
   return [
     { label: "Manage how we contact you", url: ctx.prefsLink },
     { label: "Stop optional messages", url: ctx.stopOptionalLink },
   ];
 }
 
+function participantMessage(
+  ctx: RecipientContext,
+  subject: string,
+  body: string[],
+  button: EmailLink,
+  alsoLink?: EmailLink,
+): TemplateResult {
+  const rendered = renderEmail({
+    greeting: greeting(ctx),
+    body,
+    button,
+    alsoLink,
+    smallPrint: [PRIVATE_LINK],
+    footerLinks: preferenceLinks(ctx),
+  });
+  return { subject, ...rendered };
+}
+
+/**
+ * Sent unconditionally, whatever the participation's preferences say. The
+ * two wrappers below render identically on purpose: whether a message is
+ * transactional decides *if* it is sent (`lib/notify.ts`), never what it
+ * contains. They stay separate so this file still says which kind each
+ * message is.
+ */
 function transactional(
   ctx: RecipientContext,
   subject: string,
@@ -60,16 +93,10 @@ function transactional(
   button: EmailLink,
   alsoLink?: EmailLink,
 ): TemplateResult {
-  const rendered = renderEmail({
-    greeting: greeting(ctx),
-    body,
-    button,
-    alsoLink,
-    smallPrint: [PRIVATE_LINK],
-  });
-  return { subject, ...rendered };
+  return participantMessage(ctx, subject, body, button, alsoLink);
 }
 
+/** Sent only when the recipient's named preference is on. */
 function subscription(
   ctx: RecipientContext,
   subject: string,
@@ -77,15 +104,7 @@ function subscription(
   button: EmailLink,
   alsoLink?: EmailLink,
 ): TemplateResult {
-  const rendered = renderEmail({
-    greeting: greeting(ctx),
-    body,
-    button,
-    alsoLink,
-    smallPrint: [PRIVATE_LINK],
-    footerLinks: subscriptionLinks(ctx),
-  });
-  return { subject, ...rendered };
+  return participantMessage(ctx, subject, body, button, alsoLink);
 }
 
 /** The clock sentence, or nothing when the document isn't open. */
