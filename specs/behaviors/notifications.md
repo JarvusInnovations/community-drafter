@@ -24,6 +24,8 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `listing-changed-<ts>` | a signature's display fields edited — name, descriptor, organization, title or the listing choice (`behaviors/signatures.md` § Changing how a signature is listed) | the signer | yes (names how they are now listed, and says plainly if they are no longer named on the list) |
 | `review-receipt-<ts>` | a review submitted | the author | yes (brief; lists judgement and comment count) |
 | `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (not a participation message: no `notified` mark, no preference link; subject "Sign in to *Instance name*"; body: greeting by name, one sentence naming the instance URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Instance name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
+| `operator-added` | an operator record is created (`behaviors/operators.md` § Operators) | that operator | yes (operator message, see § Operator mail below; subject "You're an operator on *Instance name*"; body: greeting by name, one sentence naming the instance and the operator who created the account, a button labeled "Sign in to *Instance name*" addressing `<instance>/admin`, and the plain sentence that signing in is an emailed link rather than a password. No document, no token) |
+| `operator-added-to-document` | an operator is added to a document | that operator | yes (operator message, see § Operator mail below; subject "[Title] — you were added as an operator"; body: greeting by name, one sentence naming the document, who added them and the instance, and a button labeled "Open the dashboard" addressing `<instance>/admin/d/<slug>`. No participant data) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
 | `digest-<date>` | daily job, only if anything changed that day | invitees with `daily_digest` | subscription |
 | `signing-opened` | phase becomes signing (the clock) | all invitees with `phase_changes` who have opened the link, plus every current signer regardless | subscription (signers: forced on) |
@@ -35,6 +37,18 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `reminder-<n>` | admin action "remind", targeted at unopened or opened-but-not-acted invitations | targets with `reminders` | subscription |
 
 "Forced on" means the preference toggle is shown disabled with the explanation that signers are always told when the final text lands and when the window closes.
+
+## Operator mail
+
+`operator-magic-link`, `operator-added` and `operator-added-to-document` go to an **operator**, not to a participant, and the rules for participant mail do not reach them:
+
+- **Never preference-gated.** An operator has no participation and no preferences; being given access is not something to opt out of. There is no preference link and no "stop optional messages" footer.
+- **Nothing is written to the record.** No `participations.notified` key, no `sent_at`, no commit. These messages are not counted in any document's funnel, and an operator's mailbox never affects what the record says.
+- **Never sent to the operator who caused it.** An operator who creates their own record, or adds themselves to a document they already run, is not mailed about their own action.
+- **Delivery is recorded in the log and nowhere else.** A send that fails after its retries is logged with the event key, the operator's email and the error. It does not enter the failure list that `notifications list` and the dashboard show: that list is the participation dispatcher's, and a retry there re-renders from a participation record an operator does not have — an operator message parked in it could never be retried or cleared.
+- **The action is committed before the message is sent**, so a mailer that refuses never turns a change that happened into a request that failed. The operator record or the document membership stands either way; the person may simply need to be told out of band.
+
+Both `operator-added` messages render through the same shell as every other message from the instance (§ Content rules, "Shape"): a greeting by name, one or two plain sentences, exactly one button with the same URL in plain text beneath it, and the small print. They carry no participant's name, email or content, and no personal-link token.
 
 ## Defaults
 

@@ -6,6 +6,7 @@ specs:
   - specs/api/admin-cli.md
   - specs/data-model.md
   - specs/behaviors/notifications.md
+  - specs/behaviors/operators.md
 ---
 
 # Plan: link-expiry-and-operator-mail
@@ -47,8 +48,12 @@ dashboard surface for operator mail; a message on `operator-remove` / `doc-opera
     link, not a password.
   - `operator-added-to-document` — an operator is added to a document → that operator. Names
     the document and who added them, and links `<instance>/admin/d/<slug>`.
-  Both carry the same "not a participation message" caveat `operator-magic-link` does, and
-  § Sending gains one rule covering how *all* operator-facing mail is recorded.
+  A new § Operator mail states what operator-facing mail is and is not — never
+  preference-gated, nothing written to the record, never sent to the actor, delivery recorded
+  in the log and nowhere else, and the triggering action committed before the send — covering
+  `operator-magic-link` too, which shipped with those rules implicit.
+- **`specs/behaviors/operators.md`** § Operators — one bullet saying a new operator is told,
+  pointing at those two messages.
 
 ## Approach
 
