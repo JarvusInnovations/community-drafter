@@ -118,3 +118,29 @@ resource "google_dns_record_set" "signatories_org_www" {
   ttl          = 300
   rrdatas      = ["jarvusinnovations.github.io."]
 }
+
+# The app itself at the .app apex: A and AAAA records exactly as the Cloud
+# Run domain mapping asks for them (an apex cannot CNAME).
+locals {
+  platform_records = var.platform_hostname == null ? [] : google_cloud_run_domain_mapping.platform[0].status[0].resource_records
+  platform_a       = [for r in local.platform_records : r.rrdata if r.type == "A"]
+  platform_aaaa    = [for r in local.platform_records : r.rrdata if r.type == "AAAA"]
+}
+
+resource "google_dns_record_set" "signatories_app_apex_a" {
+  count        = var.platform_hostname == null ? 0 : 1
+  name         = google_dns_managed_zone.signatories_app.dns_name
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "A"
+  ttl          = 300
+  rrdatas      = local.platform_a
+}
+
+resource "google_dns_record_set" "signatories_app_apex_aaaa" {
+  count        = var.platform_hostname == null ? 0 : 1
+  name         = google_dns_managed_zone.signatories_app.dns_name
+  managed_zone = google_dns_managed_zone.signatories_app.name
+  type         = "AAAA"
+  ttl          = 300
+  rrdatas      = local.platform_aaaa
+}

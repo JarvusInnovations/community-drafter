@@ -93,3 +93,9 @@ variable "auth_login_rate_limit" {
   type        = number
   default     = 5
 }
+
+variable "platform_hostname" {
+  description = "The platform's own hostname for the running app (the default site). Mapped to the Cloud Run service; its apex A/AAAA records are derived from the mapping. null to skip."
+  type        = string
+  default     = "signatories.app"
+}

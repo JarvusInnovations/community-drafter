@@ -231,3 +231,21 @@ resource "google_cloud_run_domain_mapping" "sites" {
     route_name = google_cloud_run_v2_service.community_drafter.name
   }
 }
+
+# The platform's own hostname for the app (specs/behaviors/sites.md § The
+# default site): the apex of the .app domain. Its DNS records live in
+# dns.tf and are read from this mapping's status, so nothing is copied by
+# hand.
+resource "google_cloud_run_domain_mapping" "platform" {
+  count    = var.platform_hostname == null ? 0 : 1
+  name     = var.platform_hostname
+  location = google_cloud_run_v2_service.community_drafter.location
+
+  metadata {
+    namespace = data.google_project.project.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.community_drafter.name
+  }
+}
