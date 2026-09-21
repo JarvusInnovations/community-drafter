@@ -73,7 +73,7 @@ A `Mailer` interface with implementations selected by configuration: **Postmark*
 
 - Container from `oven/bun` (Debian variant) with `git` and `openssh-client`; deploy key mounted from Secret Manager; entrypoint clones the data repo then starts the API server (the proposal-renderer `entrypoint.sh` pattern).
 - **Cloud Run**, `max_instance_count = 1` (load-bearing: single writer), `min_instance_count = 1` (no cold clone on a participant's first click; smaller batched-write loss window), SIGTERM handler flushes batched writes and drains the push daemon.
-- OpenTofu under `tf/` following proposal-renderer's layout (Cloud Run, Artifact Registry, Secret Manager, service accounts, domain mapping). Image build and `tofu apply` from GitHub Actions on release tags per `release-flow`.
+- OpenTofu under `tf/` following proposal-renderer's layout (Cloud Run, Artifact Registry, Secret Manager, service accounts, domain mapping). Image build and `tofu apply` from GitHub Actions on release tags per `release-flow`. A pull request that changes `tf/` is gated before it merges: formatting and validation with no credentials at all, and a **read-only `tofu plan -concise`** against the real state under the same Workload Identity credential the release uses, so a typo or an unintended replacement is read in review rather than during a deploy. CI runs `apply` nowhere but the release workflow.
 - Configuration (validated at boot by `@fastify/env`): `DATA_REPO_URL`, `DATA_REPO_BRANCH`, `DATA_REPO_WEBHOOK_SECRET`, `PUBLIC_URL`, `AUTH_SECRET` (signs sessions, CLI tokens and magic links), `BOOTSTRAP_OPERATOR_EMAIL`, `MAILER`, provider keys, `INSTANCE_NAME`, `INSTANCE_FROM_EMAIL`, `INSTANCE_TIMEZONE`.
 
 ## Repository layout
