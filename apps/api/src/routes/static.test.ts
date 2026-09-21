@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import Fastify from "fastify";
 
 import { app } from "../app.ts";
+import { GENERIC_DESCRIPTION } from "../lib/share-preview.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 import { seedDocument, seedParticipant, TEST_ACTOR } from "./test-support.ts";
 
@@ -291,7 +292,10 @@ describe("share preview metadata", () => {
 
     expect(metaContent(html, "og:title")).toBe("Keep the Museum Open");
     expect(metaContent(html, "og:type")).toBe("article");
-    expect(metaContent(html, "og:description")).toBe("Named the three galleries at risk.");
+    // The statement's own first sentence, not the version's changelog line.
+    expect(metaContent(html, "og:description")).toBe(
+      "The board voted in March to close three galleries.",
+    );
     expect(metaContent(html, "og:url")).toBe("https://drafter.example.org/d/keep-the-museum-open");
     expect(metaContent(html, "og:site_name")).toBe("Example Drafter");
     expect(metaContent(html, "og:image")).toBe("https://drafter.example.org/og.png");
@@ -306,14 +310,17 @@ describe("share preview metadata", () => {
     expect(html).toContain('<div id="root">');
   });
 
-  it("falls back to the first sentence of the text when the version has no summary", async () => {
+  it("falls back to the version summary, then the generic line, when the text yields no sentence", async () => {
     const server = await buildShellServer();
+
+    // A body that is all furniture — a heading and a list, no prose line.
+    const furniture = "## Gallery Letter\n\n- a list item\n- another list item\n";
 
     await seedDocument(server, {
       slug: "gallery-letter",
       title: "Gallery Letter",
       public_access: "read",
-      body: "## Gallery Letter\n\n- a list item\n\nWe write as neighbours of the museum. We have three asks.",
+      body: "## Gallery Letter\n\nA first draft that still had a sentence in it.",
     });
     await server.storage.commit(
       "publish",
@@ -322,19 +329,72 @@ describe("share preview metadata", () => {
         subject: "publish: gallery-letter v2",
         document: "gallery-letter",
         version: 2,
+        summary: "Named the three galleries at risk.",
+      },
+      async (tx) => {
+        await tx.documents.patch({ slug: "gallery-letter" }, { body: furniture });
+      },
+    );
+
+    const summarised = await server.inject({ method: "GET", url: "/d/gallery-letter" });
+    expect(metaContent(summarised.body, "og:description")).toBe(
+      "Named the three galleries at risk.",
+    );
+
+    // Neither source yields anything: the generic instance line.
+    await seedDocument(server, {
+      slug: "quiet-letter",
+      title: "Quiet Letter",
+      public_access: "read",
+      body: "## Quiet Letter\n\nA first draft that still had a sentence in it.",
+    });
+    await server.storage.commit(
+      "publish",
+      {
+        actor: TEST_ACTOR,
+        subject: "publish: quiet-letter v2",
+        document: "quiet-letter",
+        version: 2,
         summary: "",
       },
       async (tx) => {
+        await tx.documents.patch({ slug: "quiet-letter" }, { body: furniture });
+      },
+    );
+
+    const generic = await server.inject({ method: "GET", url: "/d/quiet-letter" });
+    expect(metaContent(generic.body, "og:description")).toBe(GENERIC_DESCRIPTION);
+  });
+
+  it("prefers the first sentence of the text over the version summary", async () => {
+    const server = await buildShellServer();
+
+    await seedDocument(server, {
+      slug: "neighbours-letter",
+      title: "Neighbours Letter",
+      public_access: "read",
+      body: "## Neighbours Letter\n\n- a list item\n\nWe write as neighbours of the museum. We have three asks.",
+    });
+    await server.storage.commit(
+      "publish",
+      {
+        actor: TEST_ACTOR,
+        subject: "publish: neighbours-letter v2",
+        document: "neighbours-letter",
+        version: 2,
+        summary: "Tightened the second ask.",
+      },
+      async (tx) => {
         await tx.documents.patch(
-          { slug: "gallery-letter" },
+          { slug: "neighbours-letter" },
           {
-            body: "## Gallery Letter\n\n- a list item\n\nWe write as **neighbours** of the museum. We have three asks.",
+            body: "## Neighbours Letter\n\n- a list item\n\nWe write as **neighbours** of the museum. We have three asks.",
           },
         );
       },
     );
 
-    const response = await server.inject({ method: "GET", url: "/d/gallery-letter" });
+    const response = await server.inject({ method: "GET", url: "/d/neighbours-letter" });
     expect(metaContent(response.body, "og:description")).toBe(
       "We write as neighbours of the museum.",
     );
