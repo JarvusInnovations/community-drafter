@@ -135,6 +135,10 @@ describe("operator digest", () => {
 
     const after = server.storage.readModel.getDocument("doc-busy");
     expect(after?.record.operator_notified?.digest).toBe(TODAY);
+    // Recording the digest touches the document record, and a commit that
+    // does not change the body is not a version
+    // (`specs/data-model.md` § Versions).
+    expect(after?.versions.length).toBe(document.versions.length);
 
     // Twice on the same day is once.
     expect(await sendOperatorDigest(server, after!, TODAY, SINCE)).toBe(false);
