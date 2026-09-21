@@ -394,12 +394,25 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
           ? undefined
           : parseDeadline(request.body.signing_closes_at, "signing_closes_at");
 
+      /**
+       * `specs/api/admin.md` § schedule: a document that has never been
+       * opened has no deadline to extend, and answering that with
+       * "comments_close_at must move later" reports a stored field to
+       * someone who needs to be told the document is not open yet (#60).
+       */
+      const requireExisting = (current: string | undefined, label: string, field: string): void => {
+        if (current) return;
+        throw new ApiError(
+          "no_deadline_set",
+          `This document has no ${label} to extend. Open it first: drafter-axi docs open ${slug}.`,
+          { field },
+        );
+      };
+
       const patch: Record<string, string> = {};
       if (comments_close_at !== undefined) {
-        if (
-          !entry.record.comments_close_at ||
-          new Date(comments_close_at) <= new Date(entry.record.comments_close_at)
-        ) {
+        requireExisting(entry.record.comments_close_at, "comment deadline", "comments_close_at");
+        if (new Date(comments_close_at) <= new Date(entry.record.comments_close_at ?? 0)) {
           throw new ApiError(
             "deadline_not_later",
             "comments_close_at must move later, never earlier.",
@@ -411,10 +424,8 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         patch.comments_close_at = comments_close_at;
       }
       if (signing_closes_at !== undefined) {
-        if (
-          !entry.record.signing_closes_at ||
-          new Date(signing_closes_at) <= new Date(entry.record.signing_closes_at)
-        ) {
+        requireExisting(entry.record.signing_closes_at, "signing deadline", "signing_closes_at");
+        if (new Date(signing_closes_at) <= new Date(entry.record.signing_closes_at ?? 0)) {
           throw new ApiError(
             "deadline_not_later",
             "signing_closes_at must move later, never earlier.",

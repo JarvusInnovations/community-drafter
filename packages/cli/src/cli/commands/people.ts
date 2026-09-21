@@ -1,5 +1,5 @@
 import { AxiError } from "axi-sdk-js";
-import { writeFileSync } from "node:fs";
+import { chmodSync, writeFileSync } from "node:fs";
 
 import {
   bool,
@@ -274,7 +274,12 @@ export async function peopleCommand(args: string[]): Promise<string> {
       );
       const out = str(parsed, "--out");
       if (out) {
-        writeFileSync(out, csvText, "utf8");
+        // `specs/api/admin-cli.md`: the rows are credentials, so the file
+        // is written `0600` exactly as `login` writes the profile. `mode`
+        // is only honoured when the file is created, so an existing, more
+        // permissive file is chmod'd explicitly (#60).
+        writeFileSync(out, csvText, { encoding: "utf8", mode: 0o600 });
+        chmodSync(out, 0o600);
         const rowCount = Math.max(0, parseCsv(csvText).length - 1);
         return render(parsed, { out, rows: rowCount }, () => renderObject({ out, rows: rowCount }));
       }

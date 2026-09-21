@@ -205,7 +205,10 @@ export async function versionsCommand(args: string[]): Promise<string> {
             number: result.number,
             summary: result.summary,
             commit: result.commit,
-            signing_closes_at: result.signing_closes_at,
+            // `specs/api/admin-cli.md`: printed only when the publish moved
+            // it — a `signing_closes_at: null` line reads as a deadline
+            // that was cleared (#60).
+            ...(result.signing_closes_at ? { signing_closes_at: result.signing_closes_at } : {}),
           }),
           renderObject({ notified: result.notified }),
           renderHelp([`Run \`drafter-axi docs show ${slug}\` to see the updated dashboard`]),

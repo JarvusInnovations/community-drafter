@@ -127,7 +127,15 @@ const adminSubmissionsRoute: FastifyPluginAsync = async (fastify) => {
         lines.push("");
         lines.push(`Version ${version.number} — ${version.summary}`);
         lines.push("");
+        // `specs/behaviors/review-and-judgement.md`: "Every section of the
+        // export states its own emptiness — a heading with nothing under
+        // it reads as a truncated file, not as 'none yet'." (#60)
         lines.push("## Submitted");
+        lines.push("");
+        if (payload.submissions.submitted.length === 0) {
+          lines.push("_No submissions yet._");
+          lines.push("");
+        }
         for (const entry of payload.submissions.submitted) {
           lines.push(`### ${entry.author} — v${entry.version} (${entry.judgement ?? "comment"})`);
           for (const comment of entry.comments) {
@@ -135,15 +143,18 @@ const adminSubmissionsRoute: FastifyPluginAsync = async (fastify) => {
           }
           lines.push("");
         }
-        if (payload.submissions.draft.length > 0) {
-          lines.push("## Draft (unsubmitted)");
-          for (const entry of payload.submissions.draft) {
-            lines.push(`### ${entry.author} — v${entry.version} (unsubmitted)`);
-            for (const comment of entry.comments) {
-              lines.push(`- ${comment.body}`);
-            }
-            lines.push("");
+        lines.push("## Draft (unsubmitted)");
+        lines.push("");
+        if (payload.submissions.draft.length === 0) {
+          lines.push("_No unsubmitted drafts._");
+          lines.push("");
+        }
+        for (const entry of payload.submissions.draft) {
+          lines.push(`### ${entry.author} — v${entry.version} (unsubmitted)`);
+          for (const comment of entry.comments) {
+            lines.push(`- ${comment.body}`);
           }
+          lines.push("");
         }
         reply.header("content-type", "text/markdown; charset=utf-8");
         return lines.join("\n");
