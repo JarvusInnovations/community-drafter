@@ -10,25 +10,30 @@ This is the **primary admin interface** of the system, and it ships as a **skill
 
 ## Configuration
 
-The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. The profile is selected by `--profile <name>`, else the `DRAFTER_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `DRAFTER_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
+The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (mode 600), written by `drafter-axi login`. `login` takes the instance URL as an argument (`--url https://…`, or `DRAFTER_URL` from the environment when the flag is absent) and saves it to the profile alongside the token, so later commands need neither the flag nor the variable. `DRAFTER_URL` and `DRAFTER_TOKEN` in the environment override the profile for CI and bots. A credential belongs to one hostname (`api/auth.md` § Token shape), so someone who works on two **sites** keeps one profile per site and selects it with `--profile`. The profile is selected by `--profile <name>`, else the `DRAFTER_PROFILE` environment variable, else `default`; a bot runs under its own operator by exporting `DRAFTER_PROFILE=<bot>` once and never touching the human's default profile. There is no actor label: every write is attributed to the signed-in operator.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `drafter-axi` | home: first the identity line (signed-in operator's email, name and kind, the instance URL, the profile in use), then that operator's documents with phase, next deadline, invited/opened/signed counts, failures; when not signed in, says so and how to `login`; when the stored token is expired or revoked, says that and how to `login` again |
-| `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `DRAFTER_URL`; refused if neither is given): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
-| `logout` / `whoami` | forget the token / show operator and expiry |
-| `operators list` | every operator |
+| `login <email> [--url <instance>]` | device-code sign-in against `--url` (or `DRAFTER_URL`; refused if neither is given). The URL's hostname picks the **site**, and the resulting token is good on that host only (`specs/behaviors/sites.md`): sends the magic link, prints the user code, waits for approval, then saves the URL, email and 90-day token to the profile |
+| `logout` / `whoami` | forget the token / show operator, site and expiry |
+| `sites list` | the caller's sites: hostname, name, the From address mail will actually use, operator and document counts, and whether the hostname and the sender are verified yet |
+| `sites show <slug>` | one site whole, with the DNS records it still needs |
+| `sites create <slug> --hostname … --name … --reply-to … [--sender-name …] [--sender-email …] [--logo-url …] [--accent …]` | create a site (superadmin). Prints the record, then **one block of every DNS record the customer must add**: the CNAME for the hostname, and, with `--sender-email`, the mail provider's DKIM TXT and Return-Path CNAME. It says plainly that creating the record routes nothing — the hostname must also be verified to the project and mapped (`docs/operations.md`) |
+| `sites update <slug> [--name …] [--sender-name …] [--sender-email …] [--reply-to …] [--logo-url …] [--accent …]` | change a site's identity; `--hostname` is deliberately absent — a new hostname is a new site |
+| `sites operators <slug>` / `sites operators add <slug> <email>` / `sites operators remove <slug> <email>` | the site's operator group; `remove` drops the email from this site only and says so |
+| `operators list` | this site's operator group (not every operator on the instance) |
 | `operators add <email> --name … [--kind person\|bot] [--title …] [--org …]` | create |
 | `operators update <email> [--name …] [--active true\|false] [--superadmin true\|false] [--title …] [--org …] [--notes …]` | update, deactivate, or (superadmins only) grant or revoke superadmin |
 | `operators remove <email>` | remove |
-| `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership |
-| `docs create <slug> --title … --audience public\|closed --sender-name … --reply-to … [--addressed-to "…"]… [--capacities personal,official] [--show-signatories list]` | create; the caller becomes the first operator. `--audience` is **required** — who the finished statement is for is not a thing to default into (`specs/data-model.md` § Audience) — and is stored as given, never written to `public_access`. `--addressed-to` names who the statement goes to and is repeatable, once per recipient; it is required with `--audience closed` |
-| `docs show <slug>` | dashboard numbers (including how many signatures are behind the current version), the audience and who the statement is addressed to, versions, schedule |
+| `docs operators <slug>` / `docs operators add <slug> <email>` / `docs operators remove <slug> <email>` | document membership; `add` draws only from the document's site's operator group and names the site when it refuses |
+| `docs create <slug> --title … --audience public\|closed [--site <slug>] [--sender-name …] [--reply-to …] [--addressed-to "…"]… [--capacities personal,official] [--show-signatories list]` | create; the caller becomes the first operator. `--audience` is **required** — who the finished statement is for is not a thing to default into (`specs/data-model.md` § Audience) — and is stored as given, never written to `public_access`. `--addressed-to` names who the statement goes to and is repeatable, once per recipient; it is required with `--audience closed` |
+| `docs show <slug>` | dashboard numbers (including how many signatures are behind the current version), the audience and who the statement is addressed to, the **site** and the canonical hostname its personal and public links are built on, versions, schedule |
 | `docs open <slug> --comments-close <when> --signing-closes <when>` | open and send invitations, printing how many were delivered and naming any the mailer rejected; `<when>` is ISO 8601 with a zone, or a zone-less time read in the machine's local zone, and the CLI echoes what it resolved to |
 | `docs extend <slug> [--comments-close <when>] [--signing-closes <when>]` | extension |
-| `docs update <slug> [--audience public\|closed] [--addressed-to "…"]…` | change the audience and who the statement is addressed to, and nothing else (`PATCH /documents/:slug`). Passing `--addressed-to` replaces the list; `--audience closed` on a document that would be left with no recipients is refused, naming the flag |
+| `docs update <slug> [--audience public\|closed] [--addressed-to "…"]… [--site <slug>]` | change the audience, who the statement is addressed to, and the site, and nothing else (`PATCH /documents/:slug`). `--site` moves the document to another site the caller belongs to: the slug, tokens and history do not change, the hostname its participants are sent to does, and the CLI prints the new canonical host so the operator sees what the next message will say. Passing `--addressed-to` replaces the list; `--audience closed` on a document that would be left with no recipients is refused, naming the flag |
 | `docs close | reopen | withdraw <slug> …` | lifecycle |
 | `versions list <slug>` / `versions show <slug> <n> [--body]` | read |
 | `versions publish <slug> --file new.md --summary "…" [--notes-file …] [--final] [--dispositions d.json]` | publish: one commit whose trailers carry the summary; prints version number, commit subject, notification counts |
@@ -53,7 +58,8 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 - Every mutation prints the resulting record's key fields and the commit subject.
 - `people list` and `docs show` never print tokens or emails unless `--contacts` is passed (emails only, still never tokens).
 - **Every document view prints `audience`** — `public` or `closed` — and, whenever recipients are named, `addressed_to`, both as stored. They sit beside `public_access` in the same object, because an operator reading a document needs to see at a glance that who the statement goes to and who may read the draft are two different answers (`specs/data-model.md` § Audience). A document stored without `audience` prints `closed`.
-- **`docs create`, `docs show` and `docs open` print `public_url`** — `<instance>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
+- **Every document view prints `site`** — the slug, `default` for a document that names none — and the canonical host its links are built on, because an operator handing out a link needs to read the address their participants will actually receive, not assemble it from the URL they happen to be signed in to (`specs/behaviors/sites.md`).
+- **`docs create`, `docs show` and `docs open` print `public_url`** — `https://<the document's site hostname>/d/<slug>` — whenever the document's `public_access` is not `none`, so the address an operator hands to their own site or newsletter never has to be guessed or assembled by hand. A document with `public_access: none` prints no such field.
 - Errors map API `error` codes to exit codes: 2 validation, 3 phase/conflict, 4 not found, 5 auth, 1 other; the message is the API's `message`.
 - The home view includes `help[]` lines suggesting the next likely command, per AXI.
 - **One invocation form per surface.** Everything the CLI itself emits — `help[]` hints, error suggestions, hook output, `--help` usage lines — writes commands as `drafter-axi <command> …`, never a resolved path. The resolved path of the bundled shim (which is not on `PATH`) appears exactly once, as the home view's `invoke_as` field, which is where a reader learns how to turn those hints into a runnable command. `SKILL.md` is the other surface and uses `scripts/drafter-axi` throughout, stated once at its top; within either surface the form never varies.
@@ -67,7 +73,9 @@ The instance URL and the credential live in `~/.config/drafter/<profile>.toml` (
 
 ## Session hook
 
-Per `axi-skills`, the skill ships a SessionStart hook that prints the home view when `DRAFTER_URL` is set, so an agent in the adopting repo opens every session knowing where each open document stands.
+Per `axi-skills`, the skill ships a SessionStart hook that prints the home view when `DRAFTER_URL` is set, so an agent in the adopting repo opens every session knowing where each open document stands. The home view's identity line names the site the profile is signed in to, since the same command against two profiles is two different tenants.
+
+`SKILL.md` carries a **Sites** section: what a site is in one paragraph, the four onboarding steps in order (verify, map, point DNS, create the record), the `sites` commands, and the warning that the record routes nothing on its own.
 
 ## Principles
 

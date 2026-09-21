@@ -10,7 +10,12 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 
 ## Channels
 
-- **email** (phase 1): via the configured `Mailer`. From: `documents.sender_name <INSTANCE_FROM_EMAIL>`, Reply-To `documents.reply_to`.
+- **email** (phase 1): via the configured `Mailer`. The From line, the Reply-To and the hostname of every link in the message come from the document's **site** (`behaviors/sites.md` § Mail):
+  - **From address**: the site's `sender_email` when it has one — the operator having verified it, or its domain, with the mail provider — otherwise the platform's own verified address (`INSTANCE_FROM_EMAIL`). The service never substitutes one for the other: a site that declared a sender and has not finished verifying it produces delivery failures, not mail from somebody else's address.
+  - **From display name**: `documents.sender_name`, else the site's `sender_name`, else the site's `name`. The document's voice wins; the site supplies the default a document may omit.
+  - **Reply-To**: `documents.reply_to`, else the site's `reply_to`.
+  - **Provider tag**: the site's slug, so per-site delivery statistics exist on one provider account.
+  On a deployment with no sites every one of these is the default site's, which is today's behavior unchanged.
 - **export**: when the mailer is `export`, "sending" writes rows to a CSV the admin can mail-merge and marks `notified` as if sent.
 - **sms** **[phase 2]**: via Twilio; only for `invitation`, `signing-opened`, `closing-soon` and `closed` events; requires `people.phone`. Preferences carry `channel` so the field exists in phase 1.
 
@@ -23,7 +28,7 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `revocation-confirmation-<ts>` | a revocation written | the signer | yes |
 | `listing-changed-<ts>` | a signature's display fields edited — name, descriptor, organization, title or the listing choice (`behaviors/signatures.md` § Changing how a signature is listed) | the signer | yes (names how they are now listed, and says plainly if they are no longer named on the list) |
 | `review-receipt-<ts>` | a review submitted | the author | yes (brief; lists judgement and comment count) |
-| `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (not a participation message: no `notified` mark, no preference link; subject "Sign in to *Instance name*"; body: greeting by name, one sentence naming the instance URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Instance name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
+| `operator-magic-link` | an operator requests sign-in (web or device code) | that operator | yes (the one message that belongs to the **resolved** site rather than to a document's site, because it is not about a document; not a participation message: no `notified` mark, no preference link; subject "Sign in to *Site name*"; body: greeting by name, one sentence naming the site's URL and what triggered it ("you asked to sign in on the web" or "a command line asked to sign in with code XXXX-YYYY"), a button labeled "Sign in to *Instance name*" with the short-code link, the plain-text alternative with the same URL, "This link works once and expires in 15 minutes", and "If you didn't request this, you can ignore this email." Nothing else: no token, no other links) |
 | `operator-added` | an operator record is created (`behaviors/operators.md` § Operators) | that operator | yes (operator message, see § Operator mail below; subject "You're an operator on *Instance name*"; body: greeting by name, one sentence naming the instance and the operator who created the account, a button labeled "Sign in to *Instance name*" addressing `<instance>/admin`, and the plain sentence that signing in is an emailed link rather than a password. No document, no token) |
 | `operator-added-to-document` | an operator is added to a document | that operator | yes (operator message, see § Operator mail below; subject "[Title] — you were added as an operator"; body: greeting by name, one sentence naming the document, who added them and the instance, and a button labeled "Open the dashboard" addressing `<instance>/admin/d/<slug>`. No participant data) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
@@ -65,7 +70,7 @@ Set when the participation is created, editable by the participant at any time:
 
 ## Content rules
 
-- Every message names the document, states the current phase and its next deadline in the recipient's time zone when known (else the document's), and links to the personal link.
+- Every message names the document, states the current phase and its next deadline in the recipient's time zone when known (else the document's), and links to the personal link — on the document's site hostname, whichever host the send was triggered from.
 - Revision messages include the version number, the summary line, and a "see what changed" link to the diff.
 - `schedule-changed` says what changed: one line per deadline that moved, with its old and new time ("Comments close moved from Thu, Sep 24 · 5:00 PM EDT to Sat, Sep 26 · 5:00 PM EDT"), before the current clock. A reopening that sets a deadline which had none states the new time alone.
 - The digest lists versions published, disposition outcomes for the recipient's comments, and current signatory counts, for the previous 24 hours.
@@ -80,7 +85,7 @@ Set when the participation is created, editable by the participant at any time:
 - While the document is open, the clock in one sentence: "Comments close Thu, Sep 24 · 5:00 PM EDT, and signatures are due Thu, Oct 1 · 5:00 PM EDT." (signing phase: only the second half; closed: "The signatory list closed …"). Dates use the instance time zone with its name and drop the year when it is the current year.
 - Exactly one button whose label is the action ("Read and sign", "See what changed", "Confirm or remove your signature", "Sign in to …"), followed by "Or paste this link into your browser:" and the same URL in plain text. At most one further link in the body (for example the full document beneath a "see what changed" button).
 - Small print at the end: "This link is yours alone; please don't forward it." and, for subscription messages, the two preference links ("Manage how we contact you" · "Stop optional messages"). Questions go to the document's reply-to, which is the message's Reply-To header, not a line in the body.
-- The HTML part and the text part say the same words; the HTML adds only a button in the accent blue and the app's type. No logo, header image, tracking pixel or extra links. No participant token appears anywhere except inside the personal link itself.
+- The HTML part and the text part say the same words; the HTML adds only a button in the accent color (the site's `accent` when it sets one) and the app's type. No logo, header image, tracking pixel or extra links — a site's `logo_url` is a web-surface identity and never appears in a message, on any site. No participant token appears anywhere except inside the personal link itself.
 
 ## Sending
 
@@ -103,4 +108,5 @@ Set when the participation is created, editable by the participant at any time:
 **Local**
 
 - **A person hears about a version at most once per channel.** If someone has both `every_revision` and `daily_digest` on, the digest omits versions already sent as `v<n>`.
+- **A sender the provider will not accept is a delivery failure, not a substitution.** When a site's `sender_email` is unverified, each affected recipient fails on the ordinary path — nothing enters `notified`, no `sent_at` is written, and the operator is named the recipients and the provider's reason — and the next send picks them up once verification lands. Quietly sending as the platform instead would put a statement in front of signers under a name its own team never chose, and nobody would learn of it from the counts.
 - **A sent count is a delivery count.** Only a message the mailer accepted may be recorded or counted as sent, and every send action reports deliveries and failures rather than intentions. When truth and a tidy number conflict — a partial batch, a rejected address, a reminder the interval refuses — the operator is told what actually happened. An operator who cannot trust the counts has to re-send blind, which is how a coalition emails the same person four times and misses the one person it never reached.
