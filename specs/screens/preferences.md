@@ -2,7 +2,7 @@
 
 ## Route
 
-`/i/<token>/prefs`. Also reachable through the one-click "stop all optional messages" link in every subscription email, which lands here with the change already applied and a confirmation banner.
+`/i/<token>/prefs`. Also reachable through the "Manage how we contact you" link every participant email carries, and through the one-click "stop all optional messages" link beside it, which lands here with the change already applied and a confirmation banner (`behaviors/notifications.md` § Content rules).
 
 ## Data Requirements
 
@@ -28,7 +28,7 @@ Change any toggle → saved immediately with a confirmation; "Stop all optional 
 
 ## Navigation
 
-From the document footer and every subscription email. Back to document.
+From the document footer and every participant email — transactional messages carry the link too, so a signer who keeps only the signing receipt can still reach this screen. Back to document.
 
 ## Principles
 

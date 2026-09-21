@@ -2,7 +2,7 @@
 
 ## Rule
 
-The system sends a small set of **transactional** messages unconditionally and a larger set of **subscription** messages according to each participation's preferences, with role-based defaults. Every message is rendered from a template, carries the recipient's personal link, is recorded on success under `participations.notified.<event>` so it can never be sent twice, and (for subscription messages) includes a one-click preference link.
+The system sends a small set of **transactional** messages unconditionally and a larger set of **subscription** messages according to each participation's preferences, with role-based defaults. Every message is rendered from a template, carries the recipient's personal link, is recorded on success under `participations.notified.<event>` so it can never be sent twice, and — transactional or subscription alike — ends with the preference links.
 
 ## Applies To
 
@@ -43,6 +43,8 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `schedule-changed` | admin extends or reopens | invitees with `phase_changes` | subscription |
 | `disposition-v<n>` | a version published with dispositions on the recipient's comments | those authors with `my_comments_addressed` | subscription |
 | `reminder-<n>` | admin action "remind", targeted at unopened or opened-but-not-acted invitations | targets with `reminders` | subscription |
+
+**"Transactional" means sent unconditionally** — the message goes out whatever the participation's preferences say, and no preference can turn it off. It does *not* mean the message arrives without the controls: every participant message, transactional and subscription alike, ends with the same preference footer (§ Content rules). "Subscription" means the opposite: sent only when the named preference is on.
 
 "Forced on" means the preference toggle is shown disabled with the explanation that signers are always told when the final text lands and when the window closes.
 
@@ -104,7 +106,7 @@ Set when the participation is created, editable by the participant at any time:
 - Revision messages include the version number, the summary line, and a "see what changed" link to the diff.
 - `schedule-changed` says what changed: one line per deadline that moved, with its old and new time ("Comments close moved from Thu, Sep 24 · 5:00 PM EDT to Sat, Sep 26 · 5:00 PM EDT"), before the current clock. A reopening that sets a deadline which had none states the new time alone.
 - The digest lists versions published, disposition outcomes for the recipient's comments, and current signatory counts, for the previous 24 hours.
-- Subscription messages end with "Manage how we contact you" → `/i/<token>/prefs` and a one-click "stop all optional messages" link that sets every optional preference off (transactional messages continue).
+- **Every message to a participant** ends with "Manage how we contact you" → `/i/<token>/prefs` and a one-click "stop all optional messages" link that sets every optional preference off (transactional messages continue). Transactional messages carry the pair too, and carrying it does not make them optional: the signing receipt is the one message from a campaign people keep, so it is where someone goes looking for the controls, and a receipt that offers no way to reach them teaches the reader that this sender has none. Operator messages carry neither link (§ Operator mail).
 - No message ever includes another participant's contact details or unsubmitted content.
 - Subject lines are short and stable: "[Title] — version 3 published", "[Title] — final version, please confirm", "[Title] — you signed", "[Title] — how you're listed changed".
 
@@ -114,7 +116,7 @@ Set when the participation is created, editable by the participant at any time:
 - One or two plain sentences in the sender's voice (`documents.sender_name`) saying what happened and what, if anything, the reader is being asked to do. No boilerplate "you are receiving this because".
 - While the document is open, the clock in one sentence: "Comments close Thu, Sep 24 · 5:00 PM EDT, and signatures are due Thu, Oct 1 · 5:00 PM EDT." (signing phase: only the second half; closed: "The signatory list closed …"). Dates use the instance time zone with its name and drop the year when it is the current year.
 - Exactly one button whose label is the action ("Read and sign", "See what changed", "Confirm or remove your signature", "Sign in to …"), followed by "Or paste this link into your browser:" and the same URL in plain text. At most one further link in the body (for example the full document beneath a "see what changed" button).
-- Small print at the end: "This link is yours alone; please don't forward it." and, for subscription messages, the two preference links ("Manage how we contact you" · "Stop optional messages"). Questions go to the document's reply-to, which is the message's Reply-To header, not a line in the body.
+- Small print at the end: "This link is yours alone; please don't forward it." and the two preference links ("Manage how we contact you" · "Stop optional messages"). They are small print, not a second call to action — the one-button rule above is unaffected. Questions go to the document's reply-to, which is the message's Reply-To header, not a line in the body.
 - The HTML part and the text part say the same words; the HTML adds only a button in the accent color (the site's `accent` when it sets one) and the app's type. No logo, header image, tracking pixel or extra links — a site's `logo_url` is a web-surface identity and never appears in a message, on any site. No participant token appears anywhere except inside the personal link itself.
 
 ## Sending

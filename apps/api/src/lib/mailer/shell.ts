@@ -29,7 +29,7 @@ export interface EmailParts {
   alsoLink?: EmailLink;
   /** Small print: one line per entry. */
   smallPrint?: string[];
-  /** Subscription-message footer links (preferences, stop optional). */
+  /** Preference footer links (manage, stop optional). Participant mail passes both; operator mail passes none. */
   footerLinks?: EmailLink[];
 }
 

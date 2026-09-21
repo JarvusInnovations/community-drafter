@@ -9,8 +9,8 @@ export interface TemplateResult {
  * (`specs/behaviors/notifications.md` § Content rules: "Every message names
  * the document, states the current phase and its next deadline ..., and
  * links to the personal link"; § "Shape": greeting by first name, the
- * sender's voice, the clock as one sentence) plus the two
- * subscription-message footer links. Built once per recipient by
+ * sender's voice, the clock as one sentence) plus the two preference
+ * footer links every participant message carries. Built once per recipient by
  * `context.ts`'s `buildRecipientContext` so no template touches the read
  * model directly — which is also what structurally prevents a template from
  * ever pulling in another participant's data (the plan's leakage validation

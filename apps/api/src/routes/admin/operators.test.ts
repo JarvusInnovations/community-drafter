@@ -401,9 +401,14 @@ describe("operator mail", () => {
     expect(message!.text).toContain(TEST_ACTOR.email);
     expect(message!.text).toContain("https://drafter.example.org/admin");
     expect(message!.text).toContain("There is no password");
-    // An operator message carries no personal-link token and no preference links.
+    // An operator message carries no personal-link token and no preference
+    // links — `specs/behaviors/notifications.md` § Operator mail, which the
+    // participant-wide footer rule in § Content rules does not reach.
     expect(message!.text).not.toContain("/i/");
     expect(message!.text).not.toContain("Manage how we contact you");
+    expect(message!.text).not.toContain("Stop optional messages");
+    expect(message!.text).not.toContain("/prefs");
+    expect(message!.html).not.toContain("/prefs");
     expect(message!.personalLink).toBeUndefined();
 
     // An actor whose record carries a name is named, not emailed at.
