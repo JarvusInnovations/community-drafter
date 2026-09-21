@@ -11,8 +11,18 @@ WORKDIR /app
 # git: entrypoint clones/opens the data repo and the storage plugin shells out
 # to it. openssh-client: SSH deploy-key auth to github.com. ca-certificates:
 # HTTPS calls (Google OAuth token verification, etc.).
+#
+# chromium: the statement PDF (specs/screens/deliverable.md) is printed by a
+# headless browser that puppeteer-core drives over the DevTools protocol.
+# Debian's own package, so nothing downloads a browser at build or run time.
+# The font packages come with it deliberately: --no-install-recommends means
+# Chromium arrives with no fonts at all, and a container with no fonts prints
+# a page of empty boxes rather than failing loudly. Inter travels inside the
+# render itself; these are the fallback for anything it does not cover.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git openssh-client ca-certificates \
+ && apt-get install -y --no-install-recommends \
+      git openssh-client ca-certificates \
+      chromium fonts-liberation fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
 # Workspace manifests first so `bun install` layers cache across source changes.
@@ -49,6 +59,9 @@ RUN chmod +x /usr/local/bin/community-drafter-entrypoint
 
 ENV NODE_ENV=production
 ENV PORT=8080
+# Named rather than probed, so a change to Debian's layout is a build-time
+# fact rather than a runtime surprise (specs/architecture.md § Configuration).
+ENV CHROMIUM_PATH=/usr/bin/chromium
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/community-drafter-entrypoint"]
