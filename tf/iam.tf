@@ -145,3 +145,104 @@ resource "google_project_iam_member" "github_actions_wif_pool_admin" {
   role    = "roles/iam.workloadIdentityPoolAdmin"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
+
+# --- The pull-request `tofu plan` gate's own principal (#99) ---
+#
+# `specs/architecture.md` § Deployment: the read-only plan gate "runs under a
+# second, read-only service account of its own ... a plan that authenticates
+# as the deploy account is one typo in a workflow away from being an apply."
+# Everything below is read-only; the account can refresh state and nothing
+# else.
+resource "google_service_account" "github_actions_plan" {
+  # 30-char account_id ceiling again: "community-drafter-ci-plan" is 25.
+  account_id   = "community-drafter-ci-plan"
+  display_name = "Community Drafter CI plan (read-only)"
+}
+
+# The same pool and repo condition as the deploy account's binding above.
+# The provider maps `google.subject` and `attribute.repository` only, so
+# there is no `event_name` attribute to bind a pull-request-only principal
+# set to; scoping this binding to the event would mean editing the trust
+# attributes of the provider the deploy account also assumes, which is a
+# change to make deliberately and on its own. What makes a repo-scoped
+# binding safe here is the role set: every grant below is a viewer.
+resource "google_service_account_iam_member" "github_actions_plan_wif" {
+  service_account_id = google_service_account.github_actions_plan.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
+}
+
+# The resources this module declares, each read by `tofu plan`'s refresh:
+# Cloud Run services and the domain mappings, secrets (metadata only — never
+# a payload), the image registry, the DNS zones and records, and the
+# Workload Identity pool and provider.
+resource "google_project_iam_member" "github_actions_plan_run_viewer" {
+  project = var.project_id
+  role    = "roles/run.viewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_secretmanager_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_artifactregistry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_dns_reader" {
+  project = var.project_id
+  role    = "roles/dns.reader"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_wif_pool_viewer" {
+  project = var.project_id
+  role    = "roles/iam.workloadIdentityPoolViewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+# `data "google_project"` (cloudrun.tf's domain mapping), same as the deploy
+# account's grant above.
+resource "google_project_iam_member" "github_actions_plan_browser" {
+  project = var.project_id
+  role    = "roles/browser"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+# The three reads the viewer roles above do not cover, and without which the
+# refresh 403s on this module's own resources — the failure mode #92 was:
+# `google_project_service` needs `serviceusage.services.get`; the two
+# `google_service_account` resources need `iam.serviceAccounts.get`; and
+# every `*_iam_member` needs a `getIamPolicy` on its resource, which
+# securityReviewer grants across services. All three are read-only.
+resource "google_project_iam_member" "github_actions_plan_serviceusage_viewer" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageViewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_serviceaccount_viewer" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountViewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+resource "google_project_iam_member" "github_actions_plan_security_reviewer" {
+  project = var.project_id
+  role    = "roles/iam.securityReviewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+# Not declared here: `roles/storage.objectViewer` on the `jarvus-tfstate`
+# bucket, which holds this module's state. That bucket lives outside this
+# project and `tf/` manages none of its IAM, so granting it from here would
+# mean adopting a resource this module has no business owning. The owner
+# runs the one binding by hand — `docs/operations.md` § The `tofu plan` gate's
+# read-only account. With `-lock=false` (which the plan workflow already
+# passes) object read is enough: a plan reads the state object and takes no
+# lock.

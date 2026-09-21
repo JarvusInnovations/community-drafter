@@ -380,6 +380,44 @@ a human's job:
    in under its own identity from then on, with its own `Actor` trailer on
    every commit it makes.
 
+### 9. The `tofu plan` gate's read-only account
+
+The pull-request plan gate (`.github/workflows/tf-plan.yml`) authenticates as
+`community-drafter-ci-plan`, a second service account that holds viewer roles
+only — the deploy account's admin roles have no business being mintable by
+every pull request (`specs/architecture.md` § Deployment). The account, its
+Workload Identity binding and its project roles are declared in `tf/iam.tf`;
+like every other grant in that file they are applied from a workstation:
+
+```sh
+cd tf && tofu apply -concise
+```
+
+One grant it needs is **not** in `tf/`: read on the state bucket. The state
+lives in `jarvus-tfstate`, which is outside this project and unmanaged by this
+module, so the owner adds the binding by hand, once, after the apply above has
+created the account:
+
+```sh
+gcloud storage buckets add-iam-policy-binding gs://jarvus-tfstate \
+  --member=serviceAccount:community-drafter-ci-plan@community-drafter.iam.gserviceaccount.com \
+  --role=roles/storage.objectViewer
+```
+
+`objectViewer` — read, not write — is enough because the workflow plans with
+`-lock=false`: it reads the state object and never writes the lock object a
+real apply takes. Until both steps are done the plan job fails at its
+authentication step; the credential-free `tf-validate.yml` gate is unaffected.
+
+Verify from the gate itself (re-run the `OpenTofu plan` check on any PR that
+touches `tf/`) or locally:
+
+```sh
+gcloud storage ls gs://jarvus-tfstate/community-drafter/ \
+  --impersonate-service-account=community-drafter-ci-plan@community-drafter.iam.gserviceaccount.com
+```
+
+
 ## First boot: `init-data-repo`
 
 A freshly created data repo (step 1 above) has no commits, so
