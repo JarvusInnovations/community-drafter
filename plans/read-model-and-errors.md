@@ -1,0 +1,116 @@
+---
+status: in-progress
+depends: []
+issues: [6, 21, 78, 8]
+specs:
+  - specs/behaviors/versioning.md
+  - specs/screens/admin-dashboard.md
+  - specs/api/admin.md
+  - specs/api/conventions.md
+  - specs/architecture.md
+---
+
+# Plan: read-model-and-errors
+
+## Scope
+
+Four small, independent corrections that share no code but do share a shape: each is a
+place where the running service tells a thinner truth than its spec.
+
+- **#6** — the version scan only looks at commits the service itself made. A body change
+  pushed by hand or with `gitsheets-axi` is not counted, though
+  `specs/behaviors/versioning.md` says any body change is a version.
+- **#21** — an `extend`/`reopen` commit names *which* deadlines moved but not what they
+  moved from and to, so the dashboard's activity feed cannot show old and new times even
+  though the schedule-changed email already can (PR #80).
+- **#78** — a body Fastify itself refuses to parse (`FST_ERR_CTP_EMPTY_JSON_BODY` and
+  friends) is reported as a 500 `internal_error` rather than the 400 `invalid_request`
+  `specs/api/conventions.md` requires.
+- **#8** — nothing gates `tf/` on a pull request; infra typos surface at apply time, on a
+  release.
+
+Out of scope: any other error-handler behavior (5xx handling, logging shape) beyond
+carrying a framework 4xx through; any change to how the schedule-changed *email* is
+composed (already correct); `tofu apply` from a PR (never — see Approach); a read-only
+service account of its own for the plan job (deferred, see Follow-ups).
+
+## Implements
+
+- `specs/behaviors/versioning.md` § Any body change is a version — the version scan runs
+  over every commit that changed the document's record file, not only commits carrying
+  this service's `Action`/`Document` trailers.
+- `specs/screens/admin-dashboard.md` § Recent activity — an `extend`/`reopen` entry shows
+  the deadlines it moved with their literal old and new times.
+- `specs/api/admin.md` § Activity — the entry shape gains `deadlines`, parsed from the
+  commit's `Deadlines` trailer.
+- `specs/api/conventions.md` § Responses — a framework-raised error that already carries a
+  4xx status keeps that status and reports the matching `error` value; `internal_error` is
+  reserved for 5xx.
+- `specs/architecture.md` § Deployment — a pull request touching `tf/` is gated in CI.
+
+## Approach
+
+1. **#6 (read model).** `logWithTrailers` gains each commit's changed paths (one extra
+   `--name-only` on the existing single `git log` pass; a distinct record separator keeps
+   the path block unambiguous next to the trailer block). `computeDocumentEntry` treats a
+   commit as this document's when its `Document` trailer matches **or** its changed paths
+   contain `documents/<slug>.md`, and admits a commit to the version scan when its action
+   is document-mutating **or** it touched that path. The existing
+   `body === previousBody` check then does the real work, so a settings-only hand edit
+   still is not a version.
+2. **#21 (deadlines in activity).** Add a `Deadlines` trailer (`CommitInput.deadlines`)
+   carrying `<field> <from|-> -> <to>` pairs, set by `/schedule` and `/reopen` from the
+   `DeadlineChange[]` they already compute for the `schedule-changed` event. The activity
+   route parses it back into `deadlines: [{ deadline, from, to }]`; the dashboard renders
+   "Comments close moved from … to …" in the operator's locale under the subject line.
+3. **#78 (error handler).** In `app.ts`, before the `internal_error` fallback, map an
+   error carrying a 4xx `statusCode` onto the conventions table's value for that status
+   (400 `invalid_request`, 401 `unauthenticated`, 403 `forbidden`, 404 `not_found`,
+   413 `payload_too_large`, 415 `unsupported_media_type`, 429 `rate_limited`; any other
+   4xx → `invalid_request`), keeping the framework's message and putting its `code` in
+   `details`. 5xx keeps `internal_error` and the error log.
+4. **#8 (CI).** Two workflows, split on the credential line that `ci-quality-gates` draws:
+   - `tf-validate.yml` — credential-free, fork-safe: `tofu fmt -check -recursive`,
+     `tofu init -backend=false`, `tofu validate`. The required gate.
+   - `tf-plan.yml` — the same Workload Identity auth `publish.yml` uses
+     (`google-github-actions/auth`, asdf-installed opentofu), `tofu init` against the real
+     `jarvus-tfstate` backend, then `tofu plan -concise -lock=false` and nothing else. Never
+     `apply`, never `-out`, never an uploaded plan file. Skipped on fork PRs, which cannot
+     mint an OIDC token. Variables come from the committed `tf/terraform.tfvars` (the same
+     `image_tag` a release passes explicitly), so the plan reads against the deployed tag.
+
+## Validation
+
+- [ ] A commit that changes `documents/<slug>.md` with no trailers at all is counted as a
+      version, with its subject as the summary; a trailerless settings-only commit is not.
+- [ ] Extending a deadline records old and new times on the commit, and
+      `GET /admin/api/documents/:slug/activity` returns them as `deadlines`.
+- [ ] `DELETE /admin/api/documents/:slug/operators/:email` with
+      `content-type: application/json` and no body returns 400 `invalid_request`, not
+      `internal_error`; a genuine 500 still reports `internal_error`.
+- [ ] `bun run lint`, `bun run format:check`, `bun run typecheck`, `bun test` pass for
+      every package the change touches.
+- [ ] The two `tf/` workflows parse (`actionlint`) and are scoped to `paths: [tf/**]`;
+      neither runs `apply`.
+
+## Risks / unknowns
+
+- **`--name-only` on merge commits.** `--first-parent` sets `--diff-merges=first-parent`
+  on modern git, so a merge's paths are its first-parent diff. Older git would list none —
+  acceptable: the data repo is single-writer and has no merges.
+- **Activity feed noise.** Admitting path-touching commits also admits them to the activity
+  feed with no `Action`; that is the truthful reading of "the record's own event log", and
+  the dashboard renders the subject either way.
+- **Plan-job credential.** The CI service account is the deploy account, not a read-only
+  one. `plan` cannot write, and `-lock=false` keeps a PR from taking the state lock, but a
+  narrower principal would be better (Follow-ups).
+- **Fork PRs.** The plan job is skipped rather than failing red on forks; the credential-free
+  validate job still runs.
+
+## Notes
+
+(At closeout.)
+
+## Follow-ups
+
+(At closeout.)
