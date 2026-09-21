@@ -44,7 +44,7 @@ Every HTML page this instance serves declares Open Graph and Twitter card metada
 **A public document page** (`/d/<slug>` and the routes under it, when the document would render rather than 404) declares:
 
 - title: the document's title, and `og:site_name` the instance name;
-- description: one line — the current version's `summary`; failing that, the first sentence of the current version's text; failing that, a generic line naming the instance;
+- description: one line — the first sentence of the current version's text; failing that, the current version's `summary`; failing that, a generic line naming the instance. The description says what the statement *says*: `summary` is the one-line changelog of what changed in a version, which describes an edit rather than a document and reads as nonsense to someone meeting it for the first time in a group chat;
 - `og:url` and the canonical link: `<instance>/d/<slug>`, whichever of the document's public routes was requested;
 - `og:type`: `article`;
 - image: a generic instance card, the same static image for every document. Nothing about a document is rendered into an image — the title and the one-line description are already in the preview's text, and a per-document image would put an image renderer in the path of an anonymous request.
