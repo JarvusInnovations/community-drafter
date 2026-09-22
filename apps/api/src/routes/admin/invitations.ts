@@ -45,6 +45,12 @@ interface ListInvitationsQuery {
   status?: string;
   source?: string;
   q?: string;
+  /**
+   * `specs/api/admin.md` § People and invitations: `true` | `false`, keeping
+   * only rows with a **live** signature carrying that listing choice. A row
+   * with no signature, or with a revoked one, matches neither value.
+   */
+  listed?: string;
 }
 
 interface SendBody {
@@ -436,7 +442,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       const document = fastify.storage.readModel.getDocument(request.params.slug);
       if (!document) throw notFoundDocument(request.params.slug);
       const slug = document.record.slug;
-      const { status, source, q } = request.query;
+      const { status, source, q, listed } = request.query;
 
       const rows = fastify.storage.readModel.listParticipationsForDocument(slug).map((entry) => {
         const person = fastify.storage.readModel.getPersonOn(slug, entry.record.person);
@@ -464,6 +470,11 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       return rows.filter((row) => {
         if (status && row.status !== status) return false;
         if (source && row.source !== source) return false;
+        if (listed === "true" || listed === "false") {
+          const signature = row.signature;
+          if (!signature || signature.revoked) return false;
+          if (signature.listed !== (listed === "true")) return false;
+        }
         if (q) {
           const needle = q.toLowerCase();
           if (

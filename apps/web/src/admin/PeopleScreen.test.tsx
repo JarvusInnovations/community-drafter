@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -250,5 +250,121 @@ describe("PeopleScreen — the version a signature is attached to", () => {
       expect(screen.getByText(/personal \(revoked\) · v2/u)).toBeTruthy();
     });
     expect(screen.queryByText(/^behind v/u)).toBeNull();
+  });
+});
+
+/**
+ * `specs/screens/admin-dashboard.md` § People: every live signature says
+ * whether the signer is on the signatory list — *listed* muted, *not listed*
+ * amber soft — and a revoked signature says neither. The Listing filter lives
+ * beside status and source, in the URL.
+ */
+describe("PeopleScreen — the listing choice", () => {
+  const LISTED: InvitationRow = {
+    ...ROW,
+    person: "jane-doe",
+    name: "Jane Doe",
+    status: "signed",
+    signature: {
+      capacity: "personal",
+      display_name: "Jane Doe",
+      conditional: false,
+      listed: true,
+      signed_on_version: 1,
+      revoked: false,
+      signed_at: "2026-09-19T12:00:00Z",
+    },
+  };
+  const UNLISTED: InvitationRow = {
+    ...LISTED,
+    person: "sam-reed",
+    name: "Sam Reed",
+    signature: { ...LISTED.signature!, display_name: "Sam Reed", listed: false },
+  };
+  const REVOKED: InvitationRow = {
+    ...LISTED,
+    person: "alex-kim",
+    name: "Alex Kim",
+    status: "revoked",
+    signature: { ...LISTED.signature!, display_name: "Alex Kim", revoked: true },
+  };
+
+  let lastRequestUrl: string | null = null;
+
+  /** Stands in for the endpoint's own `listed` filter (`specs/api/admin.md`). */
+  function serveFiltered(rows: InvitationRow[]) {
+    globalThis.fetch = ((url: string) => {
+      lastRequestUrl = url;
+      const wanted = new URL(url, "http://localhost").searchParams.get("listed");
+      const served =
+        wanted === null
+          ? rows
+          : rows.filter(
+              (row) =>
+                row.signature !== null &&
+                !row.signature.revoked &&
+                row.signature.listed === (wanted === "true"),
+            );
+      return Promise.resolve(
+        new Response(JSON.stringify(served), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    }) as unknown as typeof fetch;
+  }
+
+  beforeEach(() => {
+    lastRequestUrl = null;
+    serveFiltered([LISTED, UNLISTED, REVOKED]);
+  });
+
+  it("marks a listed signer, an unlisted signer, and neither on a revoked signature", async () => {
+    renderAt("/admin/d/coalition-charter/people");
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeTruthy();
+    });
+
+    // Scoped to the table: the Listing filter's own options read the same.
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("listed")).toBeTruthy();
+    expect(table.getByText("not listed")).toBeTruthy();
+    // One pill each across three rows: the revoked row carries neither.
+    expect(table.getAllByText(/^(listed|not listed)$/u)).toHaveLength(2);
+    expect(table.getByText(/personal \(revoked\)/u)).toBeTruthy();
+  });
+
+  it("reads the listing filter from the URL, narrows the table, and offers a chip to clear it", async () => {
+    renderAt("/admin/d/coalition-charter/people?listed=false");
+
+    await waitFor(() => {
+      expect(screen.getByText("Sam Reed")).toBeTruthy();
+    });
+    expect(lastRequestUrl).toContain("listed=false");
+    expect(screen.queryByText("Jane Doe")).toBeNull();
+    expect(screen.queryByText("Alex Kim")).toBeNull();
+    expect(screen.getByLabelText("Listing")).toHaveProperty("value", "false");
+
+    fireEvent.click(screen.getByText(/^Listing: not listed/u));
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeTruthy();
+    });
+    expect(lastRequestUrl).not.toContain("listed=");
+  });
+
+  it("writes the filter back into the URL when it changes", async () => {
+    renderAt("/admin/d/coalition-charter/people");
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText("Listing"), { target: { value: "true" } });
+
+    await waitFor(() => {
+      expect(lastRequestUrl).toContain("listed=true");
+    });
+    expect(screen.queryByText("Sam Reed")).toBeNull();
   });
 });

@@ -202,7 +202,7 @@ export function extendDeadline(slug: string, body: ScheduleInput): Promise<Docum
 
 export function getInvitations(
   slug: string,
-  query: { status?: string; source?: string; q?: string } = {},
+  query: { status?: string; source?: string; q?: string; listed?: string } = {},
 ): Promise<InvitationRow[]> {
   const params = new URLSearchParams();
   if (query.status) {
@@ -213,6 +213,11 @@ export function getInvitations(
   }
   if (query.q) {
     params.set("q", query.q);
+  }
+  // `specs/api/admin.md`: "true" | "false" — only rows with a live signature
+  // carrying that listing choice.
+  if (query.listed) {
+    params.set("listed", query.listed);
   }
   const qs = params.toString();
   return request<InvitationRow[]>(

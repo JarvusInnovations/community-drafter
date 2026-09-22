@@ -219,8 +219,10 @@ export const copy = {
     search: "Search name or org…",
     statusLabel: "Status",
     sourceLabel: "Source",
+    listingLabel: "Listing",
     allStatuses: "All statuses",
     allSources: "All sources",
+    allListings: "Any listing",
     unsubmitted: "Unsubmitted",
     copyLink: "Copy personal link",
     revokeLink: "Revoke link",
@@ -235,6 +237,12 @@ export const copy = {
     /** The version a signature is attached to, and the marker when it is behind. */
     signedVersion: (version: number) => `v${version}`,
     behind: (current: number) => `behind v${current}`,
+    /**
+     * `specs/screens/admin-dashboard.md` § People: every live signature says
+     * whether the signer is on the signatory list.
+     */
+    listed: "listed",
+    notListed: "not listed",
   },
 
   submissions: {
