@@ -192,23 +192,57 @@ export const copy = {
 
   signed: {
     /**
-     * `specs/screens/document.md` § Display Rules 3 (*Signed*). The date is
-     * the signature currently in force; in official capacity the line names
-     * the organization the signature belongs to.
+     * `specs/screens/document.md` § Display Rules 3 (*Signed*): "a short
+     * heading, then the facts, then the actions." The heading is what focus
+     * moves to and what the live region announces, so it says the one thing
+     * that changed and leaves the detail to the facts below.
      */
-    heading(date: string, who: SignedWho): string {
+    heading: "You signed",
+    listedAsLabel: "Listed as",
+    onTheListLabel: "On the list",
+    signedLabel: "Signed",
+    /**
+     * § Display Rules 3: the name and, in personal capacity, the
+     * descriptor; in official capacity the organization leads and the
+     * person and title follow, because the signature is the organization's.
+     */
+    listedAs(who: SignedWho): string {
       const detail = who.capacity === "official" ? who.title : who.descriptor;
       const named = detail ? `${who.display_name}, ${detail}` : who.display_name;
-      // `specs/behaviors/signatures.md` § A signature belongs to a version:
-      // the line names the version signed, and drops that clause only when
-      // no version can be established for the signature.
+      return who.capacity === "official" && who.org ? `${who.org} — ${named}` : named;
+    },
+    /**
+     * `specs/behaviors/signatures.md` § A signature belongs to a version:
+     * the fact names the version signed, and drops that clause only when no
+     * version can be established for the signature.
+     */
+    signedOn(date: string, version?: number): string {
+      return version === undefined ? date : `Version ${version} · ${date}`;
+    },
+    /**
+     * § Display Rules 3, *Your listing status is a fact on the card*, and
+     * `specs/behaviors/signatures.md` § Display. The listed wording follows
+     * the audience the who-sees sentence already promised; the not-listed
+     * wording is the card's own voice, not a quiet aside, because it is the
+     * one fact an unlisted signer came back to check.
+     */
+    listedYes: (audience: Audience) =>
+      audience === "public"
+        ? "Your name will be published with the statement."
+        : "Your name is on the signatory list.",
+    listedNoLead: "Your name is not on the signatory list.",
+    listedNoRest: "Only the team sees it; you are counted, not named.",
+    /**
+     * The live-region announcement after signing or an edit: the heading
+     * plus the facts that changed, in one sentence a screen reader can
+     * read straight through.
+     */
+    announcement(date: string, who: SignedWho): string {
       const signed =
         who.signed_on_version === undefined
           ? `You signed on ${date}`
           : `You signed version ${who.signed_on_version} on ${date}`;
-      return who.capacity === "official" && who.org
-        ? `${signed} for ${who.org} as ${named}.`
-        : `${signed} as ${named}.`;
+      return `${signed}. Listed as ${copy.signed.listedAs(who)}.`;
     },
     changeListing: "Change how you're listed",
     remove: "Remove my name",
@@ -256,6 +290,15 @@ export const copy = {
         : `You signed version ${version} on ${date} as ${name}.`,
     ownDeclined: "You told us you wouldn't be signing.",
     ownNotSigned: "You didn't sign this document.",
+  },
+
+  /**
+   * `specs/screens/document.md` § Display Rules 5, *Sources as footnotes*:
+   * a reading preference, so the label names what the reader gets, not what
+   * the renderer does.
+   */
+  citations: {
+    toggle: "Sources as footnotes",
   },
 
   draftLine: (version: number) => `You have unsent comments on v${version}`,

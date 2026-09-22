@@ -125,7 +125,7 @@ export function CommentModeScreen(): JSX.Element {
 
   const signatureLine =
     bundle.signature && !bundle.signature.revoked
-      ? copy.signed.heading(formatAbsolute(signatureTime(bundle.signature)), bundle.signature)
+      ? copy.signed.announcement(formatAbsolute(signatureTime(bundle.signature)), bundle.signature)
       : bundle.position?.judgement === "decline"
         ? copy.declined.heading
         : copy.closedCard.ownNotSigned;

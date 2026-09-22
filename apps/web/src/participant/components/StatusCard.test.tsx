@@ -58,7 +58,7 @@ describe("StatusCard — the six states", () => {
     expect(screen.getByRole("heading", { name: "Add your name" })).toBeTruthy();
   });
 
-  it("signed: shows the own-status line and the change/remove actions", () => {
+  it("signed: shows the heading, the facts and the change/remove actions", () => {
     const bundle = makeBundle({
       signature: {
         capacity: "personal",
@@ -73,11 +73,57 @@ describe("StatusCard — the six states", () => {
     });
     renderCard(bundle);
 
-    expect(
-      screen.getByText(/You signed version 1 on .* as Jane Doe, former Academy educator\./u),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "You signed" })).toBeTruthy();
+    expect(screen.getByText("Jane Doe, former Academy educator")).toBeTruthy();
+    expect(screen.getByText(/^Version 1 · /u)).toBeTruthy();
+    expect(screen.getByText("Your name is on the signatory list.")).toBeTruthy();
     expect(screen.getByText("Change how you're listed")).toBeTruthy();
     expect(screen.getByText("Remove my name")).toBeTruthy();
+  });
+
+  /**
+   * `specs/screens/document.md` § Display Rules 3, *Your listing status is a
+   * fact on the card*: the signer who asked not to be named is the one most
+   * likely to come back and check, so the card says it rather than leaving
+   * it behind "Change how you're listed".
+   */
+  it("signed but not listed: says so plainly, in the card's own voice", () => {
+    renderCard(
+      makeBundle({
+        signature: {
+          capacity: "personal",
+          display_name: "Jane Doe",
+          conditional: false,
+          listed: false,
+          signed_on_version: 1,
+          revoked: false,
+          signed_at: "2026-09-19T12:00:00Z",
+        },
+      }),
+    );
+
+    expect(screen.getByText("Your name is not on the signatory list.")).toBeTruthy();
+    expect(screen.getByText("Only the team sees it; you are counted, not named.")).toBeTruthy();
+    expect(screen.queryByText("Your name is on the signatory list.")).toBeNull();
+  });
+
+  it("says nothing about a list on a document that shows none", () => {
+    renderCard(
+      makeBundle({
+        document: { show_signatories: "count" },
+        signature: {
+          capacity: "personal",
+          display_name: "Jane Doe",
+          conditional: false,
+          listed: true,
+          signed_on_version: 1,
+          revoked: false,
+          signed_at: "2026-09-19T12:00:00Z",
+        },
+      }),
+    );
+
+    expect(screen.queryByText(/signatory list/u)).toBeNull();
   });
 
   it("signed conditionally: shows the conditional note", () => {
@@ -189,13 +235,12 @@ describe("StatusCard — the six states", () => {
       </MemoryRouter>,
     );
 
-    const heading = screen.getByRole("heading", {
-      name: /You signed version 1 on .* as Jane Doe\./u,
-    });
+    const heading = screen.getByRole("heading", { name: "You signed" });
     expect(document.activeElement).toBe(heading);
 
+    // The heading is short, so the live region carries the facts that changed.
     const status = screen.getByRole("status");
-    expect(status.textContent ?? "").toMatch(/You signed version 1 on .* as Jane Doe\./u);
+    expect(status.textContent ?? "").toMatch(/You signed version 1 on .* Listed as Jane Doe\./u);
   });
 
   it("focus and the live region: removing a signature moves focus back to the sign form heading (#72)", () => {
@@ -261,7 +306,7 @@ describe("StatusCard — the six states", () => {
     });
     renderCard(bundle);
 
-    const line = screen.getByText(/^You signed version 1 on /u).textContent ?? "";
+    const line = screen.getByText(/^Version 1 · /u).textContent ?? "";
     expect(line).toContain("Sep 20");
     expect(line).not.toContain("Sep 19");
   });
@@ -286,11 +331,7 @@ describe("StatusCard — the six states", () => {
     });
     renderCard(bundle);
 
-    expect(
-      screen.getByText(
-        /You signed version 1 on .* for St\. Brigid Parish Council as Sr\. Margaret Doyle, Chair\./u,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("St. Brigid Parish Council — Sr. Margaret Doyle, Chair")).toBeTruthy();
   });
 
   it("draft line: shows the unsent-comments line alongside whatever the primary state is", () => {
@@ -363,11 +404,8 @@ describe("StatusCard — a signature behind the current version", () => {
   it("says the text has changed, compares from the signer's own version, and offers Keep my name", () => {
     renderCard(signedOn(2));
 
-    expect(
-      screen.getByRole("heading", {
-        name: /You signed version 2 on .* as Elena Vasquez, RN, school nurse\./u,
-      }),
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "You signed" })).toBeTruthy();
+    expect(screen.getByText("Elena Vasquez, RN, school nurse")).toBeTruthy();
     expect(
       screen.getByText(/The text has changed since you signed \(now version 3\)\./u),
     ).toBeTruthy();
