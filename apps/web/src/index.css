@@ -115,6 +115,93 @@
   }
 
   /*
+   * `specs/screens/document.md` § Design "Section break": a `---` is a pause
+   * between movements, not a divider — a short centered hairline in the
+   * border tone with generous space either side, never a page-width rule
+   * jammed against the text.
+   */
+  .doc-body hr {
+    @apply border-0 border-t border-border;
+    width: 16%;
+    margin: 2.2em auto;
+  }
+
+  /*
+   * `specs/behaviors/versioning.md` § Block classes — the four an author may
+   * reach for, and nothing else survives the sanitizer.
+   */
+  .doc-body .lede {
+    font-size: 1.15em;
+    line-height: 1.6;
+  }
+  .doc-body .callout {
+    @apply rounded-xl border border-border bg-muted;
+    border-left-width: 3px;
+    border-left-color: var(--color-primary);
+    padding: 0.9em 1.1em;
+    margin-bottom: 0.85em;
+  }
+  .doc-body .callout > :last-child {
+    margin-bottom: 0;
+  }
+  .doc-body .small {
+    @apply text-muted-foreground;
+    font-size: 0.9em;
+  }
+  .doc-body .center {
+    text-align: center;
+  }
+
+  /*
+   * `specs/behaviors/versioning.md` § Citations. The superscript is set with
+   * `line-height: 0` so a numbered paragraph keeps the leading of an
+   * unnumbered one, and the Sources section sits below the statement behind
+   * the same break a `---` draws.
+   */
+  .doc-body sup.citation-ref {
+    font-size: 0.7em;
+    line-height: 0;
+    vertical-align: super;
+    font-weight: 600;
+  }
+  .doc-body sup.citation-ref a {
+    @apply text-primary no-underline;
+  }
+  .doc-body sup.citation-ref a:hover,
+  .doc-body sup.citation-ref a:focus-visible {
+    @apply underline;
+  }
+
+  .doc-body .doc-sources {
+    @apply border-t border-border;
+    margin-top: 2.2em;
+    padding-top: 1.2em;
+    font-size: 0.9em;
+  }
+  .doc-body .doc-sources h2 {
+    @apply text-xs font-bold tracking-wider text-muted-foreground uppercase;
+    margin: 0 0 0.7em;
+  }
+  .doc-body .doc-sources ol {
+    margin-bottom: 0;
+  }
+  .doc-body .doc-sources li {
+    margin-bottom: 0.45em;
+  }
+  /* A source's address is long by nature; it wraps rather than pushing the page sideways. */
+  .doc-body .doc-sources a.source-url {
+    @apply text-muted-foreground no-underline;
+    overflow-wrap: anywhere;
+  }
+  .doc-body .doc-sources a.source-url:hover,
+  .doc-body .doc-sources a.source-url:focus-visible {
+    @apply text-primary underline;
+  }
+  .doc-body .doc-sources a.source-backref {
+    @apply text-primary no-underline;
+  }
+
+  /*
    * Tables are part of real statements (signatory lists, ratio tables), and
    * `specs/screens/version-history.md` § Display Rules "Compare" requires one
    * to still read as a table in the redline. `display: block` lets a wide
