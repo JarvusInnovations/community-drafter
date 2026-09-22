@@ -110,6 +110,37 @@ LLM disposition pass; its output is a dispositions JSON file
 two-command round trip with no manual step in between. Every mutation prints the resulting
 record's key fields and the commit subject, so you can cite exactly what changed.
 
+## Writing the text
+
+The body is Markdown (GFM). Three things the renderer does that an author should know
+(`specs/behaviors/versioning.md`):
+
+- **Cite with inline links, never a hand-made sources list.** Write `[Inquirer](https://…)`
+  as you would for the web. Readers can switch to numbered footnotes with a Sources list
+  (the "Sources as footnotes" toggle, or `?citations=footnotes`), and the PDF defaults to
+  *hybrid* — links stay clickable and are numbered too. Two links to the same address share
+  one number. `docs export <slug> --pdf --citations links|footnotes|hybrid` picks the PDF's mode.
+- **Section breaks**: a line of `---` renders as a short centered rule with space around it.
+- **Block classes** — exactly four, anything else is stripped: `lede` (a larger, looser opening
+  paragraph), `callout` (a soft bordered box), `small`, `center`. Mark one paragraph or heading
+  with a trailing `{.lede}`, or wrap a run of blocks in a fenced container. **Leave a blank line
+  on each side of both fences** — the store normalizes Markdown and a fence written flush against
+  a paragraph is joined into it and stops being a fence:
+
+  ```markdown
+  ::: lede
+
+  We respectfully request that you seek a written, interim agreement…
+
+  The City has loaned…
+
+  :::
+
+  The rest of the letter. {.small}
+  ```
+
+  Comments still anchor to the paragraphs inside a container; the container itself is not a block.
+
 ## Sites
 
 One deployment answers on many hostnames. A **site** is one hostname and the identity carried on
