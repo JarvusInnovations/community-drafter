@@ -104,6 +104,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
                 signatureConfirmationTemplate(ctx, {
                   capacity: signature.capacity,
                   conditional: signature.conditional === true,
+                  listed: listingStatus(fastify, event.document, signature.listed !== false),
                 }),
             },
           ],
@@ -129,6 +130,9 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
                 listingChangedTemplate(ctx, {
                   listedAs: listedAs(signature),
                   listed: signature.listed !== false,
+                  showsList:
+                    (fastify.storage.readModel.getDocument(event.document)?.record
+                      .show_signatories ?? "list") === "list",
                 }),
             },
           ],
@@ -266,6 +270,23 @@ function listedAs(signature: Signature): string {
   const detail = signature.capacity === "official" ? signature.title : signature.descriptor;
   const named = detail ? `${signature.display_name}, ${detail}` : signature.display_name;
   return signature.capacity === "official" && signature.org ? `${signature.org} — ${named}` : named;
+}
+
+/**
+ * `specs/behaviors/signatures.md` § Display: the listing status is told to
+ * the signer only where a signatory list exists at all. With
+ * `show_signatories` of `count` or `none` there is nothing to be on or off,
+ * so the confirmation says nothing rather than reassuring a signer about a
+ * list no reader will ever see.
+ */
+function listingStatus(
+  fastify: FastifyInstance,
+  slug: string,
+  listed: boolean,
+): boolean | undefined {
+  const document = fastify.storage.readModel.getDocument(slug);
+  const show = document?.record.show_signatories ?? "list";
+  return show === "list" ? listed : undefined;
 }
 
 /**
