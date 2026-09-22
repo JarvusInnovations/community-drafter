@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: []
+pr: 111
 specs:
   - specs/behaviors/versioning.md
   - specs/behaviors/signatures.md
@@ -91,23 +92,23 @@ the plan is failed if they do not.
 
 ## Validation
 
-- [ ] `render` in all three modes: numbering in first-appearance order, a URL cited
+- [x] `render` in all three modes: numbering in first-appearance order, a URL cited
       twice reusing its number, GFM footnotes untouched, a link whose text is itself a
       URL never numbered, and `blocks` byte-identical across the three modes.
-- [ ] The Sources section carries no `data-block` and contributes no blocks.
-- [ ] `{.lede}` on a paragraph and a heading, `::: callout` around a run of blocks: the
+- [x] The Sources section carries no `data-block` and contributes no blocks.
+- [x] `{.lede}` on a paragraph and a heading, `::: callout` around a run of blocks: the
       class lands, a non-whitelisted class is stripped, the container is not a block,
       the paragraphs inside keep the ids they would have had, and the diff still aligns
       them.
-- [ ] `---` renders an `hr` and both stylesheets style it.
-- [ ] The timeline's "today" label has clear space above it at 390 and 1280.
-- [ ] The signed card renders its facts including the listed / not-listed line, in
+- [x] `---` renders an `hr` and both stylesheets style it.
+- [x] The timeline's "today" label has clear space above it at 390 and 1280.
+- [x] The signed card renders its facts including the listed / not-listed line, in
       personal and official capacity, listed and unlisted, with the actions in one row.
-- [ ] Both emails state the listing status.
-- [ ] `?citations=hybrid` on a statement PDF produces a Sources list.
-- [ ] Gates in every touched package: lint, format:check, typecheck, tests; `apps/web`
+- [x] Both emails state the listing status.
+- [x] `?citations=hybrid` on a statement PDF produces a Sources list.
+- [x] Gates in every touched package: lint, format:check, typecheck, tests; `apps/web`
       build and `check:bundle-size` under 120 KB gzip.
-- [ ] Browser check at 390 and 1280 against a throwaway data repo: the document screen
+- [x] Browser check at 390 and 1280 against a throwaway data repo: the document screen
       with the toggle off and on, the signed card listed and unlisted, an `hr`, a lede
       block, the timeline's "today" label, and the PDF at `hybrid`.
 
@@ -125,4 +126,35 @@ the plan is failed if they do not.
 
 ## Notes
 
+- **The store re-formats every body it writes**, and that normalization joins the
+  lines of a paragraph. A `::: callout` fence written hard against the line below it
+  was swallowed into that paragraph and stopped being a fence. Found in the browser
+  check against a throwaway repo, not in unit tests, which never go through storage.
+  The syntax is therefore a blank line on each side of both fences — specced,
+  documented and tested. The `{.class}` suffix survives the round trip untouched.
+- **Citations run after the block-id pass**, which is what makes block identity
+  invariant across modes rather than something a test has to keep watching. The
+  Sources section is appended after extraction, so it cannot become a commentable
+  block by construction.
+- **Two links to one article with different `#:~:text=` fragments are one source.**
+  The renderer independently produced the same 39 sources, in the same order and with
+  the same reuse, as the print form that had been assembled by hand.
+- **Query strings are kept verbatim** in a Sources entry, unlike the hand-made form,
+  which had trimmed tracking parameters. A query parameter can be load-bearing, and a
+  renderer that guesses which ones are not would eventually break a link.
+- **`remark-directive` parses `:word` in running prose as a text directive**, which
+  `mdast-util-to-hast` would drop. Any directive the plugin does not handle is
+  restored from its source offsets, so no published sentence can lose words.
+- **The web toggle re-fetches the version body** rather than transforming in the
+  browser, so the transform lives in exactly one place. The cost is one small request
+  the first time a reader turns it on.
+- `specs/screens/document.md`'s "nothing on this route depends on cookies or local
+  storage" is now scoped rather than absolute: the one stored value is the reader's
+  citation preference, and the page renders correctly without it.
+
 ## Follow-ups
+
+- **None.** Everything in scope shipped in PR #111. The GFM footnote back-link anchor
+  is double-prefixed (`user-content-user-content-fnref-1`) by the sanitizer, which
+  predates this work and is untouched by it; worth an issue if anyone starts using
+  `[^1]` footnotes in earnest.
