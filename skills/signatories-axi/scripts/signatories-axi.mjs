@@ -1386,7 +1386,8 @@ reopen <slug> [--comments-close <when>] --signing-closes <when>
 zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
 what it resolved to.
 withdraw <slug> --reason <text> [--public]
-export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
+export <slug> --pdf [--out <file>] [--paper letter|a4]
+       [--citations links|footnotes|hybrid] [--draft]
        The deliverable: the current version's text with a title block naming
        who it is addressed to, then the signatory list as it stands. --pdf
        names the format and is the only one today, so it may be omitted.
@@ -1396,6 +1397,12 @@ export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
        draft \u2014 watermarked DRAFT, with the version number \u2014 until the
        document has a final version AND signing has closed. --draft forces
        the watermark back on; there is deliberately no flag the other way.
+
+       --citations picks how the citation links in the text are presented.
+       hybrid (the default) keeps every link clickable AND numbers it, with
+       a Sources list at the end \u2014 one file that works on a screen and on
+       paper. footnotes drops the links and keeps the numbers; links is the
+       plain form, with no numbers and no Sources list.
 
        The signatory list is computed at the moment of the render and is
        never frozen, so a name revoked after closing is simply not in the
@@ -1699,9 +1706,15 @@ async function docsCommand(args) {
           `Run \`${cli} docs export ${slug} --pdf --paper letter\``
         ]);
       }
+      const citations = str(parsed, "--citations");
+      if (citations !== void 0 && citations !== "links" && citations !== "footnotes" && citations !== "hybrid") {
+        throw new AxiError("--citations must be links, footnotes or hybrid", "USAGE", [
+          `Run \`${cli} docs export ${slug} --pdf --citations hybrid\``
+        ]);
+      }
       const download = await client.getBinary(
         `/documents/${encodeURIComponent(slug)}/statement.pdf`,
-        { paper, draft: bool(parsed, "--draft") ? "1" : void 0 }
+        { paper, citations, draft: bool(parsed, "--draft") ? "1" : void 0 }
       );
       const serverName = download.filename ?? `${slug}.pdf`;
       const out = str(parsed, "--out") ?? serverName;
@@ -1713,6 +1726,7 @@ async function docsCommand(args) {
         version: version === void 0 ? void 0 : Number(version),
         copy: draftCopy ? "draft" : "clean",
         paper: paper ?? "letter",
+        citations: citations ?? "hybrid",
         bytes: download.bytes.byteLength
       };
       return render(
@@ -3571,8 +3585,8 @@ var COMMAND_GROUPS = [
         summary: "Withdraw the document."
       },
       {
-        usage: "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]",
-        summary: "Write the deliverable \u2014 the current version's text, a title block naming who it is addressed to, and the signatory list as it stands \u2014 to a PDF file, and print the path, the version, the paper and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. The list is computed at the moment of the render and never frozen."
+        usage: "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--citations links|footnotes|hybrid] [--draft]",
+        summary: "Write the deliverable \u2014 the current version's text, a title block naming who it is addressed to, and the signatory list as it stands \u2014 to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen."
       },
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
@@ -3742,7 +3756,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "4afca03" : "dev";
+var VERSION = true ? "5fa97c5" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

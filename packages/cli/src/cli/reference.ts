@@ -136,9 +136,10 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         summary: "Withdraw the document.",
       },
       {
-        usage: "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]",
+        usage:
+          "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--citations links|footnotes|hybrid] [--draft]",
         summary:
-          "Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. The list is computed at the moment of the render and never frozen.",
+          "Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen.",
       },
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {

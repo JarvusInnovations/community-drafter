@@ -100,7 +100,8 @@ reopen <slug> [--comments-close <when>] --signing-closes <when>
 zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
 what it resolved to.
 withdraw <slug> --reason <text> [--public]
-export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
+export <slug> --pdf [--out <file>] [--paper letter|a4]
+       [--citations links|footnotes|hybrid] [--draft]
        The deliverable: the current version's text with a title block naming
        who it is addressed to, then the signatory list as it stands. --pdf
        names the format and is the only one today, so it may be omitted.
@@ -110,6 +111,12 @@ export <slug> --pdf [--out <file>] [--paper letter|a4] [--draft]
        draft — watermarked DRAFT, with the version number — until the
        document has a final version AND signing has closed. --draft forces
        the watermark back on; there is deliberately no flag the other way.
+
+       --citations picks how the citation links in the text are presented.
+       hybrid (the default) keeps every link clickable AND numbers it, with
+       a Sources list at the end — one file that works on a screen and on
+       paper. footnotes drops the links and keeps the numbers; links is the
+       plain form, with no numbers and no Sources list.
 
        The signatory list is computed at the moment of the render and is
        never frozen, so a name revoked after closing is simply not in the
@@ -459,9 +466,24 @@ export async function docsCommand(args: string[]): Promise<string> {
           `Run \`${cli} docs export ${slug} --pdf --paper letter\``,
         ]);
       }
+      // `specs/behaviors/versioning.md` § Citations. Unlike the HTTP door,
+      // which falls back rather than fail a reader's shared URL, a mistyped
+      // flag is refused: an operator asked for a specific form of the file
+      // and should be told they did not get it.
+      const citations = str(parsed, "--citations");
+      if (
+        citations !== undefined &&
+        citations !== "links" &&
+        citations !== "footnotes" &&
+        citations !== "hybrid"
+      ) {
+        throw new AxiError("--citations must be links, footnotes or hybrid", "USAGE", [
+          `Run \`${cli} docs export ${slug} --pdf --citations hybrid\``,
+        ]);
+      }
       const download = await client.getBinary(
         `/documents/${encodeURIComponent(slug)}/statement.pdf`,
-        { paper, draft: bool(parsed, "--draft") ? "1" : undefined },
+        { paper, citations, draft: bool(parsed, "--draft") ? "1" : undefined },
       );
 
       // The version number and the draft-or-clean word are read off the
@@ -478,6 +500,7 @@ export async function docsCommand(args: string[]): Promise<string> {
         version: version === undefined ? undefined : Number(version),
         copy: draftCopy ? "draft" : "clean",
         paper: paper ?? "letter",
+        citations: citations ?? "hybrid",
         bytes: download.bytes.byteLength,
       };
       return render(parsed, result, () =>
