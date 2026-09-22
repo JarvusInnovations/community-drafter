@@ -68,8 +68,13 @@ describe("publishing sends v<n> to every_revision subscribers exactly once", () 
   });
 });
 
-describe("forced-on sends for a current signer with every optional preference off", () => {
-  it("still sends signing-opened, closing-soon and final-published", async () => {
+/**
+ * `specs/behaviors/notifications.md` § Sending: "A current signer is told
+ * nothing about the clock at all" — and § Messages keeps `final-published`
+ * forced on for them, whatever their preferences say.
+ */
+describe("a current signer with every optional preference off", () => {
+  it("hears final-published, and nothing about the window opening or closing", async () => {
     const { server, cleanup, mailer } = await buildTestServer();
     cleanups.push(cleanup);
     const farFuture = new Date(Date.now() + 30 * 3_600_000).toISOString();
@@ -82,6 +87,9 @@ describe("forced-on sends for a current signer with every optional preference of
       document: "doc-forced",
       person: "signer",
       token: "signertoken1234567890",
+      // Opened, so the only thing keeping them out of the clock audience is
+      // the signature itself.
+      first_opened_at: new Date(Date.now() - 60_000).toISOString(),
       notify: {
         every_revision: false,
         daily_digest: false,
@@ -118,9 +126,7 @@ describe("forced-on sends for a current signer with every optional preference of
     await server.phaseObserver.tick();
 
     const fakeMailer = mailer as import("../lib/mailer/index.ts").FakeMailer;
-    const signingOpened = fakeMailer.sent.filter((m) => m.subject.includes("signing is open"));
-    expect(signingOpened.length).toBe(1);
-    expect(signingOpened[0]?.to.email).toBe("signer@example.org");
+    expect(fakeMailer.sent.filter((m) => m.subject.includes("signing is open")).length).toBe(0);
 
     // Move signing_closes_at within the 24h closing-soon window and tick.
     await server.storage.commit(
@@ -138,9 +144,7 @@ describe("forced-on sends for a current signer with every optional preference of
       },
     );
     await server.closingSoonScheduler.tick();
-    const closingSoon = fakeMailer.sent.filter((m) => m.subject.includes("closes soon"));
-    expect(closingSoon.length).toBe(1);
-    expect(closingSoon[0]?.to.email).toBe("signer@example.org");
+    expect(fakeMailer.sent.filter((m) => m.subject.includes("closes soon")).length).toBe(0);
 
     // Publish a final version — forced `final-published` for the signer.
     const publish = await server.inject({
@@ -365,6 +369,7 @@ describe("extending a deadline tells subscribers what moved", () => {
       document: "doc-extended",
       person: "alice",
       token: "alicetoken1234567890",
+      first_opened_at: new Date(Date.now() - 60_000).toISOString(),
       notify: { phase_changes: true },
     });
 
