@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: []
+pr: 114
 specs:
   - specs/behaviors/notifications.md
   - specs/screens/preferences.md
@@ -65,20 +66,20 @@ machinery, which is and stays the tool for the never-opened. Any change to
 
 ## Validation
 
-- [ ] `closing-soon` is not sent inside the six hours after the document's
+- [x] `closing-soon` is not sent inside the six hours after the document's
       `signing-opened` send.
-- [ ] A signing window shorter than 24 hours schedules `closing-soon` at the window's
+- [x] A signing window shorter than 24 hours schedules `closing-soon` at the window's
       midpoint; a window long enough for the midpoint to clear the quiet period gets
       the warning there.
-- [ ] A two-hour window — the live case — sends no `closing-soon` at all.
-- [ ] A window of 24 hours or more sends `closing-soon` at the 24-hour mark.
-- [ ] `schedule-changed` excludes invitees who have never opened their link, and
+- [x] A two-hour window — the live case — sends no `closing-soon` at all.
+- [x] A window of 24 hours or more sends `closing-soon` at the 24-hour mark.
+- [x] `schedule-changed` excludes invitees who have never opened their link, and
       excludes current signers.
-- [ ] `signing-opened` excludes current signers.
-- [ ] `final-published` still reaches a current signer with every optional preference
+- [x] `signing-opened` excludes current signers.
+- [x] `final-published` still reaches a current signer with every optional preference
       off.
-- [ ] A signer who removes their name is eligible for clock messages again.
-- [ ] Gates in `apps/api` and `apps/web`: lint, format:check, typecheck, tests.
+- [x] A signer who removes their name is eligible for clock messages again.
+- [x] Gates in `apps/api` and `apps/web`: lint, format:check, typecheck, tests.
 
 ## Risks / unknowns
 
@@ -92,4 +93,38 @@ machinery, which is and stays the tool for the never-opened. Any change to
 
 ## Notes
 
+- **One rule, one function.** The three clock events had three recipient functions
+  with three different rules; the spec now states one rule, so the code has one
+  `clockMessageRecipients`. `closed` and `final-published`'s commenter half keep
+  their own, and the comments say why.
+- **`closed` stayed out on purpose.** It is the terminal notice that the list is
+  final, not a countdown a signer has already answered, and it rides on
+  `phase_changes` like any other subscription. Excluding a signer from it would
+  have told the person who signed least about how the thing they signed ended.
+- **`forcedKeys` is unchanged.** A current signer still has `phase_changes` forced,
+  because `final-published` and `closed` still ride on it; only the explanation
+  changed. Turning the force off would have made `closed` optional for signers as a
+  side effect of a copy change.
+- **The quiet period is anchored to the record, not to a new field.** The earliest
+  `notified["signing-opened"]` across the document's participations is the only place
+  that moment exists, and taking the earliest anchors it to the original batch rather
+  than to a straggler a retry picked up later.
+- **Both clock templates had to be rewritten**, not just re-targeted. `closing-soon`
+  said "Your name is on it" and "close in about a day"; neither is true of its new
+  reader or its new schedule.
+- **Declines are unchanged.** A decliner with `phase_changes` on is still in the clock
+  audience once they have opened their link — the brief assumed they were already
+  excluded, and nothing in the code or the spec excluded them before this change
+  either. Left as found rather than widened silently.
+
 ## Follow-ups
+
+- **Declined invitees and the clock audience.** A person who has declined still
+  receives `signing-opened`, `closing-soon` and `schedule-changed` if they opened
+  their link and left `phase_changes` on. That may be right (they may change their
+  mind before the window shuts) or may be the same noise this plan removed for
+  signers. Worth a decision; **tracked as** a question for the owner, not a spec gap.
+- **A second schedule change sends nothing.** `notified["schedule-changed"]` is a
+  single mark, so only the first extension on a document is announced to a given
+  person. Pre-existing, out of scope here, and worth its own plan if an operator ever
+  moves a deadline twice.
