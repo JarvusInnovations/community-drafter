@@ -9,11 +9,7 @@ import { NotificationDispatcher } from "./dispatcher.ts";
 import { DigestScheduler } from "./digest.ts";
 import { formatWhen } from "./format.ts";
 import { sendFirstResponseNotice } from "./operator-digest.ts";
-import {
-  closedRecipients,
-  scheduleChangedRecipients,
-  signingOpenedRecipients,
-} from "./triggers.ts";
+import { clockMessageRecipients, closedRecipients } from "./triggers.ts";
 import {
   closedTemplate,
   listingChangedTemplate,
@@ -161,7 +157,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
         return;
       }
       case "signing-opened": {
-        const recipients = signingOpenedRecipients(fastify, event.document);
+        const recipients = clockMessageRecipients(fastify, event.document);
         if (recipients.length === 0) return;
         await dispatcher.deliver({
           document: event.document,
@@ -191,7 +187,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
         return;
       }
       case "schedule-changed": {
-        const recipients = scheduleChangedRecipients(fastify, event.document);
+        const recipients = clockMessageRecipients(fastify, event.document);
         if (recipients.length === 0) return;
         // `specs/behaviors/notifications.md` § Content rules: the message
         // names each deadline that moved with its old and new time. The

@@ -231,6 +231,10 @@ export interface SeedParticipantOptions {
   descriptor?: string;
   /** The participation's per-document sign-card overrides. */
   prefill?: { name?: string; org?: string; title?: string; descriptor?: string };
+  /** Seed the participation as already opened — the clock audience's "has opened the link" half. */
+  first_opened_at?: string;
+  /** Seed `participations.notified` directly (e.g. an existing `signing-opened` send). */
+  notified?: Record<string, string | number>;
   notify?: {
     channel?: string;
     every_revision?: boolean;
@@ -269,6 +273,8 @@ export async function seedParticipant(
         token: opts.token,
         source: "admin",
         prefill: opts.prefill,
+        first_opened_at: opts.first_opened_at,
+        notified: opts.notified,
         notify: opts.notify,
       });
     },

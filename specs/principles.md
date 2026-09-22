@@ -10,9 +10,9 @@ The default engagement is: open the link, see the document, sign your name. One 
 
 ## Just sign it for now
 
-During the comment period the interface actively encourages signing before the text is final, and promises what makes that safe: you will be told when the final version is published, and you will have until a stated date to remove your name. Copy, defaults and notifications all serve that promise. Anything that makes early signing feel risky or irreversible (a "final" label on a draft, a revocation path that is hard to find, a missing final-version alert) violates this.
+During the comment period the interface actively encourages signing before the text is final, and promises what makes that safe: you will be told when the final version is published, and you can remove your name any time until the signing window closes. Copy, defaults and notifications all serve that promise. Anything that makes early signing feel risky or irreversible (a "final" label on a draft, a revocation path that is hard to find, a missing final-version alert) violates this.
 
-*Why:* a document whose signature count grows during drafting has momentum; one that waits for the final text has a deadline nobody feels. Reversibility is what lets us ask for the early signature honestly.
+*Why:* a document whose signature count grows during drafting has momentum; one that waits for the final text has a deadline nobody feels. Reversibility is what lets us ask for the early signature honestly — and the promise stops at the final text, because a signer who has already answered the countdown is served by silence about it rather than by a warning.
 
 ## The clock is real
 
