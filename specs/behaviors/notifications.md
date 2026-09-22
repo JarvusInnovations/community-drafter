@@ -36,17 +36,17 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 | `operator-first-comment` | the first review carrying a comment submitted on a document | the document's active operators | yes (operator message; once per document, § Operator digest) |
 | `v<n>` | a version published | invitees with `every_revision` | subscription |
 | `digest-<date>` | daily job, only if anything changed that day | invitees with `daily_digest` | subscription |
-| `signing-opened` | phase becomes signing (the clock) | all invitees with `phase_changes` who have opened the link, plus every current signer regardless | subscription (signers: forced on) |
+| `signing-opened` | phase becomes signing (the clock) | the clock audience: invitees with `phase_changes` who have opened the link and have not signed (§ Sending) | subscription |
 | `final-published` | a version with `final = true` published | every current signer, every commenter with `phase_changes`; conditional signers get the confirm/remove variant | subscription (signers: forced on) |
-| `closing-soon` | 24 hours before `signing_closes_at` | current signers | subscription (forced on) |
+| `closing-soon` | the scheduled time before `signing_closes_at`, once the quiet period has passed (§ Sending) | the clock audience | subscription |
 | `closed` | phase becomes closed | signers and commenters with `phase_changes` | subscription |
-| `schedule-changed` | admin extends or reopens | invitees with `phase_changes` | subscription |
+| `schedule-changed` | admin extends or reopens | the clock audience | subscription |
 | `disposition-v<n>` | a version published with dispositions on the recipient's comments | those authors with `my_comments_addressed` | subscription |
 | `reminder-<n>` | admin action "remind", targeted at unopened or opened-but-not-acted invitations | targets with `reminders` | subscription |
 
 **"Transactional" means sent unconditionally** — the message goes out whatever the participation's preferences say, and no preference can turn it off. It does *not* mean the message arrives without the controls: every participant message, transactional and subscription alike, ends with the same preference footer (§ Content rules). "Subscription" means the opposite: sent only when the named preference is on.
 
-"Forced on" means the preference toggle is shown disabled with the explanation that signers are always told when the final text lands and when the window closes.
+"Forced on" means the preference toggle is shown disabled with the explanation that signers are always told when the final text lands. It is the final text and nothing else: a current signer is not in the clock audience (§ Sending) and hears nothing about the window opening, closing or moving.
 
 ## Operator mail
 
@@ -127,6 +127,12 @@ Set when the participation is created, editable by the participant at any time:
 - After a batch (invitation blast, revision alerts) the successes are recorded in **one commit** (`Action: send`, `Comments`-style list of persons in the body) patching each recipient's `notified`, never one commit per recipient.
 - **Recorded on success — invitations included.** Nothing enters `notified` until the mailer has accepted the message, and an invitation's `sent_at` is written in the *same* commit as `notified.invitation`. A recipient the mailer rejected is therefore still unsent: the funnel does not count them, the failures list names them with the reason, and the next `send` picks them up with no operator intervention. For an `export` mailer the row is the delivery, so writing it counts as accepted.
 - **Every send action reports what it did**, never what it attempted: how many messages were delivered, how many failed, and for each failure the person and the error. `sent_at` and the funnel's "sent" mean delivered.
+- **The clock audience is the engaged, and never a signer.** `signing-opened`, `closing-soon` and `schedule-changed` share one recipient rule: an invitee with `phase_changes` who has opened their personal link and is not a current signer. Someone who has only been sent an invitation is not told that the window opened or that a deadline moved — reminders are the tool for the never-opened, and news about a clock is no use to a person who has not yet looked at the thing it governs. A current signer is told nothing about the clock at all: they have already done what it counts down to, and the promise the early signature was asked on is about the final text, not the deadline (`principles.md` § "Just sign it for now"). Removing a name puts the person back in the clock audience, because they are an opened non-signer again.
+- **`closing-soon` keeps its distance from `signing-opened`.** Two messages about the same window minutes apart read as a malfunction, and on a window shorter than the lead time the warning fires the instant signing opens.
+  - The **signing window** runs from `comments_close_at` to `signing_closes_at`.
+  - The **scheduled time** is 24 hours before `signing_closes_at` — or, when the window is shorter than 24 hours, the window's **midpoint**.
+  - The **quiet period** is the six hours following this document's `signing-opened` send. No `closing-soon` is sent inside it. A document that has not sent `signing-opened` to anyone has no quiet period, and the scheduled time stands alone.
+  - `closing-soon` goes out at the first moment at or after the scheduled time that is outside the quiet period and still before `signing_closes_at`. When there is no such moment — a two-hour window whose midpoint is an hour after signing opened — it is **not sent at all**: a window that short is announced and over, and the message that announced it is the whole warning.
 - **Reminders keep a minimum interval.** A reminder is not sent to anyone this document has messaged within `min_age_hours` (default 48). "Messaged" is any recorded send to that person on this document — invitation, revision alert, phase change, digest, or an earlier reminder; a link export is not a message. People skipped for recency are counted and reported separately from those skipped by the `reminders` preference, so a run that sends nothing says why. An operator who must nudge sooner passes a shorter interval; `0` disables the guard.
 - The digest job runs once daily at a configured hour in the instance time zone, and the participant digest and the operator digest (§ Operator digest) both run on it.
 
@@ -135,7 +141,7 @@ Set when the participation is created, editable by the participant at any time:
 **Inherited**
 
 - [Essentials always, everything else opt-in](../principles.md#essentials-always-everything-else-opt-in).
-- [Just sign it for now](../principles.md#just-sign-it-for-now): `final-published` and `closing-soon` are forced on for signers because the early-sign promise depends on them.
+- [Just sign it for now](../principles.md#just-sign-it-for-now): `final-published` is forced on for signers because the early-sign promise depends on it — and nothing else is, because the promise is about the final text rather than the clock.
 
 **Local**
 

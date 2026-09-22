@@ -18,7 +18,7 @@ The invitation's `notify` table, the person's channel details (email shown maske
   3. "Milestones" — phase_changes. "When comments close, when the final text is published, when the signing window closes, and if a deadline moves."
   4. "Replies to my comments" — my_comments_addressed.
   5. "Reminders" — reminders. "A nudge if you haven't acted yet. Turns off by itself once you sign, comment or decline."
-- If the person is a current signer, "Milestones" is shown on and disabled with: "Because you signed, we'll always tell you when the final text is published and before the window closes."
+- If the person is a current signer, "Milestones" is shown on and disabled with: "Because you signed, we'll always tell you when the final text is published." That is the whole of the forced-on promise: a current signer is out of the clock audience and gets no message when the signing window opens, when it is about to close, or when a deadline moves (`behaviors/notifications.md` § Sending).
 - A note under the toggles: "We'll always confirm when you sign or remove your name." 
 - "Stop all optional messages" button, and a save confirmation.
 
