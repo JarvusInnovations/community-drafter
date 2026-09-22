@@ -1,5 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 
+import { parseCitationsMode, type CitationsMode } from "@signatories/shared";
+
 import { parsePaper, type Paper } from "./view.ts";
 import type { DeliverablePdf } from "./plugin.ts";
 
@@ -7,6 +9,17 @@ import type { DeliverablePdf } from "./plugin.ts";
 export function paperFromQuery(request: FastifyRequest): Paper {
   const query = request.query as Record<string, string | undefined>;
   return parsePaper(query.paper);
+}
+
+/**
+ * `?citations=links|footnotes|hybrid` (`specs/behaviors/versioning.md` §
+ * Citations). Every PDF door defaults to `hybrid`: a reader on a computer
+ * clicks the links, a reader holding the printed page uses the numbers, and
+ * one file has to serve both.
+ */
+export function citationsFromQuery(request: FastifyRequest): CitationsMode {
+  const query = request.query as Record<string, string | undefined>;
+  return parseCitationsMode(query.citations, "hybrid");
 }
 
 /**

@@ -1,3 +1,4 @@
+import { type CitationsMode } from "../lib/citations.ts";
 import {
   type Bundle,
   type Capacity,
@@ -77,8 +78,19 @@ export function getBundle(token: string, version?: number): Promise<Bundle> {
   return request<Bundle>(`${base(token)}/bundle${query}`);
 }
 
-export function getVersion(token: string, n: number): Promise<VersionDetail> {
-  return request<VersionDetail>(`${base(token)}/versions/${n}`);
+/**
+ * `specs/api/participant.md` § `GET /i/:token/api/versions/:n`. `citations`
+ * is how the reader's "Sources as footnotes" preference reaches the render
+ * (`specs/behaviors/versioning.md` § Citations); omitted, the server renders
+ * `links`, which is what the bundle already carried.
+ */
+export function getVersion(
+  token: string,
+  n: number,
+  citations?: CitationsMode,
+): Promise<VersionDetail> {
+  const query = citations && citations !== "links" ? `?citations=${citations}` : "";
+  return request<VersionDetail>(`${base(token)}/versions/${n}${query}`);
 }
 
 export function getCompare(token: string, from: number, to: number): Promise<CompareResult> {

@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
+import { citationsFromQuery } from "../../lib/citations.ts";
 import { PUBLIC_ROUTE } from "../../gateway/gateway.ts";
 import { computeSignatories } from "../../lib/signatories.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
@@ -12,6 +13,7 @@ interface BundleParams {
 
 interface BundleQuery {
   v?: string;
+  citations?: string;
 }
 
 /**
@@ -32,7 +34,11 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
       const requestedVersion = request.query.v !== undefined ? Number(request.query.v) : undefined;
       const version = resolveVersion(document, requestedVersion);
       const latest = document.versions[document.versions.length - 1];
-      const rendered = fastify.rendering.render(version.commit, version.body);
+      const rendered = fastify.rendering.render(
+        version.commit,
+        version.body,
+        citationsFromQuery(request),
+      );
 
       const signatories = computeSignatories(
         fastify.storage.readModel.listParticipationsForDocument(document.record.slug),

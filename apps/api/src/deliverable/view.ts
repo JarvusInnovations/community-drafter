@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { ShowSignatories } from "@signatories/shared";
+import type { CitationsMode, ShowSignatories } from "@signatories/shared";
 import type { FastifyInstance } from "fastify";
 
 import { ApiError } from "../errors.ts";
@@ -40,7 +40,7 @@ export interface DeliverableView {
   paper: Paper;
   /** `<slug>-v3.pdf`, or `<slug>-v3-draft.pdf` while the deliverable is a draft. */
   filename: string;
-  /** Document + version commit + signatory-list hash + draft/clean + paper. */
+  /** Document + version commit + signatory-list hash + draft/clean + paper + citation mode. */
   cacheKey: string;
 }
 
@@ -86,6 +86,12 @@ export function formatDeliverableDate(iso: string, timeZone: string | undefined)
 export interface BuildDeliverableOptions {
   paper?: Paper;
   /**
+   * `specs/screens/deliverable.md` § Routes: the deliverable's default is
+   * `hybrid` — the file is read on a screen *and* on paper, and hybrid is
+   * the only mode that serves both readers from one file.
+   */
+  citations?: CitationsMode;
+  /**
    * `specs/api/admin.md` § The deliverable: `?draft=1` forces the
    * watermarked form of a document that has already gone clean. There is no
    * flag the other way — a clean copy of an unfinished statement is the one
@@ -107,6 +113,7 @@ export function buildDeliverableView(
   const phase = derivePhase(document.record, new Date());
   const draft = options.forceDraft === true || isDeliverableDraft(document, phase);
   const paper = options.paper ?? "letter";
+  const citations: CitationsMode = options.citations ?? "hybrid";
 
   const site = siteForDocument(fastify, document.record);
   const showSignatories = document.record.show_signatories ?? "list";
@@ -115,7 +122,7 @@ export function buildDeliverableView(
     showSignatories,
   );
 
-  const rendered = fastify.rendering.render(version.commit, version.body);
+  const rendered = fastify.rendering.render(version.commit, version.body, citations);
   const slug = document.record.slug;
 
   // Only when the public door is actually open (§ Display Rules 5): a URL
@@ -147,6 +154,13 @@ export function buildDeliverableView(
     signatories,
     paper,
     filename: `${slug}-v${version.number}${draft ? "-draft" : ""}.pdf`,
-    cacheKey: [slug, version.commit, signatureHash, draft ? "draft" : "clean", paper].join(":"),
+    cacheKey: [
+      slug,
+      version.commit,
+      signatureHash,
+      draft ? "draft" : "clean",
+      paper,
+      citations,
+    ].join(":"),
   };
 }

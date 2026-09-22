@@ -129,9 +129,23 @@ export function invitationTemplate(ctx: RecipientContext): TemplateResult {
   );
 }
 
+/**
+ * `specs/behaviors/signatures.md` § Display: "A signer is told their own
+ * listing status, twice." `listed` is `undefined` on a document whose
+ * `show_signatories` is not `list` — there is no signatory list to be on or
+ * off, so the sentence is absent rather than reassuring about a list nobody
+ * will ever see.
+ */
+export function listingLine(listed: boolean | undefined): string {
+  if (listed === undefined) return "";
+  return listed
+    ? "Your name is on the signatory list."
+    : "Your name is not on the signatory list — only the team sees it. You are counted, not named.";
+}
+
 export function signatureConfirmationTemplate(
   ctx: RecipientContext,
-  extra: { capacity: string; conditional: boolean },
+  extra: { capacity: string; conditional: boolean; listed?: boolean },
 ): TemplateResult {
   const capacity =
     extra.capacity === "official"
@@ -143,7 +157,13 @@ export function signatureConfirmationTemplate(
   return transactional(
     ctx,
     `${ctx.documentTitle} — you signed`,
-    [`Your name is on ${quoted(ctx)}, ${capacity}.${conditional}`, clock(ctx)],
+    [
+      `Your name is on ${quoted(ctx)}, ${capacity}.${conditional}`,
+      // A signer who asked not to be named keeps this mail as their record
+      // of what they were promised, so it says so in its own sentence.
+      listingLine(extra.listed),
+      clock(ctx),
+    ],
     { label: "Open the document", url: ctx.personalLink },
   );
 }
@@ -174,7 +194,7 @@ export function revocationConfirmationTemplate(
  */
 export function listingChangedTemplate(
   ctx: RecipientContext,
-  extra: { listedAs: string; listed: boolean },
+  extra: { listedAs: string; listed: boolean; showsList?: boolean },
 ): TemplateResult {
   const line = extra.listed
     ? `You're now listed on ${quoted(ctx)} as ${extra.listedAs}.`
@@ -184,6 +204,9 @@ export function listingChangedTemplate(
     `${ctx.documentTitle} — how you're listed changed`,
     [
       `${line} If you didn't make this change, open the document and change it back, or reply to this message.`,
+      // Stated again in its own sentence, for the same reason the signing
+      // confirmation states it: this is the mail a signer keeps.
+      listingLine(extra.showsList === false ? undefined : extra.listed),
       clock(ctx),
     ],
     { label: "Open the document", url: ctx.personalLink },

@@ -36,7 +36,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
 
 ## The deliverable
 
-- `GET /documents/:slug/statement.pdf` → the deliverable (`../screens/deliverable.md`) as `application/pdf`, `Content-Disposition: attachment`. `?paper=letter|a4` (default letter) and `?draft=1` — which forces the watermarked form of a document that has already gone clean, for an operator who wants a marked copy to circulate; there is no flag the other way, because a clean copy of an unfinished statement is the one thing nobody may produce. Errors: `not_found` for an unknown slug, a document with no version, and a `withdrawn` one. Recorded nowhere: rendering is a read, and the PDF is never written to the data repo.
+- `GET /documents/:slug/statement.pdf` → the deliverable (`../screens/deliverable.md`) as `application/pdf`, `Content-Disposition: attachment`. `?paper=letter|a4` (default letter), `?citations=links|footnotes|hybrid` (default hybrid, `../behaviors/versioning.md` § Citations) and `?draft=1` — which forces the watermarked form of a document that has already gone clean, for an operator who wants a marked copy to circulate; there is no flag the other way, because a clean copy of an unfinished statement is the one thing nobody may produce. Errors: `not_found` for an unknown slug, a document with no version, and a `withdrawn` one. Recorded nowhere: rendering is a read, and the PDF is never written to the data repo.
 
 ## People and invitations
 

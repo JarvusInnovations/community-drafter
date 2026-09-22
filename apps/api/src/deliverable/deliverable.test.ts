@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
+import { render } from "@signatories/shared";
+
 import { countsSentence, deliverableCopy, joinNames } from "./copy.ts";
 import { DeliverableCache } from "./cache.ts";
 import { escapeHtml, renderDeliverableHtml } from "./template.ts";
@@ -149,12 +151,53 @@ describe("the print document", () => {
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("Alex &lt;b&gt;Kim&lt;/b&gt;");
-    expect(html).not.toContain("display: none");
+    // The accent is rejected whole rather than written into the sheet; the
+    // assertion names the injected rule, because the sheet legitimately hides
+    // the Sources return arrows on paper.
+    expect(html).not.toContain("body { display: none }");
     expect(html).toContain("--accent: #2457f5");
   });
 
   it("escapes the four characters that could break out of markup", () => {
     expect(escapeHtml('<a href="x">&</a>')).toBe("&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;");
+  });
+});
+
+/**
+ * `specs/screens/deliverable.md` § Display Rules 3, "Sources". The print
+ * document does not build the section — it comes out of the shared render
+ * in `hybrid`, the deliverable's default — so the numbering on paper is the
+ * numbering the document screen shows a reader who turned footnotes on.
+ */
+describe("citations on paper", () => {
+  const MARKDOWN =
+    "We asked for [notice](https://news.example/story#:~:text=a) and again\n" +
+    "for [notice](https://news.example/story#:~:text=b), plus [minutes](https://board.example/m).\n";
+
+  it("prints the Sources list and the superscripts in hybrid", () => {
+    const html = renderDeliverableHtml(
+      view({ bodyHtml: render(MARKDOWN, { citations: "hybrid" }).html }),
+    );
+    expect(html).toContain('<h2 id="doc-sources-heading">Sources</h2>');
+    expect(html).toContain("https://news.example/story");
+    expect(html).toContain("https://board.example/m");
+    expect(html).toContain('class="citation-ref"');
+    // One entry per source, not one per citation.
+    expect(html.match(/<li id="src-\d+"/gu)).toHaveLength(2);
+    // The stylesheet has to style what the render emits.
+    expect(html).toContain(".statement .doc-sources");
+    expect(html).toContain("sup.citation-ref");
+  });
+
+  it("prints no Sources list in links mode", () => {
+    const html = renderDeliverableHtml(
+      view({ bodyHtml: render(MARKDOWN, { citations: "links" }).html }),
+    );
+    // Only the body, not the stylesheet — which names both classes either way.
+    const statement = html.slice(html.indexOf('<section class="statement">'));
+    expect(statement).not.toContain("Sources</h2>");
+    expect(statement).not.toContain("citation-ref");
+    expect(statement).toContain('<a href="https://board.example/m">minutes</a>');
   });
 });
 

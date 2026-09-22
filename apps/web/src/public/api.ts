@@ -1,3 +1,4 @@
+import { type CitationsMode } from "../lib/citations.ts";
 import { type CompareResult, type PublicBundle, type PublicVersionDetail } from "./types.ts";
 
 /** Thrown for any non-2xx response from `/d/:slug/api/*`, same shape as `../participant/api.ts`'s. */
@@ -45,8 +46,18 @@ export function getPublicBundle(slug: string, version?: number): Promise<PublicB
   return request<PublicBundle>(`${base(slug)}/bundle${query}`);
 }
 
-export function getPublicVersion(slug: string, n: number): Promise<PublicVersionDetail> {
-  return request<PublicVersionDetail>(`${base(slug)}/versions/${n}`);
+/**
+ * `?citations=` carries the reader's "Sources as footnotes" preference to
+ * the render (`specs/behaviors/versioning.md` § Citations); omitted, the
+ * server renders `links`.
+ */
+export function getPublicVersion(
+  slug: string,
+  n: number,
+  citations?: CitationsMode,
+): Promise<PublicVersionDetail> {
+  const query = citations && citations !== "links" ? `?citations=${citations}` : "";
+  return request<PublicVersionDetail>(`${base(slug)}/versions/${n}${query}`);
 }
 
 export function getPublicCompare(slug: string, from: number, to: number): Promise<CompareResult> {

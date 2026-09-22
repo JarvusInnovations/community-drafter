@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../copy.ts";
@@ -16,11 +17,14 @@ export function PublicVersionLabel({
   number,
   publishedAt,
   summary,
+  citations,
 }: {
   slug: string;
   number: number;
   publishedAt: string;
   summary: string;
+  /** The *Sources as footnotes* toggle, last on this line as on the participant's. */
+  citations?: ReactNode;
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-2 text-sm">
@@ -42,6 +46,7 @@ export function PublicVersionLabel({
         <Link to={`/d/${slug}/history`} className="font-medium text-primary">
           {copy.versionLabel.allVersions}
         </Link>
+        {citations}
       </p>
     </div>
   );

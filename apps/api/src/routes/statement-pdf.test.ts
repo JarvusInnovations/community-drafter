@@ -381,6 +381,48 @@ describe.if(chromiumAvailable)("the rendered PDF", () => {
     }
   }, 60_000);
 
+  it("defaults to hybrid citations and honors ?citations=links", async () => {
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
+    await seedDocument(server, {
+      slug: "cited-charter",
+      title: "Charter with sources",
+      body:
+        "We asked for [notice](https://news.example/story#:~:text=a) and again for " +
+        "[notice](https://news.example/story#:~:text=b), plus [minutes](https://board.example/m).\n",
+      audience: "public",
+      public_access: "read",
+      show_signatories: "none",
+    });
+
+    const textOf = async (url: string): Promise<string> => {
+      const response = await server.inject({ url });
+      expect(response.statusCode).toBe(200);
+      const parser = new PDFParse({ data: new Uint8Array(response.rawPayload) });
+      try {
+        return (await parser.getText()).text;
+      } finally {
+        await parser.destroy();
+      }
+    };
+
+    // `specs/screens/deliverable.md` § Routes: hybrid is the default door.
+    const byDefault = await textOf("/d/cited-charter/statement.pdf");
+    // The heading is uppercased by the print stylesheet.
+    expect(byDefault).toContain("SOURCES");
+    expect(byDefault).toContain("https://news.example/story");
+    expect(byDefault).toContain("https://board.example/m");
+    // Two citations of one article, one entry — the highlight fragment is not
+    // a different source (`specs/behaviors/versioning.md` § Citations).
+    expect(byDefault.match(/https:\/\/news\.example\/story/gu)).toHaveLength(1);
+    expect(await textOf("/d/cited-charter/statement.pdf?citations=hybrid")).toContain("SOURCES");
+
+    const plain = await textOf("/d/cited-charter/statement.pdf?citations=links");
+    expect(plain).not.toContain("SOURCES");
+    expect(plain).toContain("We asked for notice and again for notice, plus minutes.");
+  }, 90_000);
+
   it("serves the same document to a personal link, closed audience and all", async () => {
     const harness = await buildTestServer();
     const { server } = harness;

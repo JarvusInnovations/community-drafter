@@ -26,7 +26,7 @@ Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`), 
 
 ## Display Rules
 
-**Public read view**: the document screen layout without the status card and identity line. In its place, a card: "Want to add your name? This document is open to invited signers. Ask the team for your personal link: *reply_to*." **[phase 2]** when `public_access = participate`, the card becomes "Sign or comment: enter your email and we'll send you your own link" with name and email fields, then a "check your email" state.
+**Public read view**: the document screen layout without the status card and identity line. In its place, a card: "Want to add your name? This document is open to invited signers. Ask the team for your personal link: *reply_to*." **[phase 2]** when `public_access = participate`, the card becomes "Sign or comment: enter your email and we'll send you your own link" with name and email fields, then a "check your email" state. The text itself renders exactly as it does on a personal link, including the *Sources as footnotes* reader toggle and `?citations=` (`screens/document.md` § Display Rules 5).
 
 **The statement download**: when `statement.pdf` would render rather than 404, the public read view's footer carries "Download the statement (PDF)", the same quiet link the participant page carries. When it would 404 — a `closed` audience — the link is absent, and nothing on the page says a download exists.
 

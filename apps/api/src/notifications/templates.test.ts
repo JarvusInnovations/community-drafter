@@ -103,6 +103,52 @@ describe("notification templates", () => {
     assertNoLeakage(result);
   });
 
+  it("signature confirmation states the listing status, both ways", () => {
+    const listed = signatureConfirmationTemplate(ctx, {
+      capacity: "personal",
+      conditional: false,
+      listed: true,
+    });
+    expect(listed.text).toContain("Your name is on the signatory list.");
+    assertShape(listed);
+    assertNoLeakage(listed);
+
+    const unlisted = signatureConfirmationTemplate(ctx, {
+      capacity: "personal",
+      conditional: false,
+      listed: false,
+    });
+    expect(unlisted.text).toContain("Your name is not on the signatory list");
+    expect(unlisted.text).toContain("counted, not named");
+    assertShape(unlisted);
+    assertNoLeakage(unlisted);
+
+    // No signatory list exists, so there is nothing to be on or off.
+    const noList = signatureConfirmationTemplate(ctx, {
+      capacity: "personal",
+      conditional: false,
+    });
+    expect(noList.text).not.toContain("signatory list");
+  });
+
+  it("listing-changed states the listing status, both ways", () => {
+    const listed = listingChangedTemplate(ctx, { listedAs: "Jane Doe", listed: true });
+    expect(listed.text).toContain("Your name is on the signatory list.");
+    assertShape(listed);
+    assertNoLeakage(listed);
+
+    const unlisted = listingChangedTemplate(ctx, { listedAs: "Jane Doe", listed: false });
+    expect(unlisted.text).toContain("Your name is not on the signatory list");
+    assertShape(unlisted);
+
+    const noList = listingChangedTemplate(ctx, {
+      listedAs: "Jane Doe",
+      listed: true,
+      showsList: false,
+    });
+    expect(noList.text).not.toContain("Your name is on the signatory list.");
+  });
+
   it("conditional signature confirmation mentions confirm/remove", () => {
     const result = signatureConfirmationTemplate(ctx, { capacity: "personal", conditional: true });
     expect(result.text).toContain("conditional");

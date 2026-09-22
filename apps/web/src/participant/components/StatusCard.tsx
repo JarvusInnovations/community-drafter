@@ -69,7 +69,7 @@ export function StatusCard({
   function panelAnnouncement(): string {
     if (state === "signed" || state === "signed_conditional" || state === "signed_final_pending") {
       return signature
-        ? copy.signed.heading(formatAbsolute(signatureTime(signature)), signature)
+        ? copy.signed.announcement(formatAbsolute(signatureTime(signature)), signature)
         : "";
     }
     if (state === "declined") {
@@ -257,10 +257,53 @@ export function StatusCard({
               <h2
                 ref={headingRef}
                 tabIndex={-1}
-                className="text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="text-base font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                {copy.signed.heading(formatAbsolute(signatureTime(signature)), signature)}
+                {copy.signed.heading}
               </h2>
+
+              {/*
+               * § Display Rules 3 (*Signed*): the facts as a short labeled
+               * list, one per line — how you are listed, whether your name
+               * is on the list, and what you signed and when. A run-on
+               * sentence made all three hard to find and the third easy to
+               * miss.
+               */}
+              <dl className="flex flex-col gap-1.5 text-sm">
+                <Fact label={copy.signed.listedAsLabel}>{copy.signed.listedAs(signature)}</Fact>
+
+                {/*
+                 * § *Your listing status is a fact on the card*, and
+                 * `specs/behaviors/signatures.md` § Display. Absent when
+                 * `show_signatories` is not `list`: no list is shown to
+                 * anyone, so there is nothing to be on or off.
+                 */}
+                {bundle.document.show_signatories === "list" ? (
+                  <Fact label={copy.signed.onTheListLabel}>
+                    {signature.listed ? (
+                      <span className="text-muted-foreground">
+                        {copy.signed.listedYes(bundle.document.audience)}
+                      </span>
+                    ) : (
+                      <span>
+                        <span className="font-semibold text-foreground">
+                          {copy.signed.listedNoLead}
+                        </span>{" "}
+                        <span className="text-muted-foreground">{copy.signed.listedNoRest}</span>
+                      </span>
+                    )}
+                  </Fact>
+                ) : null}
+
+                <Fact label={copy.signed.signedLabel}>
+                  <span className="text-muted-foreground">
+                    {copy.signed.signedOn(
+                      formatAbsolute(signatureTime(signature)),
+                      signature.signed_on_version,
+                    )}
+                  </span>
+                </Fact>
+              </dl>
 
               {state === "signed_conditional" ? (
                 <p className="text-sm text-muted-foreground">{copy.signed.conditionalNote}</p>
@@ -293,49 +336,41 @@ export function StatusCard({
                 </p>
               ) : null}
 
+              {/*
+               * § Display Rules 3 (*Signed*), the action row: "one row that
+               * wraps as a group with even gaps, every item styled the same
+               * quiet way so none of them orphans on a line of its own."
+               * "Add comments" used to be the one anchor among buttons,
+               * which is exactly why it kept landing alone on a second
+               * line; it is a quiet button like the rest now.
+               */}
               {canAct ? (
-                <div className="flex flex-wrap gap-3 text-sm">
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                   {/*
                    * One re-affirmation action, ever: the final version's
                    * "Confirm my signature" stands in for "Keep my name"
                    * when both would otherwise apply.
                    */}
                   {state === "signed_final_pending" || drift ? (
-                    <button
-                      type="button"
+                    <QuietAction
                       onClick={() => void handleConfirmSignature()}
                       disabled={busy || readOnly}
-                      className="inline-flex min-h-8 items-center font-semibold text-primary hover:underline disabled:no-underline disabled:opacity-60"
                     >
                       {state === "signed_final_pending"
                         ? copy.signed.confirmButton
                         : copy.signed.keep}
-                    </button>
+                    </QuietAction>
                   ) : null}
-                  <button
-                    type="button"
-                    disabled={readOnly}
-                    className="inline-flex min-h-8 items-center font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
-                    onClick={() => setEditing(true)}
-                  >
+                  <QuietAction disabled={readOnly} onClick={() => setEditing(true)}>
                     {copy.signed.changeListing}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={readOnly}
-                    className="inline-flex min-h-8 items-center font-medium text-primary hover:underline disabled:no-underline disabled:opacity-60"
-                    onClick={() => setRemoveOpen(true)}
-                  >
+                  </QuietAction>
+                  <QuietAction disabled={readOnly} onClick={() => setRemoveOpen(true)}>
                     {copy.signed.remove}
-                  </button>
+                  </QuietAction>
                   {canComment ? (
-                    <InertLink
-                      readOnly={readOnly}
-                      to={`/i/${token}/comment`}
-                      className="inline-flex min-h-8 items-center font-medium"
-                    >
+                    <QuietAction disabled={readOnly} to={`/i/${token}/comment`}>
                       {copy.signed.addComments}
-                    </InertLink>
+                    </QuietAction>
                   ) : null}
                 </div>
               ) : null}
@@ -419,6 +454,57 @@ export function StatusCard({
         onCancel={() => setDeclineOpen(false)}
       />
     </section>
+  );
+}
+
+/**
+ * One fact on the signed card: a small muted label and its value, each on
+ * its own line (`specs/screens/document.md` § Design "Signed card": "the
+ * facts as label-and-value rows with the label small, uppercase and
+ * muted").
+ */
+function Fact({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * One item in the signed card's action row. Every item is the same quiet
+ * control whether it navigates or acts (§ Display Rules 3: "every item
+ * styled the same quiet way so none of them orphans on a line of its
+ * own"), and `disabled` under view-as is a genuinely disabled button, not a
+ * link that merely looks inert (`specs/screens/admin-dashboard.md`).
+ */
+function QuietAction({
+  children,
+  to,
+  onClick,
+  disabled = false,
+}: {
+  children: ReactNode;
+  to?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}): JSX.Element {
+  const className =
+    "inline-flex min-h-9 items-center rounded-lg border border-border px-3 font-medium text-primary hover:bg-muted hover:underline disabled:pointer-events-none disabled:no-underline disabled:opacity-60";
+  if (to !== undefined && !disabled) {
+    return (
+      <Link to={to} className={className}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" className={className} disabled={disabled} onClick={onClick}>
+      {children}
+    </button>
   );
 }
 

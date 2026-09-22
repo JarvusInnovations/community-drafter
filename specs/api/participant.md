@@ -16,7 +16,7 @@ Response:
   person:   { id, name },
   document: { slug, title, state, phase, opened_at, comments_close_at, signing_closes_at,
               capacities, show_signatories, audience, addressed_to, reply_to, sender_name },
-  version:  { number, summary, published_at, final, html, is_current },   // ?v=<n> selects
+  version:  { number, summary, published_at, final, html, is_current },   // ?v=<n> selects; ?citations= sets the mode
   versions: [{ number, summary, published_at, final, dispositions }],
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
                       signed_on_version, revoked, signed_at, revoked_at, resigned_at },   // dates from history
@@ -73,7 +73,7 @@ Effects per `behaviors/review-and-judgement.md`. Errors: `phase_closed` (except 
 
 ## `GET /i/:token/api/versions/:n`
 
-Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (derived from the document record's body history).
+Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (derived from the document record's body history). `?citations=links|footnotes|hybrid` sets how citations are presented in `html` (`../behaviors/versioning.md` § Citations); `links` is the default here and on the bundle, because that is what a reader who expressed no preference gets. The mode changes only the HTML: the blocks a comment can be anchored to are the same in every mode, which is why `compare` deliberately has no such parameter.
 
 ## `GET /i/:token/api/compare?from=&to=`
 
@@ -81,7 +81,7 @@ Response: `{ from, to, summary: { changed, added, removed, items: [{ kind: "para
 
 ## `GET /i/:token/api/statement.pdf`
 
-The deliverable (`../screens/deliverable.md`): the current version's text, its title block, and the signatory list as it stands, rendered to a PDF. `application/pdf`, `Content-Disposition: attachment` with the filename that spec gives. `?paper=letter|a4` selects the paper size; letter is the default.
+The deliverable (`../screens/deliverable.md`): the current version's text, its title block, and the signatory list as it stands, rendered to a PDF. `application/pdf`, `Content-Disposition: attachment` with the filename that spec gives. `?paper=letter|a4` selects the paper size; letter is the default. `?citations=links|footnotes|hybrid` selects how citations are presented (`../behaviors/versioning.md` § Citations); `hybrid` is the default on every PDF door.
 
 Every holder of a personal link may fetch it, in every phase in which they may read the document at all — they can already read every word of it on their own screen, and the `audience` gate that guards the public door has nothing to add here. `not_found` for a document with no version yet and for a `withdrawn` one. Whether the render is watermarked `DRAFT` is a fact about the document, never about the caller (`../screens/deliverable.md` § Draft and clean).
 

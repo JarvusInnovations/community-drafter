@@ -1,5 +1,7 @@
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 
+import { getVersion } from "../api.ts";
+import { CitationsToggle } from "./CitationsToggle.tsx";
 import { DocumentBody } from "./DocumentBody.tsx";
 import { DocumentHeader } from "./DocumentHeader.tsx";
 import { Footer } from "./Footer.tsx";
@@ -10,6 +12,7 @@ import { SubmissionsSection } from "./SubmissionsSection.tsx";
 import { VersionLabel } from "./VersionLabel.tsx";
 import { copy } from "../copy.ts";
 import { type Bundle } from "../types.ts";
+import { type CitationsMode, useCitationsMode, useCitedHtml } from "../../lib/citations.ts";
 
 /**
  * The document screen's layout, shared by the current-version route
@@ -48,6 +51,15 @@ export function DocumentView({
   readOnly?: boolean;
 }): JSX.Element {
   const panelRef = useRef<HTMLElement | null>(null);
+  // `specs/screens/document.md` § Display Rules 5, *Sources as footnotes*.
+  // Read-only view-as renders the participant's screen, so the toggle is
+  // shown there too — disabled, like every other control on that route.
+  const { mode, sourcesShown, setSourcesShown } = useCitationsMode();
+  const fetchHtml = useCallback(
+    async (next: CitationsMode) => (await getVersion(token, version.number, next)).html,
+    [token, version.number],
+  );
+  const bodyHtml = useCitedHtml(version.html, readOnly ? "links" : mode, fetchHtml);
   const phase = bundle.document.phase;
   const canSign =
     !readOnly &&
@@ -83,8 +95,15 @@ export function DocumentView({
               isCurrent={isCurrent}
               currentNumber={bundle.version.number}
               readOnly={readOnly}
+              citations={
+                <CitationsToggle
+                  checked={sourcesShown}
+                  onChange={setSourcesShown}
+                  disabled={readOnly}
+                />
+              }
             />
-            <DocumentBody html={version.html} demoteFirstHeading={readOnly} />
+            <DocumentBody html={bodyHtml} demoteFirstHeading={readOnly} />
           </section>
           <SubmissionsSection submissions={bundle.submissions} />
           <Signatories signatories={bundle.signatories} />

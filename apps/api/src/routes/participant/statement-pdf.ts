@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
+import { citationsFromQuery, paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { loadParticipantContext } from "./context.ts";
 
@@ -13,7 +13,10 @@ import { loadParticipantContext } from "./context.ts";
 const participantStatementPdfRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get("/statement.pdf", { config: PARTICIPANT_ROUTE }, async (request, reply) => {
     const { document } = loadParticipantContext(fastify, request);
-    const pdf = await fastify.deliverable.pdf(document, { paper: paperFromQuery(request) });
+    const pdf = await fastify.deliverable.pdf(document, {
+      paper: paperFromQuery(request),
+      citations: citationsFromQuery(request),
+    });
     return sendPdf(reply, pdf);
   });
 };

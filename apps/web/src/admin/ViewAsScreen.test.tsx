@@ -95,7 +95,10 @@ describe("ViewAsScreen", () => {
       expect(screen.getByText("Viewing as Jane Doe (read-only)")).toBeTruthy();
     });
 
-    expect(screen.getByText(/You signed version 1 on/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "You signed" })).toBeTruthy();
+    // The version label chip says "Version 1 · current" too; the card's own
+    // fact is the one with the signature's time in it.
+    expect(screen.getByText(/^Version 1 · Sat, Sep 19/u)).toBeTruthy();
     expect(screen.getByRole("button", { name: /remove my name/iu })).toBeTruthy();
     expect(screen.getByRole("button", { name: /change how you're listed/iu })).toBeTruthy();
 
