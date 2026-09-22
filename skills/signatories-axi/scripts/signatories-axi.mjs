@@ -2928,6 +2928,11 @@ async function signaturesCommand(args) {
             computed("capacity", (r) => r.signature?.capacity ?? ""),
             computed("conditional", (r) => r.signature?.conditional ?? false),
             computed("revoked", (r) => r.signature?.revoked ?? false),
+            // `specs/api/admin-cli.md`: each signature carries whether
+            // the signer is on the signatory list — an unlisted signer is
+            // counted and never named (`specs/behaviors/signatures.md` §
+            // Display), which is the team's to honour.
+            computed("listed", (r) => r.signature?.listed ?? true),
             // `specs/api/admin-cli.md`: each signature carries the
             // version it is attached to and whether that version is
             // behind the document's current one.
@@ -3756,7 +3761,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "5fa97c5" : "dev";
+var VERSION = true ? "f4e0ad9" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,
