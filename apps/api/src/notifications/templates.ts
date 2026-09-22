@@ -283,7 +283,7 @@ export function signingOpenedTemplate(ctx: RecipientContext): TemplateResult {
     ctx,
     `${ctx.documentTitle} — signing is open`,
     [
-      `The comment period on ${quoted(ctx)} has ended and signing is open. If your name isn't on it yet, now is the time; if it is, nothing changes unless you remove it.`,
+      `The comment period on ${quoted(ctx)} has ended and signing is open. If you mean to add your name, now is the time.`,
       clock(ctx),
     ],
     { label: "Open the document", url: ctx.personalLink },
@@ -316,15 +316,22 @@ export function finalPublishedTemplate(
   );
 }
 
+/**
+ * `specs/behaviors/notifications.md` § Sending: the clock audience is
+ * "an invitee ... who has opened their personal link and is not a current
+ * signer", so this addresses someone whose name is *not* on the document —
+ * and it no longer always fires 24 hours out (a short window sends it at
+ * the midpoint instead), so the body leaves the timing to `clock(ctx)`.
+ */
 export function closingSoonTemplate(ctx: RecipientContext): TemplateResult {
   return subscription(
     ctx,
     `${ctx.documentTitle} — signing window closes soon`,
     [
-      `Signatures on ${quoted(ctx)} close in about a day. Your name is on it; if you'd rather it weren't, remove it before then.`,
+      `Signatures on ${quoted(ctx)} close soon, and your name isn't on it yet. If you mean to add it, now is the time.`,
       clock(ctx),
     ],
-    { label: "Review your signature", url: ctx.personalLink },
+    { label: "Read and sign", url: ctx.personalLink },
   );
 }
 

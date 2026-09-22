@@ -46,8 +46,13 @@ export const TOGGLES: readonly ToggleDef[] = [
   },
 ];
 
+/**
+ * `specs/screens/preferences.md` § Display Rules. The final text alone: a
+ * current signer is out of the clock audience (`specs/behaviors/
+ * notifications.md` § Sending) and hears nothing about the window.
+ */
 export const FORCED_EXPLANATION =
-  "Because you signed, we'll always tell you when the final text is published and before the window closes.";
+  "Because you signed, we'll always tell you when the final text is published.";
 
 export const ALWAYS_CONFIRM_NOTE = "We'll always confirm when you sign or remove your name.";
 
