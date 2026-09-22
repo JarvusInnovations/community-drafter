@@ -123,7 +123,13 @@ export function Timeline({
         />
       </div>
 
-      <div className="relative mt-6 pb-9">
+      {/*
+       * `specs/screens/document.md` § Display Rules 2: "The *now* marker's
+       * label keeps clear space between itself and the chips above it, so
+       * the two never read as one stack." The label hangs ~24 px above the
+       * track, so the track's own top margin is what gives it that air.
+       */}
+      <div className="relative mt-8 pb-9">
         <div
           className="flex h-2.5 w-full overflow-hidden rounded-full bg-border"
           role="presentation"
