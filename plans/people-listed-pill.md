@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: []
+pr: 113
 specs:
   - specs/screens/admin-dashboard.md
   - specs/api/admin.md
@@ -46,15 +47,15 @@ the listing choice stays the signer's, made on their own card.
 
 ## Validation
 
-- [ ] A listed signer's row shows the muted `listed` pill; an unlisted signer's shows
+- [x] A listed signer's row shows the muted `listed` pill; an unlisted signer's shows
       the amber `not listed` pill; a revoked signature shows neither.
-- [ ] The Listing filter reads from the URL on mount, writes back on change, shows a
+- [x] The Listing filter reads from the URL on mount, writes back on change, shows a
       removable chip, and narrows the table.
-- [ ] `GET /documents/:slug/invitations?listed=false` returns only unlisted signers.
-- [ ] `signatories-axi signatures list` prints `listed` for each signature.
-- [ ] Confirmed unchanged: "view as" renders the participant's own card, and the
+- [x] `GET /documents/:slug/invitations?listed=false` returns only unlisted signers.
+- [x] `signatories-axi signatures list` prints `listed` for each signature.
+- [x] Confirmed unchanged: "view as" renders the participant's own card, and the
       dashboard counts an unlisted signer once and never names them.
-- [ ] Gates in every touched package: lint, format:check, typecheck, tests; `apps/web`
+- [x] Gates in every touched package: lint, format:check, typecheck, tests; `apps/web`
       build and `check:bundle-size`.
 
 ## Risks / unknowns
@@ -65,4 +66,21 @@ the listing choice stays the signer's, made on their own card.
 
 ## Notes
 
+- **The listing choice was already on the wire**, in `buildSignatureView` and so in
+  both the invitations and the signatures responses; it was simply never rendered or
+  printed. The work was display, a filter and a column.
+- **The filter lives on the endpoint, not in the browser**, so one toolbar has one
+  mechanism: all four People filters round-trip and survive a reload the same way.
+- **A revoked signature shows neither pill.** The alternative — a greyed pill — reads
+  as a listing choice still in force, and there is nothing to be on or off once the
+  name is off the list.
+- Confirmed untouched: `computeSignatories` counts an unlisted signer once, in
+  `unlisted` alone, and never names them; "view as" still renders the participant's
+  own card read-only, where the signer reads their own listing status.
+- The full API suite has an unrelated flake under load (`submit.test.ts`, "declining
+  through submit records the revocation as a signature event", 5s timeout); it passes
+  on its own.
+
 ## Follow-ups
+
+- **None.** Everything in scope shipped in PR #113.
