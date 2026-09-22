@@ -38,6 +38,16 @@ const STATUSES = [
 const SOURCES = ["admin", "crm", "public"];
 
 /**
+ * `specs/screens/admin-dashboard.md` § People: the Listing filter. The values
+ * are the `listed` filter of the invitations endpoint (`specs/api/admin.md`),
+ * which keeps only rows carrying a live signature with that choice.
+ */
+const LISTINGS: { value: string; label: string }[] = [
+  { value: "true", label: "listed" },
+  { value: "false", label: "not listed" },
+];
+
+/**
  * `specs/screens/admin-dashboard.md` § People: the signature column carries
  * the version it is attached to and a "behind v3" marker when that version
  * is older than the current one (`specs/behaviors/signatures.md` § A
@@ -135,6 +145,7 @@ export function PeopleScreen(): JSX.Element {
 
   const status = searchParams.get("status") ?? "";
   const source = searchParams.get("source") ?? "";
+  const listed = searchParams.get("listed") ?? "";
   const q = searchParams.get("q") ?? "";
 
   function updateParam(key: string, value: string) {
@@ -151,6 +162,7 @@ export function PeopleScreen(): JSX.Element {
     getInvitations(document.slug, {
       status: status || undefined,
       source: source || undefined,
+      listed: listed || undefined,
       q: q || undefined,
     })
       .then(setRows)
@@ -160,7 +172,7 @@ export function PeopleScreen(): JSX.Element {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [document.slug, status, source, q]);
+  }, [document.slug, status, source, listed, q]);
 
   async function handleCopyLink(person: string) {
     const { link } = await copyPersonalLink(document.slug, person);
@@ -201,9 +213,11 @@ export function PeopleScreen(): JSX.Element {
     }
   }
 
+  const listingLabel = LISTINGS.find((option) => option.value === listed)?.label;
   const activeFilters = [
     status ? { key: "status", label: `Status: ${status}` } : null,
     source ? { key: "source", label: `Source: ${source}` } : null,
+    listingLabel ? { key: "listed", label: `${copy.people.listingLabel}: ${listingLabel}` } : null,
     q ? { key: "q", label: `Search: ${q}` } : null,
   ].filter((f): f is { key: string; label: string } => f !== null);
 
@@ -235,6 +249,19 @@ export function PeopleScreen(): JSX.Element {
           {SOURCES.map((s) => (
             <option key={s} value={s}>
               {s}
+            </option>
+          ))}
+        </select>
+        <select
+          value={listed}
+          onChange={(e) => updateParam("listed", e.target.value)}
+          className={selectClass}
+          aria-label={copy.people.listingLabel}
+        >
+          <option value="">{copy.people.allListings}</option>
+          {LISTINGS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -325,6 +352,19 @@ export function PeopleScreen(): JSX.Element {
                                 ? ` · ${copy.people.signedVersion(row.signature.signed_on_version)}`
                                 : ""}
                             </span>
+                            {/*
+                             * `specs/screens/admin-dashboard.md` § People:
+                             * every live signature says whether the signer is
+                             * on the signatory list — "not listed" in amber,
+                             * because an unlisted signer is the one the team
+                             * has to honour by hand. A revoked signature shows
+                             * neither pill.
+                             */}
+                            {row.signature.revoked ? null : (
+                              <Pill tone={row.signature.listed ? "muted" : "amber"}>
+                                {row.signature.listed ? copy.people.listed : copy.people.notListed}
+                              </Pill>
+                            )}
                             {isBehind(row, currentVersion) ? (
                               <Pill tone="amber">{copy.people.behind(currentVersion)}</Pill>
                             ) : null}
