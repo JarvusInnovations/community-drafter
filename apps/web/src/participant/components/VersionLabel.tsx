@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { Link } from "react-router";
 
 import { copy } from "../copy.ts";
@@ -18,6 +19,7 @@ export function VersionLabel({
   isCurrent,
   currentNumber,
   readOnly = false,
+  citations,
 }: {
   token: string;
   number: number;
@@ -27,6 +29,13 @@ export function VersionLabel({
   currentNumber: number;
   /** Admin "view as" has no `/i/:token` route to link into — render plain text instead. */
   readOnly?: boolean;
+  /**
+   * The *Sources as footnotes* toggle (`specs/screens/document.md` § Design
+   * "Document card": "on that same line, last"). A slot rather than a prop
+   * bundle, so this component stays about the version and knows nothing
+   * about how a reader is reading.
+   */
+  citations?: ReactNode;
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-2 text-sm">
@@ -69,6 +78,7 @@ export function VersionLabel({
             </Link>
           </>
         )}
+        {citations}
       </p>
     </div>
   );
