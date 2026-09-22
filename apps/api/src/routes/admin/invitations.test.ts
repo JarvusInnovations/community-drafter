@@ -910,3 +910,89 @@ describe("import --update decides what may be overwritten (issue #51)", () => {
     await server.close();
   });
 });
+
+/**
+ * `specs/api/admin.md` § People and invitations: `listed` keeps only rows
+ * with a live signature carrying that listing choice, which is what the
+ * People table's Listing filter reads (`specs/screens/admin-dashboard.md`
+ * § People).
+ */
+describe("GET /admin/api/documents/:slug/invitations?listed=", () => {
+  async function seedSigner(
+    server: Awaited<ReturnType<typeof buildTestServer>>["server"],
+    person: string,
+    token: string,
+    signature: { listed: boolean; revoked: boolean },
+  ): Promise<void> {
+    await seedParticipant(server, { document: "doc-listing", person, token });
+    await server.storage.commit(
+      "sign",
+      {
+        actor: { kind: "participant" },
+        subject: `sign: ${person} on doc-listing`,
+        document: "doc-listing",
+        person,
+        version: 1,
+      },
+      async (tx) => {
+        await tx.participations.patch(
+          { document: "doc-listing", person },
+          {
+            signature: {
+              capacity: "personal",
+              display_name: person,
+              authorized: true,
+              listed: signature.listed,
+              signed_on_version: 1,
+              revoked: signature.revoked,
+            },
+          },
+        );
+      },
+    );
+  }
+
+  async function personsAt(
+    server: Awaited<ReturnType<typeof buildTestServer>>["server"],
+    url: string,
+  ): Promise<string[]> {
+    const response = await server.inject({ method: "GET", url, headers: adminHeaders() });
+    return (response.json() as Array<{ person: string }>).map((row) => row.person);
+  }
+
+  it("narrows to the signers with that listing choice, and never to an unsigned or revoked row", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, { slug: "doc-listing", body: "v1 text." });
+    await seedSigner(server, "listed-signer", "listedsignertoken123", {
+      listed: true,
+      revoked: false,
+    });
+    await seedSigner(server, "unlisted-signer", "unlistedsignertoken1", {
+      listed: false,
+      revoked: false,
+    });
+    await seedSigner(server, "revoked-signer", "revokedsignertoken12", {
+      listed: false,
+      revoked: true,
+    });
+    await seedParticipant(server, {
+      document: "doc-listing",
+      person: "never-signed",
+      token: "neversignedtoken1234",
+    });
+
+    expect(
+      (await personsAt(server, "/admin/api/documents/doc-listing/invitations")).sort(),
+    ).toEqual(["listed-signer", "never-signed", "revoked-signer", "unlisted-signer"]);
+    expect(
+      await personsAt(server, "/admin/api/documents/doc-listing/invitations?listed=false"),
+    ).toEqual(["unlisted-signer"]);
+    expect(
+      await personsAt(server, "/admin/api/documents/doc-listing/invitations?listed=true"),
+    ).toEqual(["listed-signer"]);
+
+    await server.close();
+  });
+});
