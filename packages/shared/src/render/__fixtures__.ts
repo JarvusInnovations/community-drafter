@@ -182,3 +182,43 @@ Name one medication coordinator per building, available five days a week.
 - The department publishes a gap analysis by March.
 - The legislature reviews the gap analysis in April.
 `;
+
+/**
+ * `specs/behaviors/versioning.md` § Citations: the shapes that decide the
+ * numbering — one source cited from two text fragments of the same article,
+ * a second source, a visible URL that is never a citation, an autolink, a
+ * `mailto:`, and a real GFM footnote whose own link stays untouched.
+ */
+export const CITATIONS_FIXTURE = `# The ask
+
+Announced with less than a month's [notice](https://news.example/story#:~:text=one) and in
+[the absence](https://news.example/story#:~:text=two) of a roadmap, per [the board](https://board.example/minutes).
+
+The filing is at https://news.example/story and the text of it is
+[https://board.example/minutes](https://board.example/minutes). Write to
+[the team](mailto:team@example.org) or read [the summary](#the-ask).
+
+There is a real footnote here[^1].
+
+[^1]: Which itself cites [a source](https://footnote.example/paper).
+`;
+
+/** Both block-class syntaxes, one class off the whitelist, and a section break. */
+export const BLOCK_CLASSES_FIXTURE = `# Heading {.center}
+
+We are asking for a written, interim agreement. {.lede}
+
+---
+
+::: callout
+The core terms.
+
+The interim operating terms.
+:::
+
+::: sneaky
+Nothing here may carry a class.
+:::
+
+A paragraph mentioning 12:30 and a :stray colon word.
+`;

@@ -42,6 +42,18 @@ export interface Block {
   container?: BlockContainer;
 }
 
+/** Options that change presentation only (`specs/behaviors/versioning.md` § Rendering). */
+export interface RenderOptions {
+  /**
+   * How inline citation links are presented (§ Citations). `links` is the
+   * default: links render as links and nothing is appended. Whatever the
+   * mode, the `blocks` below come out identical — block identity is
+   * invariant, because a comment must land in the same place however its
+   * reader is reading.
+   */
+  citations?: import("./citations.ts").CitationsMode;
+}
+
 export interface RenderResult {
   /** Full sanitized document HTML, with `data-block` ids and heading slugs baked in. */
   html: string;
