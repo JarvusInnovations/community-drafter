@@ -1,6 +1,8 @@
 import { audienceOf } from "@signatories/shared";
+import type { CitationsMode } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
+import { citationsFromQuery } from "../../lib/citations.ts";
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { buildPrefsView } from "../../lib/prefs.ts";
 import { resolvePrefill } from "../../lib/prefill.ts";
@@ -15,6 +17,7 @@ import { loadParticipantContext } from "./context.ts";
 
 interface BundleQuery {
   v?: string;
+  citations?: string;
 }
 
 /**
@@ -31,10 +34,11 @@ export function buildParticipantBundle(
   participation: ParticipationEntry,
   phase: Phase,
   requestedVersion?: number,
+  citations: CitationsMode = "links",
 ) {
   const version = resolveVersion(document, requestedVersion);
   const latest = document.versions[document.versions.length - 1];
-  const rendered = fastify.rendering.render(version.commit, version.body);
+  const rendered = fastify.rendering.render(version.commit, version.body, citations);
 
   // `specs/behaviors/sites.md` § People are per site: the person belongs to
   // the **document's** site, so that is what resolves them.
@@ -123,7 +127,14 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
       // Side effect: record the open (batched, write-behind — `storage/tracker.ts`).
       fastify.storage.tracker.record(document.record.slug, participation.record.person);
 
-      return buildParticipantBundle(fastify, document, participation, phase, requestedVersion);
+      return buildParticipantBundle(
+        fastify,
+        document,
+        participation,
+        phase,
+        requestedVersion,
+        citationsFromQuery(request),
+      );
     },
   );
 };

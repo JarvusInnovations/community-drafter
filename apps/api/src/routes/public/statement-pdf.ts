@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
+import { citationsFromQuery, paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
 import { ApiError } from "../../errors.ts";
 import { PUBLIC_ROUTE } from "../../gateway/gateway.ts";
 import { FixedWindowLimiter } from "../../gateway/rate-limit.ts";
@@ -42,7 +42,10 @@ const statementPdfRoute: FastifyPluginAsync = async (fastify) => {
       // (`specs/screens/public-and-embed.md`).
       let pdf;
       try {
-        pdf = await fastify.deliverable.pdf(document, { paper: paperFromQuery(request) });
+        pdf = await fastify.deliverable.pdf(document, {
+          paper: paperFromQuery(request),
+          citations: citationsFromQuery(request),
+        });
       } catch (error) {
         if (error instanceof ApiError && error.code === "not_found") throw PUBLIC_NOT_FOUND;
         throw error;

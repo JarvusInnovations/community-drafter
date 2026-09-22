@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
+import { citationsFromQuery, paperFromQuery, sendPdf } from "../../deliverable/reply.ts";
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
 import { notFoundDocument } from "./context.ts";
 
@@ -12,7 +12,7 @@ import { notFoundDocument } from "./context.ts";
  * may produce.
  */
 const adminStatementPdfRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Params: { slug: string }; Querystring: { draft?: string } }>(
+  fastify.get<{ Params: { slug: string }; Querystring: { draft?: string; citations?: string } }>(
     "/documents/:slug/statement.pdf",
     { config: DOCUMENT_SCOPED_ROUTE },
     async (request, reply) => {
@@ -22,6 +22,7 @@ const adminStatementPdfRoute: FastifyPluginAsync = async (fastify) => {
       const forceDraft = request.query.draft === "1" || request.query.draft === "true";
       const pdf = await fastify.deliverable.pdf(document, {
         paper: paperFromQuery(request),
+        citations: citationsFromQuery(request),
         forceDraft,
       });
       return sendPdf(reply, pdf);

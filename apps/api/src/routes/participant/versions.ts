@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
+import { citationsFromQuery } from "../../lib/citations.ts";
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
 import { resolveVersion } from "../../lib/versions.ts";
 import { loadParticipantContext } from "./context.ts";
@@ -8,15 +9,23 @@ interface VersionParams {
   n: string;
 }
 
+interface VersionQuery {
+  citations?: string;
+}
+
 const versionsRoute: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Params: VersionParams }>(
+  fastify.get<{ Params: VersionParams; Querystring: VersionQuery }>(
     "/versions/:n",
     { config: PARTICIPANT_ROUTE },
     async (request) => {
       const { document, participation } = loadParticipantContext(fastify, request);
       const n = Number(request.params.n);
       const version = resolveVersion(document, n);
-      const rendered = fastify.rendering.render(version.commit, version.body);
+      const rendered = fastify.rendering.render(
+        version.commit,
+        version.body,
+        citationsFromQuery(request),
+      );
 
       const myComments = fastify.storage.readModel
         .listSubmissionsForDocument(document.record.slug)

@@ -1,23 +1,30 @@
 import { diffVersions, render } from "@signatories/shared";
-import type { Block, DiffResult, RenderResult } from "@signatories/shared";
+import type { Block, CitationsMode, DiffResult, RenderResult } from "@signatories/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 
 /**
  * `specs/architecture.md`: "Rendered HTML per version is cached in memory.
  * Diffs between versions are computed server-side." Keyed by the version's
- * commit hash — git history is immutable, so once rendered/diffed a pair
- * never needs to be recomputed or invalidated for the life of the process.
+ * commit hash and the citation mode — git history is immutable, so once
+ * rendered/diffed a pair never needs to be recomputed or invalidated for the
+ * life of the process, and the mode is the only other thing that changes the
+ * HTML (`specs/behaviors/versioning.md` § Citations).
+ *
+ * Diffs are not keyed by mode because they never see one: the comparison
+ * view is always `links`, and the blocks a diff runs on are identical in
+ * every mode by construction.
  */
 export class RenderCache {
   private readonly renders = new Map<string, RenderResult>();
   private readonly diffs = new Map<string, DiffResult>();
 
-  render(commit: string, body: string): RenderResult {
-    const cached = this.renders.get(commit);
+  render(commit: string, body: string, citations: CitationsMode = "links"): RenderResult {
+    const key = `${commit}:${citations}`;
+    const cached = this.renders.get(key);
     if (cached) return cached;
-    const result = render(body);
-    this.renders.set(commit, result);
+    const result = render(body, { citations });
+    this.renders.set(key, result);
     return result;
   }
 

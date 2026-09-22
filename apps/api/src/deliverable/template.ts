@@ -201,6 +201,71 @@ body > *:not(.watermark) { position: relative; z-index: 1; }
   color: var(--muted);
 }
 .statement a { color: var(--ink); text-decoration: underline; }
+
+/* A section break, not a divider: a short centered hairline with air around
+   it (specs/screens/document.md § Design "Section break"). */
+.statement hr {
+  border: 0;
+  height: 0;
+  border-top: 0.75pt solid var(--rule);
+  width: 16%;
+  margin: 16pt auto;
+}
+
+/* The four block classes (specs/behaviors/versioning.md § Block classes). */
+.statement .lede {
+  font-size: 12.5pt;
+  line-height: 1.5;
+  margin-bottom: 11pt;
+}
+.statement .callout {
+  border: 0.75pt solid var(--rule);
+  border-left: 2.5pt solid var(--accent);
+  background: #f7f9fc;
+  padding: 9pt 11pt;
+  margin: 0 0 11pt;
+  break-inside: avoid;
+}
+.statement .callout > *:last-child { margin-bottom: 0; }
+.statement .small { font-size: 9pt; color: var(--muted); }
+.statement .center { text-align: center; }
+
+/* Citation superscripts and the appended Sources list
+   (specs/screens/deliverable.md § Display Rules 3). The superscript is set
+   with an explicit line-height so a numbered paragraph keeps the leading of
+   an unnumbered one. */
+.statement sup.citation-ref {
+  font-size: 7pt;
+  line-height: 0;
+  vertical-align: super;
+  font-weight: 650;
+}
+.statement sup.citation-ref a { color: var(--accent); text-decoration: none; }
+.statement .doc-sources {
+  margin-top: 18pt;
+  border-top: 0.75pt solid var(--rule);
+  padding-top: 10pt;
+  font-size: 9pt;
+  line-height: 1.45;
+}
+.statement .doc-sources h2 {
+  margin: 0 0 6pt;
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.statement .doc-sources ol { margin: 0; padding-left: 14pt; }
+.statement .doc-sources li { margin: 0 0 3pt; break-inside: avoid; }
+/* A printed address is only useful if all of it is on the page. */
+.statement .doc-sources a {
+  color: var(--ink);
+  text-decoration: none;
+  word-break: break-all;
+}
+/* The return arrows are for a screen; on paper they are noise. */
+.statement .doc-sources .source-backref { display: none; }
 .statement code, .statement pre {
   font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 9.5pt;
