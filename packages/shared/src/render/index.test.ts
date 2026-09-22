@@ -231,6 +231,21 @@ describe("render block classes", () => {
     expect(prose?.text).toBe("A paragraph mentioning 12:30 and a :stray colon word.");
   });
 
+  /**
+   * `specs/behaviors/versioning.md` § Block classes: the store re-formats a
+   * body on every write and joins the lines of a paragraph, so a fence hard
+   * against the line below it would be swallowed into it. The blank-line
+   * form is the one that survives that round trip, and so the one the spec
+   * and the operator docs teach.
+   */
+  it("wraps a container whose fences stand alone between blank lines", () => {
+    const { html, blocks } = render(
+      "::: callout\n\nFirst here.\n\nSecond here.\n\n:::\n\nAfter.\n",
+    );
+    expect(html).toContain('<div class="callout">');
+    expect(blocks.map((block) => block.text)).toEqual(["First here.", "Second here.", "After."]);
+  });
+
   it("accepts the container fence with or without a space after the colons", () => {
     expect(render("::: lede\nHi.\n:::\n").html).toContain('<div class="lede">');
     expect(render(":::lede\nHi.\n:::\n").html).toContain('<div class="lede">');

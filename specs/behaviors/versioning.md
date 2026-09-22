@@ -47,7 +47,7 @@ The rules that govern all three:
 **Block classes.** An author may mark a block with one of a small, fixed set of classes. Two syntaxes, both standard:
 
 - A trailing `{.class}` on a paragraph or a heading marks that one block: `The museum closes Saturday. {.lede}`
-- A fenced container marks a run of blocks: a line reading `::: callout`, the blocks, then a line reading `:::`. `:::callout` without the space means the same thing.
+- A fenced container marks a run of blocks: a line reading `::: callout`, the blocks, then a line reading `:::`. `:::callout` without the space means the same thing. **Each fence line stands alone, with a blank line between it and the content.** The store normalizes a body's markdown on every write (`architecture.md` § Storage), and one of the things that normalization does is join the lines of a paragraph — a fence written hard against the line below it is swallowed into that paragraph and stops being a fence. A blank line on each side is what survives the round trip, so it is the syntax, not a style preference.
 
 The whitelist is `lede` (a larger, looser opening paragraph), `callout` (a soft bordered box), `small` and `center`. **Anything not on the list is discarded** — the marker never appears as literal text in the output, and the class never reaches the HTML. The list is deliberately short: this is typographic emphasis an author can reach for, not a styling language, and a new entry is a spec change.
 

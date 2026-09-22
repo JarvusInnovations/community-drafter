@@ -567,13 +567,18 @@ We are asking for a written, interim agreement by December 31st. {.lede}
 ```
 
 Mark a run of blocks with a fenced container (a leading `:::` line naming
-the class, a closing `:::` line; the space after the colons is optional):
+the class, a closing `:::` line; the space after the colons is optional).
+**Leave a blank line on each side of both fences** — the store re-formats
+every body it writes, and a fence hard against the line below it gets joined
+into that paragraph and stops working:
 
 ```markdown
 ::: callout
+
 **Our proposal for a temporary, written agreement**
 
 No sale, long-term lease, or transfer of the building.
+
 :::
 ```
 
