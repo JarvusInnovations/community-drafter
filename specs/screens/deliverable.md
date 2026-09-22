@@ -14,6 +14,8 @@ It is not a screen a participant navigates to and not a route in the SPA. It is 
 
 The response is `application/pdf` with a `Content-Disposition: attachment` filename of `<slug>-v<n>.pdf`, or `<slug>-v<n>-draft.pdf` while the deliverable is a draft (§ Draft and clean).
 
+Every door takes `?citations=links|footnotes|hybrid` (`behaviors/versioning.md` § Citations). The deliverable's default is **`hybrid`**: the file is read both ways — opened on a screen, where the links are the point, and printed and passed around a table, where a link is a dead end — and hybrid is the only mode that serves both readers from one file. `links` produces the file as it was before citations existed.
+
 Every route lives on the document's **site** hostname and redirects to it exactly as its neighbours do (`behaviors/sites.md`). The public route 404s — with the body every other `/d/<slug>/*` route 404s with, so a private statement and a slug that never existed answer identically — when the slug is unknown, when `state = draft`, when `public_access = none`, **and when `audience = closed`**. A statement addressed to a named body is delivered to that body; publishing a download of it to anyone who guesses the slug is exactly the disclosure `audience` exists to prevent. The other two doors do not consult `audience` at all: an operator and an invited signer may both already read every word on their own screens.
 
 There is no route for an older version. The deliverable is the current version and nothing else; an earlier version is a thing to read in the history, not a thing to hand anyone.
@@ -48,7 +50,8 @@ Top to bottom:
    - The document `title`.
    - One meta line: "Version *n* · *Sep 20, 2026*", plus " · final text" when the version is marked `final` (`behaviors/versioning.md` § The label). The date is the version's publication date in the instance time zone, written `Sep 20, 2026` — with the year always, unlike a screen's date-only point (`screens/document.md` § Design), because a printed statement outlives the year it was printed in and is read by people who were not in the room.
    - The draft note, when the deliverable is a draft (§ Draft and clean).
-3. **The statement** — the current version's rendered text, the same HTML the document screen shows, with the same heading hierarchy, lists and tables. Anchor links, highlights, comment markers and block ids leave no visible trace. A table wider than the measure shrinks to fit rather than clipping; nothing runs off the page.
+3. **The statement** — the current version's rendered text, the same HTML the document screen shows, with the same heading hierarchy, lists, tables, section breaks and block classes. Anchor links, highlights, comment markers and block ids leave no visible trace. A table wider than the measure shrinks to fit rather than clipping; nothing runs off the page.
+   - **Sources** — in `footnotes` and `hybrid`, the citation list the render appends (`behaviors/versioning.md` § Citations), between the statement and the signatories, headed "Sources", numbered to match the superscripts in the text. In `links` there is no such section. It is part of the statement's own rendering, not a section this page builds, so the numbering a reader sees on paper is the numbering the document screen shows a reader who turned footnotes on.
 4. **Signatories**, honoring `show_signatories` exactly as every other surface does:
    - `list` — the counts line, then **Organizations** (official capacity, alphabetically by `org`) as "*Skype a Scientist* — Jane Doe, Executive Director", then **Individuals** (personal capacity, earliest signature first) as "Jane Doe, former Academy educator" or bare when there is no descriptor.
    - `count` — the counts line alone.
@@ -67,6 +70,7 @@ The deliverable is a printed document, not a screenshot of a web page. It follow
 - **Type**: Inter, self-hosted with the app and embedded in the render, with a system sans-serif fallback; no third-party font request, on paper as on screen. The statement's text sits a step above the interface size with a generous line height, as it does on the document card.
 - **Color**: near-black ink on white, the muted ink for the site line and the meta line, and the accent (the site's own, when it sets one) for the section rules and the organization names. Nothing depends on color to be understood: the watermark is text, the draft note is a sentence, and the signatory sections are labeled headings.
 - **Watermark**: the word DRAFT, set large and diagonally across the page in a pale tint, behind the text and never over it to the point of illegibility.
+- **Citations and Sources**: the superscript numbers are small and set in the accent tone, and they never open the line height. The Sources section is set a step below body size, its entries numbered, each address wrapping rather than running off the measure — a printed URL is only useful if all of it is there. It takes the same section rule as the signatories.
 - **Page breaks**: a heading never ends a page alone; the Signatories heading and its counts line never separate from the first names beneath them; and no signatory's name is split from the line that describes them. Paragraphs keep at least two lines on either side of a break.
 
 ## Actions
@@ -78,7 +82,7 @@ None. It is a file. The three surfaces that offer it are:
 | Admin dashboard (`screens/admin-dashboard.md`) | "Download PDF" beside the other exports |
 | Participant document screen (`screens/document.md`) | "Download the statement (PDF)" in the footer |
 | Public read view (`screens/public-and-embed.md`) | the same footer link, when the public door is open |
-| Admin CLI (`api/admin-cli.md`) | `signatories-axi docs export <slug> --pdf [--out <file>]` |
+| Admin CLI (`api/admin-cli.md`) | `signatories-axi docs export <slug> --pdf [--out <file>] [--citations links\|footnotes\|hybrid]` |
 
 ## Navigation
 

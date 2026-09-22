@@ -514,3 +514,70 @@ record from `people/<id>.toml` to `people/default/<id>.toml` with
 Every later boot finds nothing to move and commits nothing. If the log line
 appears on a second boot, something is writing records back to the old
 path and that is a bug, not a retry.
+
+## Writing a document's text
+
+A document's body is GitHub-flavoured Markdown, rendered once per version
+by the shared pipeline (`specs/behaviors/versioning.md` § Rendering). Raw
+HTML is stripped, so anything you want on the page has to be expressible in
+Markdown or in one of the extensions below.
+
+### Citations
+
+Write citations as ordinary inline links. There is no bibliography to keep
+in step — the links *are* the bibliography:
+
+```markdown
+Announced with less than a month's [notice](https://example.org/story) and
+without a [roadmap](https://example.org/other).
+```
+
+How they present is a reader-side or export-side choice, not an authoring
+one (`specs/behaviors/versioning.md` § Citations):
+
+| Mode | What a reader gets | Where |
+| --- | --- | --- |
+| `links` | links, nothing appended | the web default |
+| `footnotes` | plain text + superscript numbers + a **Sources** list | the web reader toggle "Sources as footnotes" |
+| `hybrid` | clickable links **and** the numbers and the Sources list | the PDF default |
+
+- Numbering is by first appearance. The same URL cited twice keeps one
+  number and one entry — including when the two links differ only by a
+  `#:~:text=` highlight fragment, which is how a browser's "copy link to
+  highlight" writes them.
+- A link whose visible text is itself a URL never gets a number: the
+  address is already on the page.
+- `[^1]`-style Markdown footnotes still work and are separate from Sources.
+
+Force a mode on any URL with `?citations=links|footnotes|hybrid`, or on an
+export with `signatories-axi docs export <slug> --pdf --citations footnotes`.
+
+### Section breaks
+
+A `---` on its own line between blocks renders as a short centered
+hairline with air around it — a pause between movements, not a divider.
+
+### Block classes
+
+Four classes are available, and only four: `lede`, `callout`, `small`,
+`center`. Mark a single paragraph or heading with a trailing `{.class}`:
+
+```markdown
+We are asking for a written, interim agreement by December 31st. {.lede}
+```
+
+Mark a run of blocks with a fenced container (a leading `:::` line naming
+the class, a closing `:::` line; the space after the colons is optional):
+
+```markdown
+::: callout
+**Our proposal for a temporary, written agreement**
+
+No sale, long-term lease, or transfer of the building.
+:::
+```
+
+Anything outside the four is discarded — the class never reaches the page
+and the marker never shows up as literal text. A container is a wrapper
+only: the paragraphs inside it stay the units people comment on, so adding
+or removing one never orphans a comment.
