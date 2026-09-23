@@ -515,6 +515,134 @@ describe("POST /admin/api/documents/:slug/invitations/remind", () => {
     await server.close();
   });
 
+  it("limits a reminder to named people, naming each one it skips and why", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-remind-named" });
+    for (const [person, extra] of [
+      ["ivy", {}],
+      ["quinn", {}],
+      ["nora", { notify: { reminders: false } }],
+      ["otto", {}],
+    ] as const) {
+      await seedParticipant(server, {
+        document: "doc-remind-named",
+        person,
+        token: `${person}token`.padEnd(20, "0"),
+        ...extra,
+      });
+    }
+    await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-named/invitations/send",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    const invitations = mailer.sent.length;
+
+    // Dry run: only the named people are considered, and each skip is named.
+    const dry = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-named/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", person: ["ivy", "nora"], dry_run: true },
+    });
+    expect(dry.statusCode).toBe(200);
+    expect(dry.json()).toMatchObject({
+      dry_run: true,
+      targeted: 0,
+      skipped_recent: 1,
+      skipped_pref: 1,
+    });
+    expect(dry.json().skipped).toEqual(
+      expect.arrayContaining([
+        { person: "ivy", reason: "recently_messaged" },
+        { person: "nora", reason: "reminders_off" },
+      ]),
+    );
+    expect(dry.json().skipped).toHaveLength(2);
+    expect(mailer.sent.length).toBe(invitations);
+
+    // A real run reaches only the named person; quinn and otto hear nothing.
+    const sent = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-named/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", person: ["ivy", "nora"], min_age_hours: 0 },
+    });
+    expect(sent.json()).toMatchObject({ sent: 1, failed: 0, skipped_pref: 1 });
+    expect(sent.json().skipped).toEqual([{ person: "nora", reason: "reminders_off" }]);
+    expect(mailer.sent.length).toBe(invitations + 1);
+    const readModel = server.storage.readModel;
+    expect(readModel.getParticipation("doc-remind-named", "ivy")?.record.notified?.reminder).toBe(
+      1,
+    );
+    for (const other of ["quinn", "otto"]) {
+      expect(
+        readModel.getParticipation("doc-remind-named", other)?.record.notified?.reminder,
+      ).toBeUndefined();
+    }
+
+    // The target still applies: an unopened person is not in opened-not-acted.
+    const outside = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-named/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "opened_not_acted", person: ["otto"], min_age_hours: 0 },
+    });
+    expect(outside.json()).toMatchObject({ sent: 0, skipped_recent: 0, skipped_pref: 0 });
+    expect(outside.json().skipped).toEqual([{ person: "otto", reason: "not_in_target" }]);
+    expect(mailer.sent.length).toBe(invitations + 1);
+
+    // A run without `person` names nobody.
+    const unnamed = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-named/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", dry_run: true },
+    });
+    expect(unnamed.json().skipped).toBeUndefined();
+
+    await server.close();
+  });
+
+  it("refuses an unknown person by name and sends nothing", async () => {
+    const mailer = new FakeMailer();
+    const { server, cleanup } = await buildTestServer({ mailer });
+    cleanups.push(cleanup);
+    await seedDocument(server, { slug: "doc-remind-unknown" });
+    await seedParticipant(server, {
+      document: "doc-remind-unknown",
+      person: "ivy",
+      token: "ivytoken123456789012",
+    });
+    const response = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-unknown/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", person: ["ivy", "ghost"], min_age_hours: 0 },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({
+      error: "validation_failed",
+      details: { field: "person", unknown: ["ghost"] },
+    });
+    expect(response.json().message).toContain("ghost");
+    expect(mailer.sent.length).toBe(0);
+
+    const malformed = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-remind-unknown/invitations/remind",
+      headers: adminHeaders(),
+      payload: { target: "unopened", person: "ivy" },
+    });
+    expect(malformed.statusCode).toBe(422);
+    expect(malformed.json().details).toMatchObject({ field: "person" });
+
+    await server.close();
+  });
+
   it("rejects a negative min_age_hours", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
