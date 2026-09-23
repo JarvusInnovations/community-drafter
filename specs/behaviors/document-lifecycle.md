@@ -51,7 +51,7 @@ An action attempted outside its allowed phase fails with a clear message naming 
 
 **Extension.** Admin may move either deadline later at any time before it passes, and may move `signing_closes_at` later after `comments_close_at` has passed. Deadlines are never moved earlier once the document is open. Every change is recorded (commit) and announced to subscribers of phase changes with old and new times.
 
-**Closing.** At `signing_closes_at` the document becomes `closed`: the signatory list freezes, the current version is the final text, and the participant page becomes a read-only record showing the final version, the signatory list and the full version history. A `closed` notification goes to signers and commenters per preferences.
+**Closing.** At `signing_closes_at` the document becomes `closed`: the signatory list freezes, the current version is the final text, and the participant page becomes a read-only record showing the final version, the signatory list and the full version history. A `closed` notification goes to signers and commenters per preferences, never to a participant who declined (`notifications.md` § Sending).
 
 **Reopening.** Admin may reopen a closed document by setting a new `signing_closes_at` in the future (re-entering signing) or both deadlines (re-entering commenting). Reopening is recorded and announced; it is expected to be rare.
 
