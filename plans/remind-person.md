@@ -1,5 +1,6 @@
 ---
-status: in-progress
+status: done
+pr: 120
 depends: [notification-matrix]
 specs:
   - specs/api/admin.md
@@ -44,13 +45,13 @@ CLI: parse `--person` with the same `csv()` helper as `send`, render the `skippe
 
 ## Validation
 
-- [ ] API test: `person` limits the reminder to the named people.
-- [ ] API test: a named person outside the target segment is skipped as not in segment, named.
-- [ ] API test: an unknown slug is a 422 naming it.
-- [ ] API test: `dry_run` with `person` sends nothing and names the skips.
-- [ ] CLI e2e: `people remind --person` reaches only the named person.
-- [ ] Bundle and SKILL.md rebuilt; drift gate passes.
-- [ ] Lint, format:check, typecheck and tests pass in `apps/api` and `packages/cli`.
+- [x] API test: `person` limits the reminder to the named people.
+- [x] API test: a named person outside the target segment is skipped as not in segment, named.
+- [x] API test: an unknown slug is a 422 naming it.
+- [x] API test: `dry_run` with `person` sends nothing and names the skips.
+- [x] CLI e2e: `people remind --person` reaches only the named person.
+- [x] Bundle and SKILL.md rebuilt; drift gate passes.
+- [x] Lint, format:check, typecheck and tests pass in `apps/api` and `packages/cli`.
 
 ## Risks / unknowns
 
@@ -58,4 +59,13 @@ None significant.
 
 ## Notes
 
+The brief originally included a second item: a symlink-resolving skill shim so the CLI could
+sit on a person's `PATH`. The owner dropped it before any code was written. The CLI is
+deliberately a skill invoked as `scripts/signatories-axi`, not a `PATH` tool. Skip reasons are
+`not_in_target`, `link_revoked`, `recently_messaged` and `reminders_off`. A revoked link used
+to drop out of a remind run silently and still does on an un-named run, but a named run now
+reports it. Unlike `people send`, which ignores an unknown `--person`, remind refuses one.
+
 ## Follow-ups
+
+None.
