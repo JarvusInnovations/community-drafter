@@ -22,7 +22,7 @@ Every route here lives on the document's **site** hostname (`behaviors/sites.md`
 
 ## Data Requirements
 
-Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`, `delivered_at`), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list. `audience` is here for one reason — it decides whether the footer offers the statement download — and it is the same stored value the admin API returns; `public_access` is not in this payload and never has been.
+Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`, `delivered_at`, and `addressed_to` once delivered), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list. `audience` is here for one reason — it decides whether the footer offers the statement download — and it is the same stored value the admin API returns; `public_access` is not in this payload and never has been.
 
 ## Display Rules
 
