@@ -1,5 +1,5 @@
 import { copy } from "../copy.ts";
-import { formatAbsolute, formatDateOnly } from "../format.ts";
+import { formatAbsolute, formatPointDate, formatShortTime, isSameLocalDay } from "../format.ts";
 import { useCountdown } from "../hooks/useCountdown.ts";
 import { type DocumentInfo } from "../types.ts";
 
@@ -16,6 +16,20 @@ type SegmentState = "done" | "active" | "pending";
 
 /** A segment never gets narrower than this share of the track, so a short period stays legible. */
 const MIN_SEGMENT = 0.28;
+
+/**
+ * A passed deadline's big chip text: "Sep 23", or "today at 11 AM" when it
+ * passed today (`specs/screens/document.md` § Display Rules 2) — the chip's
+ * title reads "Comments closed" above it.
+ */
+function passedLabel(iso: string | undefined, now: Date): string {
+  if (!iso) {
+    return "";
+  }
+  return isSameLocalDay(new Date(iso), now)
+    ? copy.timeline.closedToday(formatShortTime(iso))
+    : formatPointDate(iso, now);
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -51,10 +65,10 @@ export function Timeline({
       <p className="mt-1 text-sm text-muted-foreground">
         {copy.timeline.notOpen}
         {closeAt
-          ? ` · ${copy.timeline.commentsClose} ${formatDateOnly(document.comments_close_at)}`
+          ? ` · ${copy.timeline.commentsClose} ${formatPointDate(document.comments_close_at, now)}`
           : ""}
         {dueAt
-          ? ` · ${copy.timeline.signaturesDue} ${formatDateOnly(document.signing_closes_at)}`
+          ? ` · ${copy.timeline.signaturesDue} ${formatPointDate(document.signing_closes_at, now)}`
           : ""}
       </p>
     );
@@ -104,7 +118,7 @@ export function Timeline({
           title={commentsPast ? copy.timeline.commentsClosed : copy.timeline.commentsClose}
           relative={
             commentsPast
-              ? formatDateOnly(document.comments_close_at)
+              ? passedLabel(document.comments_close_at, now)
               : copy.timeline.inLabel(commentsCountdown.label)
           }
           absolute={formatAbsolute(document.comments_close_at)}
@@ -115,7 +129,7 @@ export function Timeline({
           title={signingPast ? copy.timeline.signingClosed : copy.timeline.signaturesDue}
           relative={
             signingPast
-              ? formatDateOnly(document.signing_closes_at)
+              ? passedLabel(document.signing_closes_at, now)
               : copy.timeline.inLabel(signingCountdown.label)
           }
           absolute={formatAbsolute(document.signing_closes_at)}
@@ -141,19 +155,19 @@ export function Timeline({
         <Point
           share={0}
           label={copy.timeline.opened}
-          date={formatDateOnly(startAt.toISOString())}
+          date={formatPointDate(startAt.toISOString(), now)}
           align="start"
         />
         <Point
           share={commentShare}
           label={copy.timeline.commentsClose}
-          date={formatDateOnly(document.comments_close_at)}
+          date={formatPointDate(document.comments_close_at, now)}
           align="center"
         />
         <Point
           share={1}
           label={copy.timeline.signaturesDue}
-          date={formatDateOnly(document.signing_closes_at)}
+          date={formatPointDate(document.signing_closes_at, now)}
           align="end"
         />
 

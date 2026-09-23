@@ -61,6 +61,44 @@ export function formatDateOnly(iso: string | undefined): string {
   return (isCurrentYear(date) ? DATE_ONLY_FORMAT : DATE_ONLY_WITH_YEAR_FORMAT).format(date);
 }
 
+const HOUR_FORMAT = new Intl.DateTimeFormat(undefined, { hour: "numeric" });
+
+const HOUR_MINUTE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** Whether two instants fall on the same calendar day in the reader's zone. */
+export function isSameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/** "11 AM" on the hour, "2:30 PM" otherwise — no zone; the absolute time beside it carries that. */
+export function formatShortTime(iso: string | undefined): string {
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  return (date.getMinutes() === 0 ? HOUR_FORMAT : HOUR_MINUTE_FORMAT).format(date);
+}
+
+/**
+ * A timeline point: its short time when it falls on the reader's today
+ * ("11 AM"), else its date ("Sep 22"). `specs/screens/document.md` §
+ * Design "Dates": three points on one day that all read "Sep 23" say
+ * nothing about when.
+ */
+export function formatPointDate(iso: string | undefined, now: Date): string {
+  if (!iso) {
+    return "";
+  }
+  return isSameLocalDay(new Date(iso), now) ? formatShortTime(iso) : formatDateOnly(iso);
+}
+
 /**
  * "Sep 21" from a calendar day (`YYYY-MM-DD`) rather than an instant. A day
  * stamp has no time and no zone — parsing it as an instant would show the

@@ -101,6 +101,7 @@ export const copy = {
     commentsClosed: "Comments closed",
     signaturesDue: "Signatures due",
     signingClosed: "Signing closed",
+    closedToday: (time: string) => `today at ${time}`,
     notOpen: "Not yet open",
     now: "today",
     inLabel: (relative: string) => (relative ? `in ${relative}` : "now"),
