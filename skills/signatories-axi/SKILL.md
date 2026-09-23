@@ -110,6 +110,15 @@ LLM disposition pass; its output is a dispositions JSON file
 two-command round trip with no manual step in between. Every mutation prints the resulting
 record's key fields and the commit subject, so you can cite exactly what changed.
 
+## What participants are emailed
+
+- **Always:** the invitation when you send it, and a receipt for each of their own actions (review, signature added or removed, listing changed). No preference stops receipts.
+- **Opened, not signed, not declined:** `signing-opened`, `closing-soon` and `schedule-changed`, with `phase_changes` on. Never-opened people get reminders instead.
+- **Signed:** nothing about the clock. Then two separate events:
+  - `final-published` when you run `versions publish --final`: the **text** stops changing. Forced on for signers; conditional signers are asked to confirm or remove.
+  - `closed` when the signing window ends on the clock: the **list** stops changing. Follows `phase_changes`.
+- **Declined:** nothing further about the clock or outcome; only their own receipts, and `disposition-v<n>` if they commented. Signing later makes them an ordinary signer.
+
 ## Writing the text
 
 The body is Markdown (GFM). Three things the renderer does that an author should know
