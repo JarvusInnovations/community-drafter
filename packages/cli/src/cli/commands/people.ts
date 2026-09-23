@@ -37,7 +37,7 @@ const PEOPLE_FLAGS: Record<string, FlagSpec> = {
   links: { positionals: 1, value: ["--person", "--out"] },
   send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
   remove: { positionals: 2 },
-  remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
+  remind: { positionals: 1, value: ["--target", "--person", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 },
   expire: { positionals: 2, value: ["--expires-at"] },
@@ -90,10 +90,13 @@ send <slug> [--only-unsent] [--person a,b] [--dry-run]
        Prints how many the mailer accepted and names the ones it rejected; a
        rejected invitee stays not_sent, so running send again picks them up.
        --dry-run lists who would receive one and who is skipped and why.
-remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
+remind <slug> --target unopened|opened-not-acted [--person a,b] [--min-age <hours>] [--dry-run]
        Skips anyone this document has messaged within --min-age hours (default
        48; pass 0 to send regardless) and reports what it actually sent,
        counting recently-messaged and reminders-off invitees separately.
+       --person limits the run to those people; --target, --min-age and the
+       reminders preference still apply, and each named person not reminded
+       is listed with why. A name with no invitation here is refused.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
        Prints the new link once.
@@ -433,15 +436,18 @@ export async function peopleCommand(args: string[]): Promise<string> {
           "Valid targets: unopened, opened-not-acted",
         ]);
       }
+      const person = csv(str(parsed, "--person"));
       const result = await client.post<RemindResult>(
         `/documents/${encodeURIComponent(slug)}/invitations/remind`,
         {
           target,
+          person: person.length > 0 ? person : undefined,
           min_age_hours: minAgeHours(parsed),
           dry_run: bool(parsed, "--dry-run") || undefined,
         },
       );
       type RemindFailure = NonNullable<RemindResult["failures"]>[number];
+      type RemindSkipped = NonNullable<RemindResult["skipped"]>[number];
       const remindFailures = result.failures ?? [];
       // `specs/api/admin-cli.md`: a remind prints what it actually sent and,
       // when it sent nothing, why — the recency guard and the `reminders`
@@ -478,6 +484,12 @@ export async function peopleCommand(args: string[]): Promise<string> {
                   commit: result.commit ?? undefined,
                 },
           ),
+          result.skipped && result.skipped.length > 0
+            ? renderList("skipped", result.skipped, [
+                computed<RemindSkipped>("person", (s) => s.person),
+                computed<RemindSkipped>("reason", (s) => s.reason),
+              ])
+            : "",
           remindFailures.length > 0
             ? renderList("failures", remindFailures, [
                 computed<RemindFailure>("person", (f) => f.person),

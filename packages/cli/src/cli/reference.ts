@@ -213,9 +213,9 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       },
       {
         usage:
-          "people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]",
+          "people remind <slug> --target unopened|opened-not-acted [--person a,b] [--min-age <hours>] [--dry-run]",
         summary:
-          "Send reminders — the last call, naming the next deadline and asking them to sign or decline — to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). There is no automatic reminder.",
+          "Send reminders — the last call, naming the next deadline and asking them to sign or decline — to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). --person limits the run to named people, still subject to the target, interval and preference, and lists each one skipped with why. There is no automatic reminder.",
       },
       { usage: "people revoke-link <slug> <person>", summary: "Revoke one person's link." },
       {

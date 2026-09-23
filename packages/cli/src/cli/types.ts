@@ -290,6 +290,11 @@ export interface RemindResult {
   skipped_recent: number;
   skipped_pref: number;
   min_age_hours: number;
+  /** Only when `--person` was given: each named person not reminded, and why. */
+  skipped?: Array<{
+    person: string;
+    reason: "not_in_target" | "link_revoked" | "recently_messaged" | "reminders_off";
+  }>;
   failures?: Array<{ person: string; error: string }>;
   commit?: string | null;
 }
