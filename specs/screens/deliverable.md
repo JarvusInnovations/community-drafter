@@ -28,7 +28,7 @@ A `withdrawn` document renders nothing on any door: the statement was taken back
 
 ## Draft and clean
 
-The deliverable is **draft** until the document has a version marked `final` **and** signing has closed (phase `closed`), and **clean** from that moment on. Both conditions, because either alone leaves something still moving: a final text whose signatory list is still taking names, or a closed list under text the team has not called final.
+The deliverable is **draft** until signing has closed (phase `closed`) or the document has been delivered (`documents.delivered_at`), whichever comes first, and **clean** from that moment on. There is no "final" version to wait for (`behaviors/versioning.md`): the team may edit until delivery, and the text of record is whatever is current at that moment. Delivery makes the copy clean even while signing is still open, because the copy the team hands over is the one they deliver; a render after delivery reflects any later change in the record, like every render (§ Principles).
 
 A draft render carries, on every page, a diagonal **DRAFT** watermark; under the title block, the line "Draft of version *n* — the text and the signatory list may still change."; and the words "DRAFT · version *n*" in the running footer. A clean render carries none of the three and is otherwise byte-for-byte the same document.
 
@@ -36,7 +36,7 @@ Operators may render either. Participants and the public get whichever the docum
 
 ## Data Requirements
 
-The document (`title`, `audience`, `addressed_to`, `state`, `show_signatories`), its derived phase, its **site** (`name`, and the site's own address), the **current version** (number, published date, `final`, and the same sanitized HTML the document screen renders — `architecture.md` § API server), and the signatory counts and list computed exactly as every other surface computes them (`behaviors/signatures.md` § Display).
+The document (`title`, `audience`, `addressed_to`, `state`, `show_signatories`), its derived phase, its **site** (`name`, and the site's own address), the **current version** (number, published date, and the same sanitized HTML the document screen renders — `architecture.md` § API server), and the signatory counts and list computed exactly as every other surface computes them (`behaviors/signatures.md` § Display).
 
 Nothing else. In particular: no comments, no submissions, no dispositions, no version history, no deadlines, no funnel, no tracking, and **nothing from the `people` sheet** — a signatory's name, descriptor, organization and title come from their own `signature`, which is what they chose to have shown, and a contact address never reaches this file.
 
@@ -48,7 +48,7 @@ Top to bottom:
 2. **Title block**
    - "To: *the State Board of Education*" whenever `addressed_to` names recipients, several joined with commas and a final "and" (`data-model.md` § Audience). Absent when it names none, on a `public` or a legacy `closed` document alike.
    - The document `title`.
-   - One meta line: "Version *n* · *Sep 20, 2026*", plus " · final text" when the version is marked `final` (`behaviors/versioning.md` § The label). The date is the version's publication date in the instance time zone, written `Sep 20, 2026` — with the year always, unlike a screen's date-only point (`screens/document.md` § Design), because a printed statement outlives the year it was printed in and is read by people who were not in the room.
+   - One meta line: "Version *n* · *Sep 20, 2026*" (`behaviors/versioning.md` § The label), plus " · delivered *Sep 30, 2026*" once the document has been delivered. The date is the version's publication date in the instance time zone, written `Sep 20, 2026` — with the year always, unlike a screen's date-only point (`screens/document.md` § Design), because a printed statement outlives the year it was printed in and is read by people who were not in the room.
    - The draft note, when the deliverable is a draft (§ Draft and clean).
 3. **The statement** — the current version's rendered text, the same HTML the document screen shows, with the same heading hierarchy, lists, tables, section breaks and block classes. Anchor links, highlights, comment markers and block ids leave no visible trace. A table wider than the measure shrinks to fit rather than clipping; nothing runs off the page.
    - **Sources** — in `footnotes` and `hybrid`, the citation list the render appends (`behaviors/versioning.md` § Citations), between the statement and the signatories, headed "Sources", numbered to match the superscripts in the text. In `links` there is no such section. It is part of the statement's own rendering, not a section this page builds, so the numbering a reader sees on paper is the numbering the document screen shows a reader who turned footnotes on.

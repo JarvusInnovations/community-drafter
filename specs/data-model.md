@@ -23,14 +23,14 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 
 | Trailer | Values | On |
 | --- | --- | --- |
-| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove`, `migrate` | every commit |
+| `Action` | `create`, `settings`, `open`, `extend`, `close`, `reopen`, `withdraw`, `publish`, `invite`, `send`, `confirm-call`, `deliver`, `sign`, `resign`, `revoke`, `comment`, `submit`, `prefs`, `track`, `admin-revoke`, `link-revoke`, `link-reissue`, `link-export`, `link-expire`, `uninvite`, `operator-add`, `operator-update`, `operator-remove`, `doc-operator-add`, `doc-operator-remove`, `site-create`, `site-update`, `site-remove`, `site-operator-add`, `site-operator-remove`, `migrate` | every commit |
 | `Document` | slug | every commit about a document |
 | `Site` | slug | every commit about a site, and every commit about a document that belongs to one |
 | `Person` | slug | every commit about a person's action |
 | `Actor` | an operator's email, `participant`, or `system` (bootstrap) | every commit |
 | `Version` | integer | `publish` (the number this commit becomes), `submit`, `comment`, `sign` (the version seen) |
 | `Summary` | 1–200 chars | `publish` (the one-line changelog) |
-| `Final` | `true` | `publish` when declared final |
+| `Final` | `true` | written by earlier builds on a `publish` declared final; no longer written, and ignored when read |
 | `Notes` | text | `publish` (team-facing) |
 | `Submission` | submission id | `comment`, `submit` |
 | `Judgement` | `sign` \| `sign_conditional` \| `comment` \| `decline` | `submit` |
@@ -42,6 +42,8 @@ Every mutation is one `repo.transact` commit. The subject is a human sentence; t
 | `Request-Id` | id | every commit from a request |
 
 `migrate` is the one action no operator can ask for: a boot-time, idempotent rewrite the service performs on itself when it finds records in a layout an earlier build wrote. It is always attributed to `system`, always one commit, and always a no-op on the next boot.
+
+A `confirm-call` commit records one confirm-call: it patches the `notified` table of every signer the call reached (`notified."confirm-call-<ts>"`), names how many in its subject (`confirm-call: coalition-charter (4 signers)`), and is written after delivery, like any send batch; a call that reached nobody writes no commit. A `deliver` commit sets `delivered_at` (and `delivered_note`) on the document; the signers the `delivered` message then reached are marked `notified.delivered` in the ordinary send commit that follows it.
 
 A `track` commit is per document, like every other commit, so the opens it records belong to one document's history. Subjects look like `sign: jane-doe on coalition-charter`, `publish: coalition-charter v3`, `submit: jane-doe on coalition-charter v2 (sign_conditional)`, `comment: jane-doe on coalition-charter (jane-doe-k7q2)`, `extend: coalition-charter signing to 2026-09-30T21:00Z`.
 
@@ -66,9 +68,11 @@ One markdown record per document. Frontmatter is the settings; the body is the c
 | `site` | slug? | the site this document belongs to (`behaviors/sites.md`); absent = the default site, which is what every document written before the field existed reads as. It is the hostname every personal link, public link and message for this document is built on |
 | `created_by` | email | the operator who created the document; always also in `operators` |
 | `operators` | array of email | current operators of this document; never empty |
-| `operator_notified` | table? of event → value | the operator messages this document has already produced (`behaviors/notifications.md` § Operator digest): `digest` is the last date an operator digest was delivered (`YYYY-MM-DD` in the instance time zone), `first_signature` and `first_comment` the timestamps those once-per-document notices went out. Written only after delivery, and never about a participant; absent on a document no operator message has been sent for |
+| `operator_notified` | table? of event → value | the operator messages this document has already produced (`behaviors/notifications.md` § Operator digest): `digest` is the last date an operator digest was delivered (`YYYY-MM-DD` in the instance time zone), `first_signature` the timestamp that once-per-document notice went out (`first_comment`, written by earlier builds, is ignored). Written only after delivery, and never about a participant; absent on a document no operator message has been sent for |
 | `sender_name`, `reply_to` | string | |
 | `withdraw_reason`, `withdraw_public` | string?, boolean | |
+| `delivered_at` | timestamp? | when an operator recorded that the statement was delivered (`behaviors/signatures.md` § Delivery); set once, never cleared. Absent = not delivered |
+| `delivered_note` | string? | the operator's note on the delivery, shown to signers |
 | `tags` | array of string | |
 | `body` | markdown | the text |
 
@@ -113,7 +117,6 @@ A **version** is a commit in the record's history **in which the body changed**.
 | `summary` | the `Summary` trailer, else the subject with any `publish: <slug> v<n>` prefix removed |
 | `published_at` | committer date |
 | `published_by` | `Actor` trailer, else author name |
-| `final` | `Final: true` |
 | `notes` | `Notes` trailer |
 | `body` | the record's body at that commit |
 
@@ -211,8 +214,8 @@ One record per person per document, created by an invitation. Current state only
 | `expires_at` | timestamp? | |
 | `sent_at` | timestamp? | invitation message accepted by the mailer or exported; written in the same commit as `notified.invitation`, never before delivery |
 | `first_opened_at`, `last_seen_at`, `opens` | | batched writes (`Action: track`, one commit per document per flush, whose `Opened` trailer names the people whose first open it recorded — that trailer is where the dashboard's `opened` activity entries come from) |
-| `notify` | table | `channel`, `every_revision`, `daily_digest`, `phase_changes`, `my_comments_addressed`, `reminders` |
-| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.v3`, `notified.signing-opened`, `notified.digest = "2026-09-21"`, `notified."reminder-2"`; `notified.reminder = 2` is the reminder count beside those per-reminder timestamps. A timestamp here means the message was delivered, so the newest of them is when this document last reached the person (`notified."links-exported"` is an operator's CSV export, not a message) |
+| `notify` | table | `channel`, `my_comments_addressed`, `reminders` (`behaviors/notifications.md` § Defaults). Records written by earlier builds may also carry `every_revision`, `daily_digest` and `phase_changes`; the schema still accepts them so those records stay writable, and nothing reads them |
+| `notified` | table of event → timestamp | idempotency for sends, e.g. `notified.invitation`, `notified."disposition-v3"`, `notified."confirm-call-2026-09-28T14:00:00.000Z"`, `notified.delivered`, `notified."reminder-2"`; `notified.reminder = 2` is the reminder count beside those per-reminder timestamps. A timestamp here means the message was delivered, so the newest of them is when this document last reached the person (`notified."links-exported"` is an operator's CSV export, not a message) |
 | `signature` | table? | absent = never signed; see below |
 
 `prefill` table: `name`, `org`, `title` and `descriptor`, each optional, each overriding one of the person's site-level defaults (§ `people`). It is named for what it prefills — the `signature` table's own fields — so `prefill.title` is the default for `signature.title` and overrides the person's `role`, which is the same fact recorded as a standing one. An import writes it from the row it imported; nothing else writes it, and a signature never writes back into it.

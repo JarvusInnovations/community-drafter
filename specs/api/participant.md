@@ -15,9 +15,10 @@ Response:
   site:     { name, logo_url, accent },
   person:   { id, name },
   document: { slug, title, state, phase, opened_at, comments_close_at, signing_closes_at,
-              capacities, show_signatories, audience, addressed_to, reply_to, sender_name },
-  version:  { number, summary, published_at, final, html, is_current },   // ?v=<n> selects; ?citations= sets the mode
-  versions: [{ number, summary, published_at, final, dispositions }],
+              capacities, show_signatories, audience, addressed_to, reply_to, sender_name,
+              delivered_at, delivered_note },
+  version:  { number, summary, published_at, html, is_current },   // ?v=<n> selects; ?citations= sets the mode
+  versions: [{ number, summary, published_at, dispositions }],
   signature: null | { capacity, display_name, descriptor, org, title, conditional, listed,
                       signed_on_version, revoked, signed_at, revoked_at, resigned_at },   // dates from history
   position:  null | { judgement, version, at, submission },                             // from the latest submitted submission
@@ -27,7 +28,7 @@ Response:
   signatories: { organizations: n, individuals: n, unlisted: n,
                  list: [{ display_name, capacity, descriptor, org, title }] } | { organizations, individuals, unlisted } | null,
   prefill: { name, org, role, descriptor, suggested_capacity },   // resolved per field: the participation's `prefill` (whose `title` supplies `role`), else the person's site-level default, else absent
-  notify:   { channel, every_revision, daily_digest, phase_changes, my_comments_addressed, reminders, forced: [..] }
+  notify:   { channel, my_comments_addressed, reminders }
 }
 ```
 
@@ -42,7 +43,7 @@ Creates or replaces the person's signature (`behaviors/signatures.md`). In offic
 
 ## `PATCH /i/:token/api/signature`
 
-Body: any of the display fields, or `{ confirm: true }` to clear `conditional`. For the text fields (`display_name`, `descriptor`, `org`, `title`) a field **omitted** from the body is unchanged, and a field **present and empty after trimming whitespace** is cleared — removed from the stored signature; any other value is stored trimmed. A blank `display_name` is refused (`validation_failed`, `field: display_name`), as are a blank `org` or `title` on an official signature (`validation_failed` naming the field). A change to `org` on an official signature requires `authorized: true` in the same body — `attestation_required` otherwise — and an official signature may not be saved with a blank `title` (`validation_failed`). A body that changes any display field sends `listing-changed-<ts>`; `{ confirm: true }` alone changes none and sends nothing. Response: the signature.
+Body: any of the display fields, or `{ confirm: true }` to re-affirm: the signature moves onto the current version and `conditional` is cleared ("Keep my name" / "Confirm my signature"). For the text fields (`display_name`, `descriptor`, `org`, `title`) a field **omitted** from the body is unchanged, and a field **present and empty after trimming whitespace** is cleared — removed from the stored signature; any other value is stored trimmed. A blank `display_name` is refused (`validation_failed`, `field: display_name`), as are a blank `org` or `title` on an official signature (`validation_failed` naming the field). A change to `org` on an official signature requires `authorized: true` in the same body — `attestation_required` otherwise — and an official signature may not be saved with a blank `title` (`validation_failed`). A body that changes any display field sends `listing-changed-<ts>`; `{ confirm: true }` alone changes none and sends nothing. Response: the signature.
 
 ## `DELETE /i/:token/api/signature`
 
@@ -73,7 +74,7 @@ Effects per `behaviors/review-and-judgement.md`. Errors: `phase_closed` (except 
 
 ## `GET /i/:token/api/versions/:n`
 
-Response: `{ number, summary, published_at, final, html, my_comments: [...] }` (derived from the document record's body history). `?citations=links|footnotes|hybrid` sets how citations are presented in `html` (`../behaviors/versioning.md` § Citations); `links` is the default here and on the bundle, because that is what a reader who expressed no preference gets. The mode changes only the HTML: the blocks a comment can be anchored to are the same in every mode, which is why `compare` deliberately has no such parameter.
+Response: `{ number, summary, published_at, html, my_comments: [...] }` (derived from the document record's body history). `?citations=links|footnotes|hybrid` sets how citations are presented in `html` (`../behaviors/versioning.md` § Citations); `links` is the default here and on the bundle, because that is what a reader who expressed no preference gets. The mode changes only the HTML: the blocks a comment can be anchored to are the same in every mode, which is why `compare` deliberately has no such parameter.
 
 ## `GET /i/:token/api/compare?from=&to=`
 
@@ -87,11 +88,11 @@ Every holder of a personal link may fetch it, in every phase in which they may r
 
 ## `GET /i/:token/api/prefs` / `PUT /i/:token/api/prefs`
 
-Body/response: the `notify` table plus `forced` (list of keys the server keeps on) and `email_masked` (`j***@example.org` — `screens/preferences.md`'s masked email display; no other endpoint exposes a participant's own contact address). `PUT` ignores attempts to turn off forced keys and reports them (as `ignored`).
+Body/response: the `notify` table — `channel`, `my_comments_addressed`, `reminders` — plus `email_masked` (`j***@example.org` — `screens/preferences.md`'s masked email display; no other endpoint exposes a participant's own contact address). `PUT` accepts only those keys; any other key is ignored and named in `ignored`.
 
 ## `POST /i/:token/api/prefs/stop-optional`
 
-Sets every non-forced optional preference off. Used by the one-click email link (GET to the page, which POSTs).
+Sets `my_comments_addressed` and `reminders` off. Used by the one-click email link (GET to the page, which POSTs).
 
 ## Principles
 
