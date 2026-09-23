@@ -10,13 +10,13 @@ The default engagement is: open the link, see the document, sign your name. One 
 
 ## Just sign it for now
 
-During the comment period the interface actively encourages signing before the text is final, and promises what makes that safe: you will be told when the final version is published, and you can remove your name any time until the signing window closes. Copy, defaults and notifications all serve that promise. Anything that makes early signing feel risky or irreversible (a "final" label on a draft, a revocation path that is hard to find, a missing final-version alert) violates this.
+During the comment period the interface actively encourages signing before the text is final, and promises what makes that safe: if the text changes after you sign, you will be asked once to confirm before it is delivered, and you can remove your name any time until then. Copy, defaults and notifications all serve that promise. Anything that makes early signing feel risky or irreversible (a "final" label on a draft, a revocation path that is hard to find, a changed text nobody asks the signer about) violates this.
 
-*Why:* a document whose signature count grows during drafting has momentum; one that waits for the final text has a deadline nobody feels. Reversibility is what lets us ask for the early signature honestly — and the promise stops at the final text, because a signer who has already answered the countdown is served by silence about it rather than by a warning.
+*Why:* a document whose signature count grows during drafting has momentum; one that waits for the final text has a deadline nobody feels. Reversibility is what lets us ask for the early signature honestly, and the confirmation before delivery is what keeps a name on the text its signer actually read. The promise is about the text, not the clock: a signer who has already answered the countdown is served by silence about it.
 
 ## The clock is real
 
-Every deadline shown to a participant is enforced by the system at that instant, not by an administrator remembering to flip a switch. Administrators may extend a deadline, but an extension is a visible, recorded, announced event; there is no quiet late acceptance. A comment submitted after the comment period closes is rejected, even by one minute, even from a core member.
+Every deadline shown to a participant is enforced by the system at that instant, not by an administrator remembering to flip a switch. Administrators may extend a deadline, but an extension is a visible, recorded event: every page shows the new time the moment it is set, and the team decides whether to tell the people still deciding (§ Operators speak; state changes don't). There is no quiet late acceptance. A comment submitted after the comment period closes is rejected, even by one minute, even from a core member.
 
 *Why:* a consent-window governance model (the pilot's coalition charter is one) works only if "silence is consent" is a fair claim. That claim requires a deadline that was what it said it was.
 
@@ -60,9 +60,25 @@ There is one deployment with a generic name. Each document is reached only by it
 
 ## Essentials always, everything else opt-in
 
-Confirmation of a signature, a revocation, and the invitation itself are always sent. Everything else (each revision, digests, phase changes, reminders) is a preference, with role-based defaults that are minimal and stated plainly on the preferences page, and a working unsubscribe on every message.
+The invitation, the receipt for anything a person does themselves, a call to confirm their signature and word that the statement they signed was delivered are always sent. The only other messages are replies to their comments and reminders, and each is a preference with a stated default and a working unsubscribe on every message.
 
 *Why:* the people we most want to keep engaged are the ones most likely to be over-messaged by every other campaign. Being the one that respects their inbox is a feature.
+
+## Every email asks something of its reader
+
+Every message to a participant offers one clear thing to do: read and sign, sign again, change it back, confirm or remove your name, add more comments, sign or decline before a deadline. A message with nothing to do is not sent. There are exactly two exceptions, and both are records a person keeps: the receipt for a signature, and `delivered`, which tells a signer the statement went where it was going.
+
+*Why:* the people a coalition most needs are the most over-emailed. Mail with nothing to do teaches them to ignore the mail that matters, and the one that matters is always the next one: the call to confirm, the last chance to sign.
+
+*Rules out:* "version 3 was published" to people who cannot comment on it any more; "signing has closed" to people who can do nothing about it; a daily summary; a receipt whose only content is that we received something.
+
+## Operators speak; state changes don't
+
+Communication with the participant pool happens because an operator ran a command, never as a side effect of a phase change, a schedule change or a publish. Opening the signing window, closing it, moving a deadline and publishing a version send nothing by themselves; a command that could reach people says how many it would reach and reaches them only when asked. The only automatic messages are receipts for a person's own action.
+
+*Why:* the team knows the campaign's rhythm; a clock or a publish does not. A deadline moved by an hour to fix a typo in a date, or a version published to correct a comma, is not news to two hundred inboxes, and only the people running the campaign can tell that apart from the extension everyone was waiting for.
+
+*Rules out:* a scheduler that mails participants; a publish, extend or reopen that notifies by default; a message whose trigger is a timestamp passing.
 
 ## Comments never orphan silently
 
