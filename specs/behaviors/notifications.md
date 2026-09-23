@@ -48,6 +48,20 @@ Sending on publish, phase transitions, submissions and signature changes; the da
 
 "Forced on" means the preference toggle is shown disabled with the explanation that signers are always told when the final text lands. It is the final text and nothing else: a current signer is not in the clock audience (§ Sending) and hears nothing about the window opening, closing or moving.
 
+## What a participant hears, start to finish
+
+The table above is the catalogue; this is the same thing from one person's side, in the order it happens.
+
+1. **Invited.** The invitation arrives when an operator sends it. Until the person opens their link, the only other thing they can receive is a reminder, when an operator runs one and `reminders` is on.
+2. **Their own actions, always.** Every review they submit, signature they add or remove, and change to how they are listed produces a receipt. Receipts are transactional: no preference turns them off, and nothing below (signing, declining) stops them.
+3. **Engaged and not yet signed.** Once they have opened their link, and while they have neither signed nor declined, they are the clock audience: `signing-opened` when the signing window opens, `closing-soon` before it shuts, and `schedule-changed` when an operator moves a deadline, each only with `phase_changes` on.
+4. **Signed.** Nothing more about the clock. Two things are still to come, and they are different events:
+   - **`final-published`: the text stops changing.** An operator publishes a version with `--final`, and the wording is locked. A signer always hears this (forced on), and a conditional signer gets the variant that asks them to confirm or remove their signature. A commenter who has not signed hears it too, with `phase_changes` on.
+   - **`closed`: the list stops changing.** The signing window ends on the clock, not by anyone's action, and the signatory list is locked. This follows `phase_changes` like any other subscription.
+5. **Declined.** Nothing further about the clock or the outcome: no clock messages, no `final-published`, no `closed`, no reminders. They still get their own receipts, and `disposition-v<n>` if they left comments, because they are owed an answer about what happened to them (§ Sending). A later signature makes them an ordinary signer again, from step 4.
+
+Throughout, `disposition-v<n>` tells a commenter what happened to their comments (`my_comments_addressed`), and `v<n>` and the digest carry revision news to anyone who opted in.
+
 ## Operator mail
 
 Every message addressed to an **operator** rather than to a participant — `operator-magic-link`, `operator-added`, `operator-added-to-document`, and the three of § Operator digest below — is governed by these rules, and the rules for participant mail do not reach them:
