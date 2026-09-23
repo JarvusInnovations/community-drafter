@@ -9,7 +9,7 @@ import {
   signatureTime,
 } from "../cardState.ts";
 import { copy } from "../copy.ts";
-import { formatAbsolute } from "../format.ts";
+import { formatAbsolute, formatDateOnly } from "../format.ts";
 import { type Bundle } from "../types.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { EditSignatureForm } from "./EditSignatureForm.tsx";
@@ -17,7 +17,7 @@ import { SignForm } from "./SignForm.tsx";
 
 /**
  * The sign card — `specs/screens/document.md` § Display Rules 3, the state
- * machine over `not_signed` / `signed` (+ conditional / final-pending
+ * machine over `not_signed` / `signed` (+ conditional
  * variants) / `declined` / `closed`, always shown above the document text
  * (`## Principles` § Local: "the first sentence a returning participant
  * reads is what they have done and what they can do next").
@@ -67,7 +67,7 @@ export function StatusCard({
   const editingMounted = useRef(false);
 
   function panelAnnouncement(): string {
-    if (state === "signed" || state === "signed_conditional" || state === "signed_final_pending") {
+    if (state === "signed" || state === "signed_conditional") {
       return signature
         ? copy.signed.announcement(formatAbsolute(signatureTime(signature)), signature)
         : "";
@@ -221,8 +221,7 @@ export function StatusCard({
         </div>
       ) : null}
 
-      {(state === "signed" || state === "signed_conditional" || state === "signed_final_pending") &&
-      signature ? (
+      {(state === "signed" || state === "signed_conditional") && signature ? (
         <div className="flex flex-col gap-2">
           {editing ? (
             <EditSignatureForm
@@ -309,12 +308,21 @@ export function StatusCard({
                 <p className="text-sm text-muted-foreground">{copy.signed.conditionalNote}</p>
               ) : null}
 
-              {state === "signed_final_pending" ? (
-                <p className="text-sm text-muted-foreground">
-                  {copy.signed.finalPublished(
-                    formatAbsolute(bundle.versions.find((v) => v.final)?.published_at),
-                  )}
-                </p>
+              {/*
+               * `specs/behaviors/signatures.md` § Delivery: once the team
+               * records the delivery, the card says where it went and when,
+               * with their note.
+               */}
+              {bundle.document.delivered_at ? (
+                <div className="text-sm text-muted-foreground">
+                  <p>
+                    {copy.signed.delivered(
+                      bundle.document.addressed_to,
+                      formatDateOnly(bundle.document.delivered_at),
+                    )}
+                  </p>
+                  {bundle.document.delivered_note ? <p>{bundle.document.delivered_note}</p> : null}
+                </div>
               ) : null}
 
               {/*
@@ -347,16 +355,18 @@ export function StatusCard({
               {canAct ? (
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                   {/*
-                   * One re-affirmation action, ever: the final version's
-                   * "Confirm my signature" stands in for "Keep my name"
-                   * when both would otherwise apply.
+                   * One re-affirmation action, ever: a conditional
+                   * signature gets "Confirm my signature" (which also clears
+                   * any drift), an unconditional one that is behind gets
+                   * "Keep my name" — the card a confirm-call's "Keep or
+                   * remove my name" lands on.
                    */}
-                  {state === "signed_final_pending" || drift ? (
+                  {state === "signed_conditional" || drift ? (
                     <QuietAction
                       onClick={() => void handleConfirmSignature()}
                       disabled={busy || readOnly}
                     >
-                      {state === "signed_final_pending"
+                      {state === "signed_conditional"
                         ? copy.signed.confirmButton
                         : copy.signed.keep}
                     </QuietAction>
@@ -395,6 +405,14 @@ export function StatusCard({
                 ? copy.closedCard.ownDeclined
                 : copy.closedCard.ownNotSigned}
           </p>
+          {bundle.document.delivered_at ? (
+            <p className="text-muted-foreground">
+              {copy.signed.delivered(
+                bundle.document.addressed_to,
+                formatDateOnly(bundle.document.delivered_at),
+              )}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

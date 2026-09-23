@@ -21,7 +21,9 @@ function toLocalInputValue(iso: string | undefined): string {
 
 /**
  * `specs/screens/admin-dashboard.md` § Actions: "Extend deadline | dialog
- * with new time (must be later); records and announces per lifecycle."
+ * with new time (must be later) and an unchecked 'Tell the n people who
+ * opened it but haven't signed or declined' box" — the extension is
+ * announced only when the box is checked.
  * Shows the `deadline_not_later` message on that specific rejection, and
  * the resulting commit on success (`plans/admin-dashboard.md` § Approach).
  */
@@ -38,7 +40,9 @@ export function ExtendDeadlineDialog({
 }): JSX.Element | null {
   const [comments, setComments] = useState(toLocalInputValue(document.comments_close_at));
   const [signing, setSigning] = useState(toLocalInputValue(document.signing_closes_at));
+  const [notify, setNotify] = useState(false);
   const [busy, setBusy] = useState(false);
+  const undecided = document.counts.undecided ?? 0;
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -46,6 +50,7 @@ export function ExtendDeadlineDialog({
     if (open) {
       setComments(toLocalInputValue(document.comments_close_at));
       setSigning(toLocalInputValue(document.signing_closes_at));
+      setNotify(false);
       setError(null);
       setSuccess(null);
     }
@@ -58,7 +63,9 @@ export function ExtendDeadlineDialog({
     try {
       const oldComments = document.comments_close_at;
       const oldSigning = document.signing_closes_at;
-      const body: { comments_close_at?: string; signing_closes_at?: string } = {};
+      const body: { comments_close_at?: string; signing_closes_at?: string; notify?: boolean } = {
+        notify,
+      };
       if (comments) {
         body.comments_close_at = new Date(comments).toISOString();
       }
@@ -77,8 +84,12 @@ export function ExtendDeadlineDialog({
           `signing: ${oldSigning ? formatAbsolute(oldSigning) : "—"} → ${formatAbsolute(updated.signing_closes_at)}`,
         );
       }
+      const told =
+        updated.notify?.requested === true
+          ? copy.extendDeadline.notified(updated.notify.sent ?? 0)
+          : copy.extendDeadline.notNotified(updated.notify?.would_notify ?? 0);
       setSuccess(
-        `Extended (${parts.join(", ") || "no change"}). Commit: ${updated.commit ?? "(none)"}`,
+        `Extended (${parts.join(", ") || "no change"}). ${told} Commit: ${updated.commit ?? "(none)"}`,
       );
       onExtended();
     } catch (err) {
@@ -130,6 +141,17 @@ export function ExtendDeadlineDialog({
           onChange={(event) => setSigning(event.target.value)}
           className={inputClass}
         />
+      </label>
+
+      <label className="flex items-start gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={notify}
+          disabled={undecided === 0}
+          onChange={(event) => setNotify(event.target.checked)}
+        />
+        <span>{copy.extendDeadline.notifyLabel(undecided)}</span>
       </label>
 
       {error ? (

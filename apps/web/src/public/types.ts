@@ -43,13 +43,16 @@ export interface PublicDocumentInfo {
    * payload and never has been.
    */
   audience?: "public" | "closed";
+  /** `specs/screens/public-and-embed.md` § Delivered. */
+  delivered_at?: string;
+  /** Carried only once delivered, for the delivered line. */
+  addressed_to?: string[];
 }
 
 export interface PublicVersionInfo {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   html: string;
   is_current: boolean;
 }
@@ -58,7 +61,6 @@ export interface PublicVersionListItem {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   dispositions: number;
 }
 
@@ -66,7 +68,6 @@ export interface PublicVersionDetail {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   html: string;
 }
 

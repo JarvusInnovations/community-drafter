@@ -163,7 +163,7 @@ export const copy = {
     revokedLinks: "Links revoked",
     /**
      * `specs/screens/admin-dashboard.md` § Funnel: the number the team
-     * needs before marking anything final — live signatures still attached
+     * needs before delivering — live signatures still attached
      * to an older version (`specs/behaviors/signatures.md` § A signature
      * belongs to a version).
      */
@@ -171,7 +171,29 @@ export const copy = {
     versions: "Versions",
     publishHint: "Publishing is CLI-only. To publish a new version:",
     publishCommand: (slug: string) =>
-      `signatories-axi versions publish ${slug} --file <file.md> --summary "…"`,
+      `signatories-axi versions publish ${slug} --file <file.md> --summary "…" [--dispositions d.json --notify-commenters]`,
+    /** `specs/screens/admin-dashboard.md` § Dashboard, "Delivered". */
+    deliveredLine: (date: string) => `Delivered ${date}`,
+    /** § Dashboard, "Before delivery". */
+    beforeDelivery: "Before delivery",
+    confirmCallCount: (n: number) =>
+      n === 0
+        ? "Nobody needs to confirm."
+        : `${n} ${n === 1 ? "signer" : "signers"} would be asked to confirm (behind the current version or conditional):`,
+    confirmCallCommand: (slug: string) => `signatories-axi docs confirm-call ${slug}`,
+    deliverHint: "When the statement has been delivered, record it and tell every signer:",
+    deliverCommand: (slug: string) => `signatories-axi docs delivered ${slug} --note "…"`,
+    /** § Dashboard, "Remind hint". */
+    remindHint: (deadline: string, unopened: number, undecided: number) =>
+      `${deadline}. ${unopened} unopened and ${undecided} opened but undecided. There is no automatic last call:`,
+    remindCommand: (slug: string) =>
+      `signatories-axi people remind ${slug} --target unopened|opened-not-acted`,
+    activityConfirmCall: (subject: string) => {
+      const match = /\((\d+) signers?\)/u.exec(subject);
+      const n = match ? Number(match[1]) : 0;
+      return `asked ${n} ${n === 1 ? "signer" : "signers"} to confirm`;
+    },
+    activityDelivered: "delivered",
     recentActivity: "Recent activity",
     noActivity: "No activity yet.",
     /**
@@ -212,6 +234,16 @@ export const copy = {
     submitting: "Extending…",
     cancel: "Cancel",
     success: (commit: string | null) => `Extended. Commit: ${commit ?? "(none)"}`,
+    /**
+     * `specs/screens/admin-dashboard.md` § Actions: unchecked by default —
+     * an extension is announced only when the operator asks
+     * (`specs/principles.md` § Operators speak; state changes don't).
+     */
+    notifyLabel: (n: number) =>
+      `Tell the ${n} ${n === 1 ? "person" : "people"} who opened it but haven't signed or declined`,
+    notified: (sent: number) => `Told ${sent} ${sent === 1 ? "person" : "people"}.`,
+    notNotified: (n: number) =>
+      n === 0 ? "Nobody was told." : `Nobody was told (${n} could have been).`,
   },
 
   people: {

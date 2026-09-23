@@ -19,7 +19,12 @@ import { ExtendDeadlineDialog } from "./components/ExtendDeadlineDialog.tsx";
 import { FunnelBar, StatTile } from "./components/Funnel.tsx";
 import { useAdminDocument } from "./DocumentContext.tsx";
 import { quietButtonClass } from "./styles.ts";
-import { type ActivityEntry, type InvitationRow, type NotificationsHealth } from "./types.ts";
+import {
+  type ActivityEntry,
+  type DocumentDetail,
+  type InvitationRow,
+  type NotificationsHealth,
+} from "./types.ts";
 import { Timeline } from "../participant/components/Timeline.tsx";
 import { formatAbsolute, formatDayStamp } from "../participant/format.ts";
 
@@ -217,6 +222,15 @@ export function DashboardScreen(): JSX.Element {
         {copy.dashboard.siteLine(document.site, document.site_url)}
       </p>
 
+      {document.delivered_at ? (
+        <p className="mt-1 text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">
+            {copy.dashboard.deliveredLine(formatAbsolute(document.delivered_at))}
+          </span>
+          {document.delivered_note ? ` · ${document.delivered_note}` : ""}
+        </p>
+      ) : null}
+
       <Timeline document={document} />
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -294,6 +308,8 @@ export function DashboardScreen(): JSX.Element {
           {error}
         </p>
       ) : null}
+
+      <OperatorHints document={document} />
 
       <ExtendDeadlineDialog
         open={extendOpen && hasDeadline}
@@ -374,7 +390,6 @@ export function DashboardScreen(): JSX.Element {
                 <th className="px-4 py-2.5">Published</th>
                 <th className="px-4 py-2.5">Summary</th>
                 <th className="px-4 py-2.5">Dispositions</th>
-                <th className="px-4 py-2.5">Final</th>
               </tr>
             </thead>
             <tbody>
@@ -393,7 +408,6 @@ export function DashboardScreen(): JSX.Element {
                   </td>
                   <td className="px-4 py-2.5 text-foreground">{v.summary}</td>
                   <td className="px-4 py-2.5 text-foreground">{v.dispositions}</td>
-                  <td className="px-4 py-2.5">{v.final ? "final" : ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -417,7 +431,11 @@ export function DashboardScreen(): JSX.Element {
                   className="border-b border-border px-4 py-2.5 last:border-0"
                 >
                   <span className="text-muted-foreground">{formatAbsolute(entry.date)}</span> —{" "}
-                  {entry.subject}
+                  {entry.action === "confirm-call"
+                    ? copy.dashboard.activityConfirmCall(entry.subject)
+                    : entry.action === "deliver"
+                      ? copy.dashboard.activityDelivered
+                      : entry.subject}
                   {entry.actor ? (
                     <span className="text-muted-foreground">
                       {" "}
@@ -502,5 +520,80 @@ export function DashboardScreen(): JSX.Element {
         )}
       </section>
     </main>
+  );
+}
+
+const REMIND_WINDOW_MS = 48 * 3_600_000;
+
+/**
+ * `specs/screens/admin-dashboard.md` § Dashboard, "Before delivery" and
+ * "Remind hint": the dashboard runs neither command; it says what each
+ * would do. There is no automatic last call
+ * (`specs/behaviors/notifications.md` § Sending), so the remind hint is the
+ * only prompt the team gets.
+ */
+function OperatorHints({ document }: { document: DocumentDetail }): JSX.Element | null {
+  const signingPossible = document.phase === "commenting" || document.phase === "signing";
+  const beforeDelivery = !document.delivered_at && signingPossible;
+  const needsConfirmation = document.counts.needs_confirmation ?? 0;
+  const unopened = document.counts.unopened ?? 0;
+  const undecided = document.counts.undecided ?? 0;
+
+  // Read once per mount: the hint is a prompt, not a countdown.
+  const [now] = useState(() => Date.now());
+  const deadline =
+    document.phase === "commenting"
+      ? { label: "Comments close", at: document.comments_close_at }
+      : document.phase === "signing"
+        ? { label: "Signing closes", at: document.signing_closes_at }
+        : undefined;
+  const deadlineSoon =
+    deadline?.at !== undefined &&
+    new Date(deadline.at).getTime() > now &&
+    new Date(deadline.at).getTime() - now <= REMIND_WINDOW_MS;
+  const remind = deadlineSoon && unopened + undecided > 0;
+
+  if (!beforeDelivery && !remind) {
+    return null;
+  }
+  return (
+    <section className="mt-6 flex flex-col gap-2">
+      {remind && deadline ? (
+        <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-foreground">
+          {copy.dashboard.remindHint(
+            `${deadline.label} ${formatAbsolute(deadline.at)}`,
+            unopened,
+            undecided,
+          )}{" "}
+          <code className="rounded bg-card px-1.5 py-0.5">
+            {copy.dashboard.remindCommand(document.slug)}
+          </code>
+        </p>
+      ) : null}
+      {beforeDelivery ? (
+        <div className="rounded-xl border-l-[3px] border-border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+          <p className="font-semibold text-foreground">{copy.dashboard.beforeDelivery}</p>
+          <p className="mt-1">
+            {copy.dashboard.confirmCallCount(needsConfirmation)}
+            {needsConfirmation > 0 ? (
+              <>
+                {" "}
+                <code className="rounded bg-card px-1.5 py-0.5">
+                  {copy.dashboard.confirmCallCommand(document.slug)}
+                </code>
+              </>
+            ) : null}
+          </p>
+          {document.phase === "signing" ? (
+            <p className="mt-1">
+              {copy.dashboard.deliverHint}{" "}
+              <code className="rounded bg-card px-1.5 py-0.5">
+                {copy.dashboard.deliverCommand(document.slug)}
+              </code>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }

@@ -10,12 +10,8 @@ afterEach(cleanup);
 
 const NOTIFY: InvitationRow["notify"] = {
   channel: "email",
-  every_revision: false,
-  daily_digest: false,
-  phase_changes: true,
   my_comments_addressed: true,
   reminders: true,
-  forced: [],
 };
 
 function signedRow(person: string, signedOnVersion: number, revoked = false): InvitationRow {

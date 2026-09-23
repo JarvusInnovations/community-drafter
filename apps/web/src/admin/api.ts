@@ -191,13 +191,29 @@ export function getDocument(slug: string): Promise<DocumentDetail> {
 export interface ScheduleInput {
   comments_close_at?: string;
   signing_closes_at?: string;
+  /** `specs/api/admin.md` § schedule: announce to the O segment only when asked. */
+  notify?: boolean;
 }
 
-export function extendDeadline(slug: string, body: ScheduleInput): Promise<DocumentDetail> {
-  return request<DocumentDetail>(`${BASE}/documents/${encodeURIComponent(slug)}/schedule`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+/** `specs/api/admin.md` § schedule: what the announcement did, or would have done. */
+export interface ScheduleNotifyReport {
+  requested: boolean;
+  would_notify: number;
+  sent?: number;
+  failed?: number;
+}
+
+export function extendDeadline(
+  slug: string,
+  body: ScheduleInput,
+): Promise<DocumentDetail & { notify?: ScheduleNotifyReport }> {
+  return request<DocumentDetail & { notify?: ScheduleNotifyReport }>(
+    `${BASE}/documents/${encodeURIComponent(slug)}/schedule`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export function getInvitations(

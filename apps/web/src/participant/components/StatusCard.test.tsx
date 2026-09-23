@@ -142,13 +142,42 @@ describe("StatusCard — the six states", () => {
 
     expect(
       screen.getByText(
-        "You signed conditionally; we'll show you what changed when the final version is published.",
+        "You signed conditionally. We'll ask you to confirm before the letter is delivered.",
       ),
     ).toBeTruthy();
   });
 
-  it("signed, final version pending confirmation: shows the final-published line and Confirm my signature", () => {
+  it("signed conditionally: promises a confirmation before delivery and offers Confirm my signature", () => {
     const bundle = makeBundle({
+      signature: {
+        capacity: "personal",
+        display_name: "Jane Doe",
+        conditional: true,
+        listed: true,
+        signed_on_version: 1,
+        revoked: false,
+        signed_at: "2026-09-19T12:00:00Z",
+      },
+    });
+    renderCard(bundle);
+
+    expect(
+      screen.getByText(
+        "You signed conditionally. We'll ask you to confirm before the letter is delivered.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Confirm my signature" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Keep my name" })).toBeNull();
+    expect(screen.queryByText(/final/iu)).toBeNull();
+  });
+
+  it("delivered: the signed card says where it went and when, with the team's note", () => {
+    const bundle = makeBundle({
+      document: {
+        addressed_to: ["the State Board of Education"],
+        delivered_at: "2026-09-30T18:00:00Z",
+        delivered_note: "Handed over at the public meeting.",
+      },
       signature: {
         capacity: "personal",
         display_name: "Jane Doe",
@@ -158,27 +187,11 @@ describe("StatusCard — the six states", () => {
         revoked: false,
         signed_at: "2026-09-19T12:00:00Z",
       },
-      versions: [
-        {
-          number: 1,
-          summary: "Initial draft.",
-          published_at: "2026-09-01T00:00:00Z",
-          final: false,
-          dispositions: 0,
-        },
-        {
-          number: 2,
-          summary: "Final text.",
-          published_at: "2026-09-24T00:00:00Z",
-          final: true,
-          dispositions: 3,
-        },
-      ],
     });
     renderCard(bundle);
 
-    expect(screen.getByText(/The final text was published/u)).toBeTruthy();
-    expect(screen.getByText("Confirm my signature")).toBeTruthy();
+    expect(screen.getByText(/^Delivered to the State Board of Education on /u)).toBeTruthy();
+    expect(screen.getByText("Handed over at the public meeting.")).toBeTruthy();
   });
 
   it("declined: shows the decline message and a way to change your mind", () => {
@@ -424,19 +437,18 @@ describe("StatusCard — a signature behind the current version", () => {
     expect(screen.queryByRole("button", { name: "Keep my name" })).toBeNull();
   });
 
-  it("offers only 'Confirm my signature' when a final version is what the signer is behind", () => {
+  it("offers only 'Confirm my signature' to a conditional signer who is also behind", () => {
     const bundle = makeBundle({
       version: {
         number: 3,
-        summary: "Final text.",
+        summary: "Third draft.",
         published_at: "2026-09-20T00:00:00Z",
-        final: true,
       },
-      versions: [...V1_V3.slice(0, 2), { ...V1_V3[2]!, final: true }],
+      versions: V1_V3,
       signature: {
         capacity: "personal",
         display_name: "Elena Vasquez",
-        conditional: false,
+        conditional: true,
         listed: true,
         signed_on_version: 2,
         revoked: false,
