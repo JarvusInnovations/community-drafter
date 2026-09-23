@@ -1,7 +1,8 @@
 ---
-status: in-progress
+status: done
 depends: []
 issues: [116]
+pr: 117
 specs:
   - specs/behaviors/signatures.md
   - specs/api/participant.md
@@ -60,15 +61,15 @@ carries the full date and time.
 
 ## Validation
 
-- [ ] PATCH with `descriptor: ""` removes the stored descriptor.
-- [ ] PATCH with `descriptor: "   "` removes it too.
-- [ ] PATCH that omits `descriptor` leaves it unchanged.
-- [ ] PATCH with a blank `display_name` is refused 422 `validation_failed`.
-- [ ] A blank `title` on an official signature is still refused.
-- [ ] Emptying the descriptor in the edit form sends `descriptor: ""`.
-- [ ] Timeline, fixed clock: a point on today shows the time, one on yesterday shows
+- [x] PATCH with `descriptor: ""` removes the stored descriptor.
+- [x] PATCH with `descriptor: "   "` removes it too.
+- [x] PATCH that omits `descriptor` leaves it unchanged.
+- [x] PATCH with a blank `display_name` is refused 422 `validation_failed`.
+- [x] A blank `title` on an official signature is still refused.
+- [x] Emptying the descriptor in the edit form sends `descriptor: ""`.
+- [x] Timeline, fixed clock: a point on today shows the time, one on yesterday shows
       the date; a chip whose deadline passed today reads "today at …".
-- [ ] Gates in `apps/api` and `apps/web`: lint, format:check, typecheck, tests; web
+- [x] Gates in `apps/api` and `apps/web`: lint, format:check, typecheck, tests; web
       build and bundle-size check.
 
 ## Risks / unknowns
@@ -77,3 +78,27 @@ carries the full date and time.
   organization, so it needs the attestation, and an official signature without an
   organization would be invalid anyway. The POST refuses a missing `org`; the PATCH
   should refuse a blank one the same way.
+
+## Notes
+
+- **Root cause of #116 was two layers.** The form sent `descriptor || undefined`, so an
+  emptied field never reached the server. Behind it, the route merged with `??` and
+  wrote through gitsheets' RFC 7396 merge patch, where an absent key keeps the stored
+  value, so even a correct body could not remove a field. A single space "worked" only
+  because it was stored verbatim. A cleared field is now sent to the patch as `null`.
+- **A blank official `org` is refused**, not cleared, alongside the blank title and
+  blank name: an official signature cannot stand without its organization, and the
+  POST already refuses one.
+- **Values are stored trimmed**, and `listing-changed` compares the normalised values,
+  so re-sending an unchanged name with stray spaces does not count as an edit.
+- **The PATCH body gained a JSON schema** (string text fields, boolean flags); the
+  trimming would otherwise throw a 500 on a non-string.
+- **Chip wording**: the brief suggested "Closed at 11 AM"; the chip's title already
+  reads "Comments closed", so the big text is "today at 11 AM" and the pair reads
+  "Comments closed today at 11 AM", matching "Comments closed Sep 24".
+- The full API suite timed out on unrelated tests at the default 5 s under heavy host
+  load; it passes 300/300 with `--timeout 30000`.
+
+## Follow-ups
+
+- None.
