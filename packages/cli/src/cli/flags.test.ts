@@ -14,14 +14,14 @@ import {
 
 describe("parseFlags", () => {
   it("collects positionals and declared value/boolean flags", () => {
-    const parsed = parseFlags("docs create", ["my-slug", "--title", "Hello", "--final"], {
+    const parsed = parseFlags("docs create", ["my-slug", "--title", "Hello", "--dry-run"], {
       positionals: 1,
       value: ["--title"],
-      boolean: ["--final"],
+      boolean: ["--dry-run"],
     });
     expect(parsed.positional).toEqual(["my-slug"]);
     expect(str(parsed, "--title")).toBe("Hello");
-    expect(bool(parsed, "--final")).toBe(true);
+    expect(bool(parsed, "--dry-run")).toBe(true);
   });
 
   it("rejects an unknown flag with exit-2 usage error, listing valid flags", () => {

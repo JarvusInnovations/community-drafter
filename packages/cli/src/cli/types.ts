@@ -228,14 +228,11 @@ export interface SignatureView {
   resigned_at?: string;
 }
 
+/** `specs/behaviors/notifications.md` § Defaults: the two preferences. */
 export interface PrefsView {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
 }
 
 export interface InvitationRow {
