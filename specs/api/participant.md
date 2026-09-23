@@ -42,7 +42,7 @@ Creates or replaces the person's signature (`behaviors/signatures.md`). In offic
 
 ## `PATCH /i/:token/api/signature`
 
-Body: any of the display fields, or `{ confirm: true }` to clear `conditional`. A change to `org` on an official signature requires `authorized: true` in the same body — `attestation_required` otherwise — and an official signature may not be saved with a blank `title` (`validation_failed`). A body that changes any display field sends `listing-changed-<ts>`; `{ confirm: true }` alone changes none and sends nothing. Response: the signature.
+Body: any of the display fields, or `{ confirm: true }` to clear `conditional`. For the text fields (`display_name`, `descriptor`, `org`, `title`) a field **omitted** from the body is unchanged, and a field **present and empty after trimming whitespace** is cleared — removed from the stored signature; any other value is stored trimmed. A blank `display_name` is refused (`validation_failed`, `field: display_name`), as are a blank `org` or `title` on an official signature (`validation_failed` naming the field). A change to `org` on an official signature requires `authorized: true` in the same body — `attestation_required` otherwise — and an official signature may not be saved with a blank `title` (`validation_failed`). A body that changes any display field sends `listing-changed-<ts>`; `{ confirm: true }` alone changes none and sends nothing. Response: the signature.
 
 ## `DELETE /i/:token/api/signature`
 

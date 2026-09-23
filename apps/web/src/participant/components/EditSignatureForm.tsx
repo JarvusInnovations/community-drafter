@@ -63,7 +63,10 @@ export function EditSignatureForm({
     try {
       await patchSignature(token, {
         display_name: displayName,
-        descriptor: isOfficial ? undefined : descriptor || undefined,
+        // An emptied field is sent empty, never dropped: the server reads an
+        // omitted field as "unchanged" and an empty one as "cleared"
+        // (`specs/api/participant.md` § PATCH; issue #116).
+        descriptor: isOfficial ? undefined : descriptor,
         org: isOfficial ? org : undefined,
         title: isOfficial ? title : undefined,
         listed,

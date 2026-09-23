@@ -49,6 +49,19 @@ const signatureBodySchema = {
   },
 } as const;
 
+const signaturePatchBodySchema = {
+  type: "object",
+  properties: {
+    display_name: { type: "string" },
+    descriptor: { type: "string" },
+    org: { type: "string" },
+    title: { type: "string" },
+    authorized: { type: "boolean" },
+    listed: { type: "boolean" },
+    confirm: { type: "boolean" },
+  },
+} as const;
+
 /**
  * The display fields "Change how you're listed" edits
  * (`specs/behaviors/signatures.md` § Changing how a signature is listed) —
@@ -56,6 +69,32 @@ const signatureBodySchema = {
  * `listing-changed-<ts>`.
  */
 const LISTING_FIELDS = ["display_name", "descriptor", "org", "title", "listed"] as const;
+
+/** The text display fields a listing edit can set or clear. */
+const TEXT_FIELDS = ["display_name", "descriptor", "org", "title"] as const;
+type TextField = (typeof TEXT_FIELDS)[number];
+
+/**
+ * Each text field of a PATCH body as an edit: `undefined` when omitted
+ * (unchanged), `null` when present but blank after trimming (cleared),
+ * otherwise the trimmed value.
+ */
+function normaliseTextFields(
+  body: SignaturePatchBody,
+): Record<TextField, string | null | undefined> {
+  const edits = {} as Record<TextField, string | null | undefined>;
+  for (const field of TEXT_FIELDS) {
+    const value = body[field];
+    edits[field] = value === undefined ? undefined : value.trim() || null;
+  }
+  return edits;
+}
+
+/** An edit applied to a stored optional value: omitted keeps it, cleared drops it. */
+function pick(edit: string | null | undefined, current: string | undefined): string | undefined {
+  if (edit === undefined) return current;
+  return edit ?? undefined;
+}
 
 function notSigned(): ApiError {
   return new ApiError("not_found", "You have not signed this document.");
@@ -170,7 +209,7 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
 
   fastify.patch<{ Body: SignaturePatchBody }>(
     "/signature",
-    { config: PARTICIPANT_ROUTE },
+    { config: PARTICIPANT_ROUTE, schema: { body: signaturePatchBodySchema } },
     async (request, reply) => {
       const { document, participation } = loadParticipantContext(fastify, request);
 
@@ -201,24 +240,42 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
             ? resolveVersion(document).number
             : effectiveSignedVersion(participation);
 
+          // `specs/api/participant.md` § PATCH: a text field omitted from
+          // the body is unchanged; one present and blank after trimming is
+          // cleared — removed from the record, not kept at its old value
+          // (issue #116: the form dropped an emptied descriptor, and a
+          // bare `??` merge could not tell "cleared" from "unchanged").
+          const edits = normaliseTextFields(body);
+          if (edits.display_name === null) {
+            throw new ApiError("validation_failed", "Your name is required.", {
+              field: "display_name",
+            });
+          }
           const signature: Signature = {
             ...current,
-            display_name: body.display_name ?? current.display_name,
-            descriptor: body.descriptor ?? current.descriptor,
-            org: body.org ?? current.org,
-            title: body.title ?? current.title,
+            display_name: edits.display_name ?? current.display_name,
+            descriptor: pick(edits.descriptor, current.descriptor),
+            org: pick(edits.org, current.org),
+            title: pick(edits.title, current.title),
             listed: body.listed ?? current.listed,
             conditional: reaffirming ? false : current.conditional,
             signed_on_version: reaffirming ? signedOnVersion : current.signed_on_version,
           };
 
           if (current.capacity === "official") {
+            if (edits.org === null) {
+              throw new ApiError(
+                "validation_failed",
+                "An organization name is required for an official signature.",
+                { field: "org" },
+              );
+            }
             // `specs/behaviors/signatures.md` § Changing how a signature is
             // listed: the organization is the claim the signature makes
             // about authority, so swapping it is a new claim and needs the
             // attestation again. An unchanged organization does not.
             const orgChanged =
-              signature.org !== undefined && signature.org.trim() !== (current.org ?? "").trim();
+              signature.org !== undefined && signature.org !== (current.org ?? "").trim();
             if ((orgChanged || body.authorized === false) && body.authorized !== true) {
               throw new ApiError(
                 "attestation_required",
@@ -240,7 +297,7 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
           // signer a confirmation; a bare re-affirmation changes no display
           // field and sends nothing.
           const listingChanged = LISTING_FIELDS.some(
-            (field) => body[field] !== undefined && body[field] !== current[field],
+            (field) => signature[field] !== current[field],
           );
 
           const result = await fastify.storage.commit(
@@ -256,7 +313,15 @@ const signatureRoute: FastifyPluginAsync = async (fastify) => {
               requestId: request.requestId,
             },
             async (tx) => {
-              await tx.participations.patch({ document: slug, person }, { signature });
+              // RFC 7396 merge patch: an absent key keeps the stored value,
+              // so a cleared field is sent as `null`, which deletes it.
+              const cleared = Object.fromEntries(
+                TEXT_FIELDS.filter((field) => edits[field] === null).map((field) => [field, null]),
+              );
+              await tx.participations.patch(
+                { document: slug, person },
+                { signature: { ...signature, ...cleared } },
+              );
             },
           );
 

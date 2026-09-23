@@ -87,3 +87,51 @@ describe("Timeline", () => {
     expect(states()).toEqual([]);
   });
 });
+
+/**
+ * `specs/screens/document.md` § Display Rules 2 and § Design "Dates": a
+ * point on the reader's today shows its time, not its date, and a chip
+ * whose deadline passed today says when. Dates are built in the local zone
+ * so the case holds wherever the tests run.
+ */
+function local(day: number, hour: number, minute = 0): string {
+  return new Date(2026, 8, day, hour, minute).toISOString();
+}
+
+function pointDates(): string[] {
+  return Array.from(document.querySelectorAll("section .absolute.top-4 span:last-child")).map(
+    (el) => el.textContent ?? "",
+  );
+}
+
+describe("Timeline — same-day points", () => {
+  const sameDay = {
+    phase: "closed" as const,
+    opened_at: local(22, 10),
+    comments_close_at: local(23, 11),
+    signing_closes_at: local(23, 14, 30),
+  };
+
+  it("today: the points show the time, an earlier day keeps its date", () => {
+    render(<Timeline document={sameDay} now={new Date(2026, 8, 23, 15, 0)} />);
+    const [openedPoint, closePoint, duePoint] = pointDates();
+    expect(openedPoint).toMatch(/^Sep 22/u);
+    expect(closePoint).toMatch(/^11\sAM$/u);
+    expect(duePoint).toMatch(/^2:30\sPM$/u);
+  });
+
+  it("today: a passed chip reads 'today at' the time", () => {
+    render(<Timeline document={sameDay} now={new Date(2026, 8, 23, 15, 0)} />);
+    expect(screen.getByText(/^today at 11\sAM$/u)).toBeTruthy();
+    expect(screen.getByText(/^today at 2:30\sPM$/u)).toBeTruthy();
+  });
+
+  it("yesterday: points and passed chips show the date", () => {
+    render(<Timeline document={sameDay} now={new Date(2026, 8, 24, 9, 0)} />);
+    const [, closePoint, duePoint] = pointDates();
+    expect(closePoint).toMatch(/^Sep 23/u);
+    expect(duePoint).toMatch(/^Sep 23/u);
+    expect(screen.queryByText(/^today at/u)).toBeNull();
+    expect(screen.getAllByText(/^Sep 23/u).length).toBe(4);
+  });
+});
