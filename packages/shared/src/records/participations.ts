@@ -6,6 +6,13 @@ import { CapacitySchema, SLUG_PATTERN } from "./documents.ts";
 export const ParticipationSourceSchema = z.enum(["crm", "admin", "public"]);
 export type ParticipationSource = z.infer<typeof ParticipationSourceSchema>;
 
+/**
+ * `specs/behaviors/notifications.md` § Defaults: `my_comments_addressed`
+ * and `reminders` are the only preferences. `every_revision`,
+ * `daily_digest` and `phase_changes` were written by earlier builds; they
+ * stay accepted here (and in the sheet schema) so those records remain
+ * writable, and nothing reads them.
+ */
 export const NotifyPrefsSchema = z.object({
   channel: z.string().optional(),
   every_revision: z.boolean().optional(),
@@ -16,7 +23,7 @@ export const NotifyPrefsSchema = z.object({
 });
 export type NotifyPrefs = z.infer<typeof NotifyPrefsSchema>;
 
-/** `notified.v3`, `notified.signing-opened`, `notified.digest`, `notified.reminder` — dynamic keys. */
+/** `notified.invitation`, `notified."disposition-v3"`, `notified."confirm-call-<ts>"`, `notified.reminder` — dynamic keys. */
 export const NotifiedSchema = z.record(z.string(), z.union([z.string(), z.number()]));
 export type Notified = z.infer<typeof NotifiedSchema>;
 

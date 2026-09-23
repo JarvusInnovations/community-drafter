@@ -52,7 +52,6 @@ const versionsRoute: FastifyPluginAsync = async (fastify) => {
         number: version.number,
         summary: version.summary,
         published_at: version.published_at,
-        final: version.final,
         html: rendered.html,
         my_comments: myComments,
       };

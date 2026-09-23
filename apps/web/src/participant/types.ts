@@ -63,13 +63,15 @@ export interface DocumentInfo {
   addressed_to: string[];
   reply_to?: string;
   sender_name?: string;
+  /** `specs/behaviors/signatures.md` § Delivery: set once the statement was delivered. */
+  delivered_at?: string;
+  delivered_note?: string;
 }
 
 export interface VersionInfo {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   html: string;
   is_current: boolean;
 }
@@ -78,7 +80,6 @@ export interface VersionListItem {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   dispositions: number;
 }
 
@@ -86,7 +87,6 @@ export interface VersionDetail {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   html: string;
   my_comments: {
     id: string;
@@ -162,12 +162,8 @@ export interface PrefillInfo {
 
 export interface NotifyPrefs {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
 }
 
 export interface Bundle {

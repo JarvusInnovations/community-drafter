@@ -617,6 +617,97 @@ describe("signatories-axi end to end (real API, temp data repo)", () => {
     rmSync(scratch, { recursive: true, force: true });
   }, 30_000);
 
+  /**
+   * `specs/api/admin-cli.md`: a command that can reach participants says how
+   * many it would reach, and reaches them only with its flag; `--final` is
+   * gone.
+   */
+  it("extend reports whom it did not tell; confirm-call and delivered dry-run; --final is refused", async () => {
+    const harness = await bootServer();
+    cleanups.push(harness.cleanup);
+    withAdminEnv(harness);
+    const slug = "e2e-matrix";
+    const scratch = mkdtempSync(join(tmpdir(), "signatories-axi-e2e-"));
+    const body = join(scratch, "v1.md");
+    writeFileSync(body, "The text.", "utf8");
+
+    await run([
+      "docs",
+      "create",
+      slug,
+      "--title",
+      "Matrix Check",
+      "--sender-name",
+      "The Board",
+      "--reply-to",
+      "board@example.org",
+      "--audience",
+      "public",
+    ]);
+    const published = await run(["versions", "publish", slug, "--file", body, "--summary", "v1"]);
+    expect(published.exitCode).toBe(0);
+    expect(published.output).toContain("not sent (nobody to tell)");
+
+    const retired = await run([
+      "versions",
+      "publish",
+      slug,
+      "--file",
+      body,
+      "--summary",
+      "v2",
+      "--final",
+    ]);
+    expect(retired.exitCode).toBe(2);
+    expect(retired.output).toContain("--final is gone");
+
+    const hour = 3_600_000;
+    await run([
+      "docs",
+      "open",
+      slug,
+      "--comments-close",
+      new Date(Date.now() + 24 * hour).toISOString(),
+      "--signing-closes",
+      new Date(Date.now() + 72 * hour).toISOString(),
+    ]);
+
+    const dry = await run([
+      "docs",
+      "extend",
+      slug,
+      "--signing-closes",
+      new Date(Date.now() + 96 * hour).toISOString(),
+      "--notify",
+      "--dry-run",
+    ]);
+    expect(dry.exitCode).toBe(0);
+    expect(dry.output).toContain("dry_run: true");
+    expect(dry.output).toContain("0 would be told");
+
+    const extended = await run([
+      "docs",
+      "extend",
+      slug,
+      "--signing-closes",
+      new Date(Date.now() + 96 * hour).toISOString(),
+    ]);
+    expect(extended.exitCode).toBe(0);
+    expect(extended.output).toContain("not sent (nobody to tell)");
+    expect(extended.output).toContain("signing_closes_at");
+
+    const call = await run(["docs", "confirm-call", slug, "--dry-run"]);
+    expect(call.exitCode).toBe(0);
+    expect(call.output).toContain("would_ask: 0");
+    expect(call.output).toContain("Nobody needs to confirm");
+
+    // Delivery waits for signing to open.
+    const early = await run(["docs", "delivered", slug]);
+    expect(early.exitCode).toBe(3);
+
+    rmSync(scratch, { recursive: true, force: true });
+  }, 60_000);
+
   it("login --url completes the device flow, writes a 600-mode profile, and the next command needs no SIGNATORIES_URL", async () => {
     const harness = await bootServer({ DEV_ADMIN_EMAIL: TEST_ACTOR.email });
     cleanups.push(harness.cleanup);

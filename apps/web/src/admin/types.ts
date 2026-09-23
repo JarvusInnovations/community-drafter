@@ -54,9 +54,16 @@ export interface DocumentSummary {
   counts: {
     versions: number;
     participations: number;
-    signatures: { organizations: number; individuals: number; unlisted: number };
+    signatures: { organizations: number; individuals: number; unlisted: number; behind?: number };
     submissions: { submitted: number; draft: number };
+    /** `specs/behaviors/notifications.md` § Segments: who the operator commands reach. */
+    unopened?: number;
+    undecided?: number;
+    needs_confirmation?: number;
   };
+  /** `specs/behaviors/signatures.md` § Delivery. */
+  delivered_at?: string;
+  delivered_note?: string;
 }
 
 export interface DocumentDetail extends DocumentSummary {
@@ -67,7 +74,6 @@ export interface VersionListItem {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   dispositions: number;
 }
 
@@ -75,7 +81,6 @@ export interface VersionDetail {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   commit?: string | null;
   published_by?: string;
   notes?: string;
@@ -100,12 +105,8 @@ export interface SignatureView {
 
 export interface NotifyPrefs {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
 }
 
 export interface InvitationRow {

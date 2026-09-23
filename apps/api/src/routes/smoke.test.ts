@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe("participant prefs", () => {
-  it("GET/PUT prefs, and stop-optional turns off every non-forced toggle", async () => {
+  it("GET/PUT the two preferences, ignore retired keys, and stop-optional turns both off", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
     await seedDocument(server, {
@@ -25,10 +25,11 @@ describe("participant prefs", () => {
 
     const initial = await server.inject({ method: "GET", url });
     expect(initial.statusCode).toBe(200);
-    expect(initial.json()).toMatchObject({
+    expect(initial.json() as unknown).toEqual({
       channel: "email",
-      phase_changes: true,
+      my_comments_addressed: true,
       reminders: true,
+      email_masked: "j*******@example.org",
     });
 
     const put = await server.inject({
@@ -37,17 +38,12 @@ describe("participant prefs", () => {
       payload: { every_revision: true, reminders: false },
     });
     expect(put.statusCode).toBe(200);
-    expect(put.json().every_revision).toBe(true);
-    expect(put.json().reminders).toBe(false);
+    expect(put.json()).toMatchObject({ reminders: false, ignored: ["every_revision"] });
+    expect(put.json().every_revision).toBeUndefined();
 
     const stop = await server.inject({ method: "POST", url: `${url}/stop-optional` });
     expect(stop.statusCode).toBe(200);
-    expect(stop.json()).toMatchObject({
-      every_revision: false,
-      daily_digest: false,
-      my_comments_addressed: false,
-      reminders: false,
-    });
+    expect(stop.json()).toMatchObject({ my_comments_addressed: false, reminders: false });
 
     await server.close();
   });

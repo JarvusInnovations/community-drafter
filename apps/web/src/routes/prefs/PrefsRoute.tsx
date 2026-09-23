@@ -1,22 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import {
-  ALWAYS_CONFIRM_NOTE,
-  BACK_TO_DOCUMENT,
-  FORCED_EXPLANATION,
-  TOGGLES,
-  type ToggleKey,
-} from "./toggles.ts";
+import { ALWAYS_SENT_NOTE, BACK_TO_DOCUMENT, TOGGLES, type ToggleKey } from "./toggles.ts";
 
 interface PrefsResponse {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
   email_masked?: string;
   ignored?: string[];
 }
@@ -124,11 +114,7 @@ export default function PrefsRoute() {
       }
       const updated = (await response.json()) as PrefsResponse;
       setPrefs(updated);
-      setBanner(
-        updated.ignored && updated.ignored.length > 0
-          ? "That one can't be turned off — it's always on for you."
-          : "Saved.",
-      );
+      setBanner("Saved.");
     } catch {
       setBanner("Couldn't save that change. Try again.");
     } finally {
@@ -168,11 +154,7 @@ export default function PrefsRoute() {
     );
   }
 
-  const forced = new Set(prefs.forced);
   const values: Record<ToggleKey, boolean> = {
-    every_revision: prefs.every_revision,
-    daily_digest: prefs.daily_digest,
-    phase_changes: prefs.phase_changes,
     my_comments_addressed: prefs.my_comments_addressed,
     reminders: prefs.reminders,
   };
@@ -197,7 +179,6 @@ export default function PrefsRoute() {
 
         <ul className="mt-6 space-y-5">
           {TOGGLES.map((toggle) => {
-            const isForced = forced.has(toggle.key);
             const inputId = `notify-${toggle.key}`;
             return (
               <li key={toggle.key} className="flex items-start gap-3">
@@ -206,24 +187,19 @@ export default function PrefsRoute() {
                   type="checkbox"
                   className="mt-1"
                   checked={values[toggle.key]}
-                  disabled={isForced || pending.has(toggle.key)}
+                  disabled={pending.has(toggle.key)}
                   onChange={(event) => void saveToggle(toggle.key, event.target.checked)}
                 />
                 <label htmlFor={inputId} className="flex flex-col gap-0.5">
                   <span className="font-medium text-foreground">{toggle.label}</span>
-                  {toggle.description && (
-                    <span className="text-sm text-muted-foreground">{toggle.description}</span>
-                  )}
-                  {isForced && (
-                    <span className="text-sm text-muted-foreground">{FORCED_EXPLANATION}</span>
-                  )}
+                  <span className="text-sm text-muted-foreground">{toggle.description}</span>
                 </label>
               </li>
             );
           })}
         </ul>
 
-        <p className="mt-6 text-sm text-muted-foreground">{ALWAYS_CONFIRM_NOTE}</p>
+        <p className="mt-6 text-sm text-muted-foreground">{ALWAYS_SENT_NOTE}</p>
 
         {/*
          * The bulk opt-out is a real action but not this page's primary one

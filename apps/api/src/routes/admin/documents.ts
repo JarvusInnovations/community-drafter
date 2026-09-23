@@ -5,7 +5,7 @@ import {
   type PublicAccess,
   type ShowSignatories,
 } from "@signatories/shared";
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest } from "fastify";
 
 import { ApiError } from "../../errors.ts";
 import type { DeadlineChange } from "../../events/bus.ts";
@@ -13,7 +13,24 @@ import { DOCUMENT_SCOPED_ROUTE, OPERATOR_ROUTE } from "../../gateway/gateway.ts"
 import { documentSummary } from "../../lib/document-summary.ts";
 import { DEFAULT_SITE_SLUG, documentSiteSlug, isSiteOperator } from "../../sites/site.ts";
 import { versionListView } from "../../lib/versions.ts";
-import { invitationTemplate } from "../../notifications/templates.ts";
+import { deliveredTo } from "../../notifications/plugin.ts";
+import { formatDay, formatWhen } from "../../notifications/format.ts";
+import { effectiveSignedVersion } from "../../lib/signature-view.ts";
+import { computeSignatories } from "../../lib/signatories.ts";
+import { countsSentence } from "../../deliverable/copy.ts";
+import {
+  confirmCallRecipients,
+  deliveredRecipients,
+  scheduleChangedRecipients,
+} from "../../notifications/segments.ts";
+import {
+  confirmCallTemplate,
+  deliveredTemplate,
+  invitationTemplate,
+  type ScheduleChangeLine,
+  scheduleChangedTemplate,
+} from "../../notifications/templates.ts";
+import { assertPhase } from "../../phase/phase.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
 interface DocumentParams {
@@ -54,14 +71,93 @@ interface OpenBody {
   signing_closes_at: string;
 }
 
-interface ScheduleBody {
+/**
+ * `specs/api/admin.md` § schedule / reopen: `notify` asks for
+ * `schedule-changed` to the O segment; without it nothing is sent.
+ * `dry_run` validates and reports, writing and sending nothing.
+ */
+interface AnnounceOptions {
+  notify?: boolean;
+  dry_run?: boolean;
+}
+
+interface ScheduleBody extends AnnounceOptions {
   comments_close_at?: string;
   signing_closes_at?: string;
 }
 
-interface ReopenBody {
+interface ReopenBody extends AnnounceOptions {
   comments_close_at?: string;
   signing_closes_at: string;
+}
+
+interface ConfirmCallBody {
+  by?: string;
+  dry_run?: boolean;
+}
+
+interface DeliveredBody {
+  note?: string;
+  dry_run?: boolean;
+}
+
+interface AnnounceReport {
+  requested: boolean;
+  would_notify: number;
+  sent?: number;
+  failed?: number;
+  failures?: Array<{ person: string; error: string }>;
+}
+
+/**
+ * `specs/behaviors/notifications.md` → `schedule-changed-<ts>`: to O only,
+ * when the operator asked, keyed per change so each `--notify` reaches a
+ * person once. `would_notify` is always reported, so a call without
+ * `notify` still says whom it did not tell.
+ */
+async function announceSchedule(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  slug: string,
+  changes: DeadlineChange[],
+  notify: boolean,
+): Promise<AnnounceReport> {
+  const recipients = scheduleChangedRecipients(fastify, slug);
+  const report: AnnounceReport = { requested: notify, would_notify: recipients.length };
+  if (!notify) return report;
+  if (recipients.length === 0 || changes.length === 0) {
+    return { ...report, sent: 0, failed: 0, failures: [] };
+  }
+
+  const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+  const lines: ScheduleChangeLine[] = [];
+  for (const change of changes) {
+    const to = formatWhen(change.to, timezone);
+    if (!to) continue;
+    const from = formatWhen(change.from, timezone);
+    lines.push({
+      label: change.deadline === "comments_close_at" ? "comments now close" : "signing now closes",
+      ...(from ? { from } : {}),
+      to,
+    });
+  }
+  const delivery = await fastify.notifications.deliver({
+    document: slug,
+    eventKey: `schedule-changed-${new Date().toISOString()}`,
+    actor: adminActor(request),
+    requestId: request.requestId,
+    targets: recipients.map((person) => ({
+      person,
+      markNotified: true,
+      render: (ctx) => scheduleChangedTemplate(ctx, { changes: lines }),
+    })),
+  });
+  return {
+    ...report,
+    sent: delivery.sent,
+    failed: delivery.failed,
+    failures: delivery.failures,
+  };
 }
 
 interface WithdrawBody {
@@ -495,10 +591,21 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         );
       }
 
-      // `specs/behaviors/document-lifecycle.md` § Extension: the change is
-      // "announced to subscribers of phase changes with old and new times",
-      // so carry the previous values on the event before the record moves.
+      // `specs/behaviors/document-lifecycle.md` § Extension: recorded and
+      // shown everywhere; announced only with `notify`, naming the old and
+      // new times — so capture the previous values before the record moves.
       const changes = deadlineChanges(patch, entry.record);
+
+      if (request.body.dry_run === true) {
+        return {
+          dry_run: true,
+          deadlines: changes,
+          notify: {
+            requested: request.body.notify === true,
+            would_notify: scheduleChangedRecipients(fastify, slug).length,
+          },
+        };
+      }
 
       const result = await fastify.storage.commit(
         "extend",
@@ -520,18 +627,23 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      await fastify.events.publish({
-        type: "schedule-changed",
-        document: slug,
-        commit: result.commitHash ?? "",
-        changes,
-      });
-
-      return documentSummary(
+      const notify = await announceSchedule(
         fastify,
-        fastify.storage.readModel.getDocument(slug)!,
-        result.commitHash,
+        request,
+        slug,
+        changes,
+        request.body.notify === true,
       );
+
+      return {
+        ...documentSummary(
+          fastify,
+          fastify.storage.readModel.getDocument(slug)!,
+          result.commitHash,
+        ),
+        deadlines: changes,
+        notify,
+      };
     },
   );
 
@@ -560,7 +672,8 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      await fastify.events.publish({ type: "closed", document: slug });
+      // Closing sends nothing (`specs/behaviors/document-lifecycle.md` §
+      // Closing); the operators' digest reports it.
       return documentSummary(
         fastify,
         fastify.storage.readModel.getDocument(slug)!,
@@ -604,6 +717,17 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
 
       const changes = deadlineChanges(patch, entry.record);
 
+      if (request.body.dry_run === true) {
+        return {
+          dry_run: true,
+          deadlines: changes,
+          notify: {
+            requested: request.body.notify === true,
+            would_notify: scheduleChangedRecipients(fastify, slug).length,
+          },
+        };
+      }
+
       const result = await fastify.storage.commit(
         "reopen",
         {
@@ -618,18 +742,217 @@ const documentsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
-      await fastify.events.publish({
-        type: "schedule-changed",
-        document: slug,
-        commit: result.commitHash ?? "",
+      const notify = await announceSchedule(
+        fastify,
+        request,
+        slug,
         changes,
+        request.body.notify === true,
+      );
+
+      return {
+        ...documentSummary(
+          fastify,
+          fastify.storage.readModel.getDocument(slug)!,
+          result.commitHash,
+        ),
+        deadlines: changes,
+        notify,
+      };
+    },
+  );
+
+  fastify.post<{ Params: DocumentParams; Body: ConfirmCallBody }>(
+    "/documents/:slug/confirm-call",
+    { config: DOCUMENT_SCOPED_ROUTE },
+    async (request) => {
+      const entry = fastify.storage.readModel.getDocument(request.params.slug);
+      if (!entry) throw notFoundDocument(request.params.slug);
+      const slug = entry.record.slug;
+      const now = new Date();
+      if (entry.record.delivered_at) {
+        throw new ApiError(
+          "already_delivered",
+          "This document has already been delivered; there is nothing left to confirm.",
+          { delivered_at: entry.record.delivered_at },
+        );
+      }
+      assertPhase(entry.record, now, "admin_confirm_call");
+
+      // `specs/api/admin.md` § confirm-call: `by` defaults to
+      // `signing_closes_at`, must be in the future and no later than it.
+      const signingClosesAt = entry.record.signing_closes_at;
+      const by =
+        request.body.by === undefined ? signingClosesAt : parseDeadline(request.body.by, "by");
+      if (!by) {
+        throw new ApiError("validation_failed", "This document has no signing deadline.", {
+          field: "by",
+        });
+      }
+      if (new Date(by) <= now) {
+        throw new ApiError("validation_failed", "by must be in the future.", { field: "by" });
+      }
+      if (signingClosesAt && new Date(by) > new Date(signingClosesAt)) {
+        throw new ApiError(
+          "validation_failed",
+          "by must be no later than when signing closes; extend signing first.",
+          { field: "by", signing_closes_at: signingClosesAt },
+        );
+      }
+
+      const current = entry.versions.length;
+      const recipients = confirmCallRecipients(fastify, slug);
+
+      if (request.body.dry_run === true) {
+        return {
+          dry_run: true,
+          by,
+          would_send: recipients.map(({ entry: participation, reason }) => ({
+            person: participation.record.person,
+            name:
+              participation.record.signature?.display_name ??
+              fastify.storage.readModel.getPersonOn(slug, participation.record.person)?.name ??
+              participation.record.person,
+            reason,
+            signed_on_version: effectiveSignedVersion(participation),
+          })),
+        };
+      }
+
+      if (recipients.length === 0) {
+        return { by, sent: 0, failed: 0, failures: [], commit: null };
+      }
+
+      const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+      const byText = formatWhen(by, timezone) ?? by;
+      let subject: string | null = null;
+      const delivery = await fastify.notifications.deliver({
+        document: slug,
+        eventKey: `confirm-call-${now.toISOString()}`,
+        actor: adminActor(request),
+        requestId: request.requestId,
+        commitAction: "confirm-call",
+        commitSubject: (marked) => {
+          subject = `confirm-call: ${slug} (${marked} signer${marked === 1 ? "" : "s"})`;
+          return subject;
+        },
+        targets: recipients.map(({ entry: participation, reason }) => {
+          const signedVersion = effectiveSignedVersion(participation);
+          return {
+            person: participation.record.person,
+            markNotified: true,
+            render: (ctx) =>
+              confirmCallTemplate(ctx, {
+                reason,
+                signedVersion,
+                currentVersion: current,
+                by: byText,
+                compareLink:
+                  signedVersion !== undefined && signedVersion < current
+                    ? `${ctx.personalLink}/history/compare?from=${signedVersion}&to=${current}`
+                    : undefined,
+              }),
+          };
+        }),
       });
 
-      return documentSummary(
-        fastify,
-        fastify.storage.readModel.getDocument(slug)!,
-        result.commitHash,
+      return {
+        by,
+        sent: delivery.sent,
+        failed: delivery.failed,
+        failures: delivery.failures,
+        commit: subject,
+      };
+    },
+  );
+
+  fastify.post<{ Params: DocumentParams; Body: DeliveredBody }>(
+    "/documents/:slug/delivered",
+    {
+      config: DOCUMENT_SCOPED_ROUTE,
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            note: { type: "string", maxLength: 1000 },
+            dry_run: { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const entry = fastify.storage.readModel.getDocument(request.params.slug);
+      if (!entry) throw notFoundDocument(request.params.slug);
+      const slug = entry.record.slug;
+      if (entry.record.delivered_at) {
+        throw new ApiError("already_delivered", "This document has already been delivered.", {
+          delivered_at: entry.record.delivered_at,
+        });
+      }
+      assertPhase(entry.record, new Date(), "admin_deliver");
+
+      const recipients = deliveredRecipients(fastify, slug);
+      const body = request.body ?? {};
+      if (body.dry_run === true) {
+        return { dry_run: true, would_send: recipients.length };
+      }
+
+      const note = body.note?.trim() || undefined;
+      const deliveredAt = new Date().toISOString();
+      const result = await fastify.storage.commit(
+        "deliver",
+        {
+          actor: adminActor(request),
+          subject: `deliver: ${slug}`,
+          document: slug,
+          requestId: request.requestId,
+        },
+        async (tx) => {
+          await tx.documents.patch(
+            { slug },
+            { delivered_at: deliveredAt, ...(note ? { delivered_note: note } : {}) },
+          );
+        },
       );
+
+      // `specs/behaviors/signatures.md` § Delivery: the message counts the
+      // list as it stands at the moment of delivery.
+      const participations = fastify.storage.readModel.listParticipationsForDocument(slug);
+      const counts = computeSignatories(participations, "count") ?? {
+        organizations: 0,
+        individuals: 0,
+        unlisted: 0,
+      };
+      const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+      const on = formatDay(deliveredAt, timezone) ?? deliveredAt;
+      const to = deliveredTo(entry.record.addressed_to);
+      const signatories = countsSentence(counts);
+
+      const delivery =
+        recipients.length === 0
+          ? { sent: 0, failed: 0, failures: [] as Array<{ person: string; error: string }> }
+          : await fastify.notifications.deliver({
+              document: slug,
+              eventKey: "delivered",
+              actor: adminActor(request),
+              requestId: request.requestId,
+              targets: recipients.map((person) => ({
+                person,
+                markNotified: true,
+                render: (ctx) => deliveredTemplate(ctx, { deliveredTo: to, on, note, signatories }),
+              })),
+            });
+
+      return {
+        ...documentSummary(
+          fastify,
+          fastify.storage.readModel.getDocument(slug)!,
+          result.commitHash,
+        ),
+        sent: delivery.sent,
+        failed: delivery.failed,
+        failures: delivery.failures,
+      };
     },
   );
 

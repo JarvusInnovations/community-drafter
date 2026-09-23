@@ -37,12 +37,8 @@ const ROW: InvitationRow = {
   signature: null,
   notify: {
     channel: "email",
-    every_revision: false,
-    daily_digest: false,
-    phase_changes: true,
     my_comments_addressed: true,
     reminders: true,
-    forced: [],
   },
 };
 

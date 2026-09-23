@@ -47,21 +47,7 @@ export type DrafterEvent =
       submission: string;
       judgement: Judgement;
     }
-  | { type: "publish"; document: string; version: number; commit: string; final: boolean }
-  | {
-      type: "schedule-changed";
-      document: string;
-      commit: string;
-      /**
-       * What moved, so `schedule-changed` can say so (`specs/behaviors/
-       * notifications.md` § Content rules; `specs/behaviors/
-       * document-lifecycle.md` § Extension: "announced ... with old and new
-       * times"). `from` is absent when the deadline had none before.
-       */
-      changes?: DeadlineChange[];
-    }
-  | { type: "signing-opened"; document: string }
-  | { type: "closed"; document: string };
+  | { type: "publish"; document: string; version: number; commit: string };
 
 export type DrafterEventListener = (event: DrafterEvent) => void | Promise<void>;
 

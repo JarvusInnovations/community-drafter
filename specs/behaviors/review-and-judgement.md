@@ -54,7 +54,7 @@ Rules:
 
 - A comment receives at most one disposition. Once dispositioned it is closed; the author may raise the point again in a new comment.
 - Dispositions are fields on the comment's entry in its submission record, written in the publish commit itself (`Disposed` trailer lists `<submission>:<comment>` refs), so the version that answered is the commit that set them.
-- Authors are notified per their `my_comments_addressed` preference, one message per version listing each of their comments and its outcome.
+- Authors are told only when the operator publishes with `--notify-commenters`, and then per their `my_comments_addressed` preference: one message per version listing each of their comments and its outcome (`notifications.md` → `disposition-v<n>`).
 - Comments with no disposition after the document closes are marked `unanswered` in the admin view; nothing is sent to authors about them automatically.
 
 ## Feedback export (for the LLM round)
@@ -70,4 +70,4 @@ The admin export for a document produces, in one file: the current version's tex
 **Local**
 - **A judgement is mandatory, a comment is optional.** Every submission states where the person stands. This is what turns a pile of comments into a count the team can act on, and it is why "decline with nothing to say" is a first-class outcome rather than silence.
 - **The submission is the unit of meaning.** People split one line of thought across inline and general comments however it falls, and the pieces only read correctly together, by one author, against one version, under one judgement. No view, export, notification or API response shows a comment without the rest of its submission. Dispositions are per comment, but they are set and displayed within the submission.
-- **Conditional is a private flag.** A conditional signature displays publicly exactly like any other. The flag is for the team's outreach when the final version lands, and for the signer's own dashboard line ("You signed conditionally on v2; 2 of your 3 comments were incorporated in v3").
+- **Conditional is a private flag.** A conditional signature displays publicly exactly like any other. The flag is for the team's confirm-call before delivery, and for the signer's own dashboard line ("You signed conditionally on v2; 2 of your 3 comments were incorporated in v3").

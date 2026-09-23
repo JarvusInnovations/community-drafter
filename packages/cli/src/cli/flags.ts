@@ -18,7 +18,7 @@ export interface FlagSpec {
    * split it in two.
    */
   multi?: string[];
-  /** Flags that are standalone switches, e.g. `--final`. */
+  /** Flags that are standalone switches, e.g. `--dry-run`. */
   boolean?: string[];
   /** Renamed or removed flags mapped to a targeted hint. */
   deprecated?: Record<string, string>;

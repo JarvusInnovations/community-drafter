@@ -66,12 +66,15 @@ const bundleRoute: FastifyPluginAsync = async (fastify) => {
           audience: document.record.audience ?? "closed",
           reply_to: document.record.reply_to,
           sender_name: document.record.sender_name,
+          // `specs/screens/public-and-embed.md` § Delivered: the date only;
+          // the operator's note is written for the signers.
+          delivered_at: document.record.delivered_at,
+          addressed_to: document.record.delivered_at ? (document.record.addressed_to ?? []) : [],
         },
         version: {
           number: version.number,
           summary: version.summary,
           published_at: version.published_at,
-          final: version.final,
           html: rendered.html,
           is_current: version.number === latest?.number,
         },

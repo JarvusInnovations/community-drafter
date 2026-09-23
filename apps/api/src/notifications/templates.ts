@@ -1,5 +1,3 @@
-import type { Judgement } from "@signatories/shared";
-
 import { type EmailLink, renderEmail } from "../lib/mailer/shell.ts";
 import type { RecipientContext, TemplateResult } from "./types.ts";
 
@@ -143,25 +141,66 @@ export function listingLine(listed: boolean | undefined): string {
     : "Your name is not on the signatory list — only the team sees it. You are counted, not named.";
 }
 
+/**
+ * `specs/behaviors/notifications.md` § What each message says: the
+ * signing receipt is one of the two messages that asks nothing, so it says
+ * what happens next instead — and promises only what the matrix sends:
+ * one confirm-call if the text moves (or, on a conditional signature,
+ * before delivery), and `delivered`. Both promises are dropped once the
+ * document has been delivered.
+ */
+export interface SignatureReceiptData {
+  capacity: string;
+  conditional: boolean;
+  /** `undefined` when the document shows no signatory list (§ Display). */
+  listed?: boolean;
+  /** "the State Board of Education" — `addressed_to` joined, or "its recipients". */
+  deliveredTo: string;
+  /** "Sep 30" when the document has already been delivered. */
+  deliveredOn?: string;
+  /** `signing_closes_at`, formatted — the change-or-remove deadline. */
+  removeBy?: string;
+  /** Set when a signing submission from comment mode carried comments. */
+  commentCount?: number;
+}
+
 export function signatureConfirmationTemplate(
   ctx: RecipientContext,
-  extra: { capacity: string; conditional: boolean; listed?: boolean },
+  extra: SignatureReceiptData,
 ): TemplateResult {
   const capacity =
     extra.capacity === "official"
       ? "in an official capacity, on behalf of your organization"
       : `in a ${extra.capacity} capacity`;
-  const conditional = extra.conditional
-    ? " You signed conditionally, so we'll show you what changed when the final version is published, and you can confirm or remove your name then."
-    : " You can remove it any time before signatures are due.";
+  const comments =
+    extra.commentCount !== undefined && extra.commentCount > 0
+      ? ` We received your ${plural(extra.commentCount, "comment")} too.`
+      : "";
+  const next: string[] = [];
+  if (extra.deliveredOn) {
+    next.push(`It was delivered to ${extra.deliveredTo} on ${extra.deliveredOn}.`);
+  } else {
+    next.push(
+      extra.conditional
+        ? "Because you signed on a condition, we'll ask you to confirm before it's delivered."
+        : "If the text changes before it's delivered, we'll ask you once to confirm your signature.",
+      `We'll let you know when it's delivered to ${extra.deliveredTo}.`,
+    );
+  }
+  if (extra.removeBy) {
+    next.push(
+      `You can change how you're listed or remove your name any time until ${extra.removeBy}.`,
+    );
+  }
   return transactional(
     ctx,
     `${ctx.documentTitle} — you signed`,
     [
-      `Your name is on ${quoted(ctx)}, ${capacity}.${conditional}`,
+      `Your name is on ${quoted(ctx)}, ${capacity}.${comments}`,
       // A signer who asked not to be named keeps this mail as their record
       // of what they were promised, so it says so in its own sentence.
       listingLine(extra.listed),
+      `What happens next: ${next.join(" ")}`,
       clock(ctx),
     ],
     { label: "Open the document", url: ctx.personalLink },
@@ -213,140 +252,42 @@ export function listingChangedTemplate(
   );
 }
 
+/**
+ * `specs/behaviors/notifications.md` § What each message says: a review
+ * receipt is sent only when it can name an action — for `comment`, adding
+ * more comments until comments close; for `decline`, signing after all
+ * until signing closes. A signing submission sends the signing receipt
+ * instead (`signatureConfirmationTemplate` with `commentCount`).
+ */
 export function reviewReceiptTemplate(
   ctx: RecipientContext,
-  extra: { judgement: Judgement; commentCount: number },
+  extra: { judgement: "comment" | "decline"; commentCount: number; until: string },
 ): TemplateResult {
-  const judgementLabel: Record<Judgement, string> = {
-    sign: "you signed",
-    sign_conditional: "you signed conditionally",
-    comment: "you left comments without signing",
-    decline: "you declined to sign",
-  };
-  return transactional(
-    ctx,
-    `${ctx.documentTitle} — we received your review`,
-    [
-      `We received your review of ${quoted(ctx)}: ${judgementLabel[extra.judgement]}, with ${plural(extra.commentCount, "comment")}. ${ctx.senderName} reads every submission whole and answers in the next version.`,
-      clock(ctx),
-    ],
-    { label: "Open the document", url: ctx.personalLink },
-  );
-}
-
-export function versionTemplate(
-  ctx: RecipientContext,
-  extra: { version: number; summary: string; compareLink: string },
-): TemplateResult {
-  return subscription(
-    ctx,
-    `${ctx.documentTitle} — version ${extra.version} published`,
-    [
-      `${ctx.senderName} published version ${extra.version} of ${quoted(ctx)}: ${extra.summary}`,
-      clock(ctx),
-    ],
-    { label: "See what changed", url: extra.compareLink },
-    { label: "Read the whole document", url: ctx.personalLink },
-  );
-}
-
-export interface DigestData {
-  versions: Array<{ number: number; summary: string }>;
-  dispositions: Array<{ outcome: string; note?: string }>;
-  signatoryCounts: { organizations: number; individuals: number; unlisted: number };
-}
-
-export function digestTemplate(ctx: RecipientContext, extra: DigestData): TemplateResult {
-  const body = [`Here's what changed on ${quoted(ctx)} today:`];
-  for (const version of extra.versions) {
-    body.push(`- Version ${version.number}: ${version.summary}`);
-  }
-  for (const disposition of extra.dispositions) {
-    body.push(
-      `- One of your comments: ${dispositionLabel(disposition.outcome)}${disposition.note ? ` — ${disposition.note}` : ""}.`,
-    );
-  }
-  const unlisted =
-    extra.signatoryCounts.unlisted > 0 ? ` (${extra.signatoryCounts.unlisted} unlisted)` : "";
-  body.push(
-    `${extra.signatoryCounts.organizations} organizations and ${extra.signatoryCounts.individuals} individuals have signed so far${unlisted}.`,
-    clock(ctx),
-  );
-  return subscription(ctx, `${ctx.documentTitle} — daily summary`, body, {
-    label: "Open the document",
-    url: ctx.personalLink,
-  });
-}
-
-export function signingOpenedTemplate(ctx: RecipientContext): TemplateResult {
-  return subscription(
-    ctx,
-    `${ctx.documentTitle} — signing is open`,
-    [
-      `The comment period on ${quoted(ctx)} has ended and signing is open. If you mean to add your name, now is the time.`,
-      clock(ctx),
-    ],
-    { label: "Open the document", url: ctx.personalLink },
-  );
-}
-
-export function finalPublishedTemplate(
-  ctx: RecipientContext,
-  extra: { version: number; conditional: boolean },
-): TemplateResult {
-  if (extra.conditional) {
-    return subscription(
+  if (extra.judgement === "decline") {
+    return transactional(
       ctx,
-      `${ctx.documentTitle} — final version, please confirm`,
+      `${ctx.documentTitle} — you declined to sign`,
       [
-        `${ctx.senderName} published the final text of ${quoted(ctx)} (version ${extra.version}). Your signature was conditional, so please read it and either confirm or remove your name.`,
+        `We've recorded that you won't be signing ${quoted(ctx)}${extra.commentCount > 0 ? `, with ${plural(extra.commentCount, "comment")}` : ""}. Changed your mind? You can still sign until ${extra.until}.`,
         clock(ctx),
       ],
-      { label: "Confirm or remove your signature", url: ctx.personalLink },
+      { label: "Open the document", url: ctx.personalLink },
     );
   }
-  return subscription(
+  return transactional(
     ctx,
-    `${ctx.documentTitle} — final version published`,
+    `${ctx.documentTitle} — we received your comments`,
     [
-      `${ctx.senderName} published the final text of ${quoted(ctx)} (version ${extra.version}). Your name stays on it unless you remove it before signatures are due.`,
+      `We received your ${plural(extra.commentCount, "comment")} on ${quoted(ctx)}. ${ctx.senderName} reads every submission whole and answers in a later version. You can add more comments until ${extra.until}.`,
       clock(ctx),
     ],
-    { label: "Read the final text", url: ctx.personalLink },
-  );
-}
-
-/**
- * `specs/behaviors/notifications.md` § Sending: the clock audience is
- * "an invitee ... who has opened their personal link and is not a current
- * signer", so this addresses someone whose name is *not* on the document —
- * and it no longer always fires 24 hours out (a short window sends it at
- * the midpoint instead), so the body leaves the timing to `clock(ctx)`.
- */
-export function closingSoonTemplate(ctx: RecipientContext): TemplateResult {
-  return subscription(
-    ctx,
-    `${ctx.documentTitle} — signing window closes soon`,
-    [
-      `Signatures on ${quoted(ctx)} close soon, and your name isn't on it yet. If you mean to add it, now is the time.`,
-      clock(ctx),
-    ],
-    { label: "Read and sign", url: ctx.personalLink },
-  );
-}
-
-export function closedTemplate(ctx: RecipientContext): TemplateResult {
-  return subscription(
-    ctx,
-    `${ctx.documentTitle} — signing has closed`,
-    [`The signatory list for ${quoted(ctx)} is now final. Thank you for taking part.`, clock(ctx)],
-    { label: "See the final record", url: ctx.personalLink },
+    { label: "Add more comments", url: ctx.personalLink },
   );
 }
 
 /** One deadline that moved, already formatted for the recipient's clock. */
 export interface ScheduleChangeLine {
-  /** "Comments close" / "Signatures due". */
+  /** "Comments now close" / "Signing now closes". */
   label: string;
   /** Absent when the deadline had none before (a reopening that sets one). */
   from?: string;
@@ -354,56 +295,137 @@ export interface ScheduleChangeLine {
 }
 
 /**
- * `specs/behaviors/notifications.md` § Content rules: "`schedule-changed`
- * says what changed: one line per deadline that moved, with its old and new
- * time ... before the current clock. A reopening that sets a deadline which
- * had none states the new time alone."
+ * `specs/behaviors/notifications.md` § What each message says:
+ * `schedule-changed-<ts>` goes to O only, and deadlines only move later, so
+ * it says there is more time, deadline by deadline, and asks them to sign
+ * or decline by the new time.
  */
 export function scheduleChangedTemplate(
   ctx: RecipientContext,
   extra: { changes?: ScheduleChangeLine[] } = {},
 ): TemplateResult {
-  const body = [`${ctx.senderName} changed the schedule for ${quoted(ctx)}.`];
-  for (const change of extra.changes ?? []) {
-    body.push(
-      change.from
-        ? `${change.label} moved from ${change.from} to ${change.to}.`
-        : `${change.label} is now ${change.to}.`,
-    );
-  }
-  body.push(clock(ctx));
-  return subscription(ctx, `${ctx.documentTitle} — schedule updated`, body, {
-    label: "Open the document",
-    url: ctx.personalLink,
-  });
+  const lines = (extra.changes ?? []).map((change) =>
+    change.from
+      ? `${change.label} ${change.to} (it was ${change.from}).`
+      : `${change.label} ${change.to}.`,
+  );
+  return transactional(
+    ctx,
+    `${ctx.documentTitle} — more time to sign`,
+    [
+      `More time on ${quoted(ctx)}: ${lines.join(" ")}`,
+      "You haven't signed or declined yet. Read it and add your name, or tell us you'd rather not sign.",
+      clock(ctx),
+    ],
+    { label: "Read and sign", url: ctx.personalLink },
+  );
 }
 
 export function dispositionTemplate(
   ctx: RecipientContext,
-  extra: { version: number; outcomes: Array<{ outcome: string; note?: string }> },
+  extra: {
+    version: number;
+    outcomes: Array<{ outcome: string; note?: string }>;
+    compareLink: string;
+  },
 ): TemplateResult {
   const body = [`Version ${extra.version} of ${quoted(ctx)} answers your comments:`];
   for (const outcome of extra.outcomes) {
     body.push(`- ${dispositionLabel(outcome.outcome)}${outcome.note ? ` — ${outcome.note}` : ""}.`);
   }
-  body.push(clock(ctx));
+  body.push(
+    "Read the new text, then sign, remove your name, or comment again while you still can.",
+    clock(ctx),
+  );
   return subscription(
     ctx,
     `${ctx.documentTitle} — your comments were addressed in version ${extra.version}`,
     body,
-    { label: `Read version ${extra.version}`, url: ctx.personalLink },
+    { label: "See what changed", url: extra.compareLink },
+    { label: "Read the whole document", url: ctx.personalLink },
   );
 }
 
-export function reminderTemplate(ctx: RecipientContext, extra: { n: number }): TemplateResult {
-  const ordinal = extra.n === 1 ? "a reminder" : `reminder #${extra.n}`;
+/**
+ * `specs/behaviors/notifications.md` § What each message says: the
+ * reminder is the last call — there is no automatic one — so its first
+ * sentence carries the deadline and the ask.
+ */
+export function reminderTemplate(
+  ctx: RecipientContext,
+  extra: { n: number; deadline?: string },
+): TemplateResult {
+  const ask = extra.deadline
+    ? `${extra.deadline} Sign or decline.`
+    : "Sign or decline when you can.";
   return subscription(
     ctx,
-    `${ctx.documentTitle} — reminder: your review is needed`,
+    `${ctx.documentTitle} — reminder: your answer is needed`,
     [
-      `Just ${ordinal}: ${quoted(ctx)} is waiting on you. Read it and add your name, leave comments, or tell us you'd rather not sign.`,
+      ask,
+      `${quoted(ctx)} is waiting on you. Read it and add your name, leave comments, or tell us you'd rather not sign.`,
+      // The opening sentence already is the clock, as an ask.
+      extra.deadline ? "" : clock(ctx),
+    ],
+    { label: "Read and sign", url: ctx.personalLink },
+  );
+}
+
+/**
+ * `specs/behaviors/notifications.md` → `confirm-call-<ts>`: to S-behind
+ * ("the text changed since you signed") and C ("please confirm your
+ * conditional signature"). One button to the card that offers both "Keep
+ * my name" and "Remove my name"; one further link to the comparison from
+ * the version they signed to the current one, whenever those differ.
+ */
+export function confirmCallTemplate(
+  ctx: RecipientContext,
+  extra: {
+    reason: "behind" | "conditional";
+    signedVersion?: number;
+    currentVersion: number;
+    by: string;
+    compareLink?: string;
+  },
+): TemplateResult {
+  const changed =
+    extra.signedVersion !== undefined && extra.signedVersion < extra.currentVersion
+      ? `You signed version ${extra.signedVersion}; the current text is version ${extra.currentVersion}.`
+      : "";
+  const opening =
+    extra.reason === "conditional"
+      ? `You signed ${quoted(ctx)} on a condition. ${changed}`.trim()
+      : `The text of ${quoted(ctx)} changed since you signed. ${changed}`.trim();
+  return transactional(
+    ctx,
+    extra.reason === "conditional"
+      ? `${ctx.documentTitle} — please confirm your conditional signature`
+      : `${ctx.documentTitle} — the text changed since you signed`,
+    [
+      opening,
+      `Please keep your name on the current text or remove it by ${extra.by}. If you do nothing, your name stays on it.`,
       clock(ctx),
     ],
-    { label: "Open the document", url: ctx.personalLink },
+    { label: "Keep or remove my name", url: ctx.personalLink },
+    extra.compareLink
+      ? { label: `See what changed since version ${extra.signedVersion}`, url: extra.compareLink }
+      : undefined,
   );
+}
+
+/**
+ * `specs/behaviors/notifications.md` → `delivered`: the one message besides
+ * the signing receipt that asks nothing — it is the outcome.
+ */
+export function deliveredTemplate(
+  ctx: RecipientContext,
+  extra: { deliveredTo: string; on: string; note?: string; signatories: string },
+): TemplateResult {
+  const body = [`${quoted(ctx)} was delivered to ${extra.deliveredTo} on ${extra.on}.`];
+  if (extra.note) body.push(extra.note);
+  body.push(extra.signatories, clock(ctx));
+  return transactional(ctx, `${ctx.documentTitle} — delivered`, body, {
+    label: "Read the statement",
+    url: ctx.personalLink,
+  });
 }

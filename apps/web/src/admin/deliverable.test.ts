@@ -3,16 +3,15 @@ import { describe, expect, it } from "bun:test";
 import { deliverableIsDraft } from "./deliverable.ts";
 
 describe("deliverableIsDraft", () => {
-  it("needs both a final version and a closed signing phase", () => {
-    expect(deliverableIsDraft({ phase: "signing", versions: [{ final: false }] })).toBe(true);
-    expect(deliverableIsDraft({ phase: "signing", versions: [{ final: true }] })).toBe(true);
-    expect(deliverableIsDraft({ phase: "closed", versions: [{ final: false }] })).toBe(true);
-    expect(deliverableIsDraft({ phase: "closed", versions: [{ final: true }] })).toBe(false);
+  it("is a draft until signing closes", () => {
+    expect(deliverableIsDraft({ phase: "commenting" })).toBe(true);
+    expect(deliverableIsDraft({ phase: "signing" })).toBe(true);
+    expect(deliverableIsDraft({ phase: "closed" })).toBe(false);
   });
 
-  it("reads final from any version, not only the current one", () => {
-    expect(
-      deliverableIsDraft({ phase: "closed", versions: [{ final: true }, { final: false }] }),
-    ).toBe(false);
+  it("goes clean on delivery, even while signing is open", () => {
+    expect(deliverableIsDraft({ phase: "signing", delivered_at: "2026-09-30T18:00:00Z" })).toBe(
+      false,
+    );
   });
 });

@@ -41,7 +41,6 @@ export function makeBundle(overrides: {
       number: 1,
       summary: "Initial draft.",
       published_at: "2026-09-01T00:00:00Z",
-      final: false,
       html: "<p>The charter text.</p>",
       is_current: true,
       ...overrides.version,
@@ -51,7 +50,6 @@ export function makeBundle(overrides: {
         number: 1,
         summary: "Initial draft.",
         published_at: "2026-09-01T00:00:00Z",
-        final: false,
         dispositions: 0,
       },
     ],
@@ -67,12 +65,8 @@ export function makeBundle(overrides: {
     prefill: { name: "Jane Doe", suggested_capacity: "personal", ...overrides.prefill },
     notify: {
       channel: "email",
-      every_revision: false,
-      daily_digest: false,
-      phase_changes: true,
       my_comments_addressed: true,
       reminders: true,
-      forced: [],
     },
   };
 }

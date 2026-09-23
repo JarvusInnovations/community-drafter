@@ -43,7 +43,6 @@ export interface VersionListItem {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   dispositions: number;
 }
 
@@ -55,7 +54,6 @@ export function versionListView(
     number: version.number,
     summary: version.summary,
     published_at: version.published_at,
-    final: version.final,
     dispositions: dispositionsCount(fastify, documentEntry.record.slug, version.number),
   }));
 }

@@ -47,7 +47,7 @@ export const TEST_ADMIN_TOKEN = (
 export interface BuildTestServerOptions {
   /** Defaults to a fresh `FakeMailer` — pass one in to assert on `.sent`/force failures. */
   mailer?: Mailer;
-  /** Test-only override for the digest/closing-soon schedulers' poll interval. */
+  /** Test-only override for the operator-digest scheduler poll interval. */
   schedulerIntervalMs?: number;
   /** Set env vars before boot (e.g. `DEV_ADMIN_EMAIL`, or `undefined` to unset one of the defaults below). */
   env?: Record<string, string | undefined>;
@@ -233,8 +233,18 @@ export interface SeedParticipantOptions {
   prefill?: { name?: string; org?: string; title?: string; descriptor?: string };
   /** Seed the participation as already opened — the clock audience's "has opened the link" half. */
   first_opened_at?: string;
-  /** Seed `participations.notified` directly (e.g. an existing `signing-opened` send). */
+  /** Seed the invitation as delivered — the U segment's "invited" half. */
+  sent_at?: string;
+  /** Seed `participations.notified` directly (e.g. an earlier reminder). */
   notified?: Record<string, string | number>;
+  /** Seed a signature directly (`specs/data-model.md` → `signature` table). */
+  signature?: {
+    capacity?: "personal" | "official";
+    display_name?: string;
+    conditional?: boolean;
+    revoked?: boolean;
+    signed_on_version?: number;
+  };
   notify?: {
     channel?: string;
     every_revision?: boolean;
@@ -274,7 +284,20 @@ export async function seedParticipant(
         source: "admin",
         prefill: opts.prefill,
         first_opened_at: opts.first_opened_at,
+        sent_at: opts.sent_at,
         notified: opts.notified,
+        signature: opts.signature
+          ? {
+              capacity: opts.signature.capacity ?? "personal",
+              display_name: opts.signature.display_name ?? opts.name ?? opts.person,
+              authorized: false,
+              conditional: opts.signature.conditional ?? false,
+              listed: true,
+              display_approved: true,
+              revoked: opts.signature.revoked ?? false,
+              signed_on_version: opts.signature.signed_on_version ?? 1,
+            }
+          : undefined,
         notify: opts.notify,
       });
     },

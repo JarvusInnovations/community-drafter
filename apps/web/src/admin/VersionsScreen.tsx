@@ -89,7 +89,6 @@ export function VersionsScreen(): JSX.Element {
                 ) : null}
                 <span className="text-muted-foreground">
                   {formatAbsolute(v.published_at)} · {copy.versions.dispositions(v.dispositions)}
-                  {v.final ? " · final" : ""}
                 </span>
               </div>
               {open === v.number ? (

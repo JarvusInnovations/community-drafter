@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 
 import type { FakeMailer } from "../lib/mailer/index.ts";
 import {
+  adminHeaders,
   buildTestServer,
   seedDocument,
   seedOperator,
@@ -10,7 +11,7 @@ import {
   seedSite,
   TEST_ACTOR,
 } from "../routes/test-support.ts";
-import { sendFirstResponseNotice, sendOperatorDigest } from "./operator-digest.ts";
+import { sendOperatorDigest } from "./operator-digest.ts";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -315,7 +316,7 @@ describe("first-response notices", () => {
     await server.close();
   });
 
-  it("announces the first comment once and names the commenter by display name", async () => {
+  it("sends no first-comment notice: comments reach the team in the digest", async () => {
     const { server, cleanup, mailer } = await buildTestServer();
     cleanups.push(cleanup);
     const fake = mailer as FakeMailer;
@@ -327,20 +328,81 @@ describe("first-response notices", () => {
       name: "Rick Roe",
       token: "v".repeat(20),
     });
+    await server.inject({
+      method: "POST",
+      url: `/i/${"v".repeat(20)}/api/draft/comments`,
+      payload: { version: 1, body: "A thought.", client_id: "k-1" },
+    });
+    const submitted = await server.inject({
+      method: "POST",
+      url: `/i/${"v".repeat(20)}/api/submit`,
+      payload: { version: 1, judgement: "comment", pending: 0 },
+    });
+    expect(submitted.statusCode).toBe(200);
 
-    expect(await sendFirstResponseNotice(server, "doc-comment", "first_comment", "rick-roe")).toBe(
-      true,
-    );
-    expect(await sendFirstResponseNotice(server, "doc-comment", "first_comment", "rick-roe")).toBe(
-      false,
+    expect(fake.sent.filter((message) => message.to.email === TEST_ACTOR.email)).toHaveLength(0);
+    expect(
+      server.storage.readModel.getDocument("doc-comment")?.record.operator_notified?.first_comment,
+    ).toBeUndefined();
+
+    await server.close();
+  });
+});
+
+describe("operator digest: the day signing closed", () => {
+  it("reports signing closed, the confirm-call and the delivery", async () => {
+    const { server, cleanup, mailer } = await buildTestServer();
+    cleanups.push(cleanup);
+    const fake = mailer as FakeMailer;
+    const hour = 3_600_000;
+
+    await seedDocument(server, {
+      slug: "doc-closing",
+      title: "Coalition Charter",
+      body: "One.",
+      comments_close_at: new Date(Date.now() - hour).toISOString(),
+      signing_closes_at: new Date(Date.now() + 48 * hour).toISOString(),
+      addressed_to: ["the Board"],
+    });
+    await seedParticipant(server, {
+      document: "doc-closing",
+      person: "jane-doe",
+      name: "Jane Doe",
+      token: "w".repeat(20),
+      signature: { display_name: "Jane Doe", conditional: true, signed_on_version: 1 },
+    });
+    const call = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-closing/confirm-call",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    expect(call.json().sent).toBe(1);
+    const delivered = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-closing/delivered",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    expect(delivered.statusCode).toBe(200);
+    await server.storage.commit(
+      "close",
+      { actor: { kind: "system" }, subject: "close: doc-closing", document: "doc-closing" },
+      async (tx) => {
+        await tx.documents.patch(
+          { slug: "doc-closing" },
+          { state: "closed", signing_closes_at: new Date(Date.now() - 1000).toISOString() },
+        );
+      },
     );
 
-    const notices = fake.sent.filter(
-      (message) => message.subject === "Coalition Charter — first comments",
-    );
-    expect(notices.length).toBe(1);
-    expect(notices[0]?.text).toContain("Rick Roe is the first person to comment");
-    expect(notices[0]?.text).not.toContain("rick-roe@example.org");
+    const document = server.storage.readModel.getDocument("doc-closing")!;
+    const since = new Date(Date.now() - 2 * hour).toISOString();
+    expect(await sendOperatorDigest(server, document, TODAY, since)).toBe(true);
+    const message = digests(fake)[0];
+    expect(message?.text).toMatch(/- Signing closed /u);
+    expect(message?.text).toContain("- Confirm-call sent to 1 signer");
+    expect(message?.text).toMatch(/- Delivered to the Board on /u);
 
     await server.close();
   });

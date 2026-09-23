@@ -185,7 +185,10 @@ export const copy = {
     attestationError: (org: string) =>
       `Check the box confirming you're authorized to sign for ${org || "this organization"} before adding your name.`,
     reassurance: (deadline: string) =>
-      `You can remove your name any time until ${deadline}. We'll email you when the final version is published.`,
+      `You can remove your name any time until ${deadline}. If the text changes after you sign, we'll ask you once to confirm before it's delivered.`,
+    /** Once delivered there is nothing left to confirm (§ Display Rules 3). */
+    reassuranceDelivered: (deadline: string) =>
+      `You can remove your name any time until ${deadline}.`,
     declineLink: "I'd rather not sign",
     commentLink: "I have comments first",
     signing: "Signing…",
@@ -251,7 +254,11 @@ export const copy = {
     /** § Conditional signatures: marked on the signer's own card, never in public. */
     conditionalMarker: "Conditional",
     conditionalNote:
-      "You signed conditionally; we'll show you what changed when the final version is published.",
+      "You signed conditionally. We'll ask you to confirm before the letter is delivered.",
+    /** `specs/behaviors/signatures.md` § Delivery. */
+    deliveredLabel: "Delivered",
+    delivered: (to: string[], date: string) =>
+      to.length > 0 ? `Delivered to ${nameList(to)} on ${date}` : `Delivered on ${date}`,
     /**
      * `specs/screens/document.md` § Display Rules 3, *Change how you're
      * listed*: a changed organization is a new claim of authority, so the
@@ -270,7 +277,6 @@ export const copy = {
       `The text has changed since you signed (now version ${current}).`,
     seeWhatChanged: "See what changed",
     keep: "Keep my name",
-    finalPublished: (date: string) => `The final text was published ${date}.`,
     confirmButton: "Confirm my signature",
     save: "Save",
     cancel: "Cancel",
@@ -402,7 +408,6 @@ export const copy = {
     explainer:
       "Each version is the full text as published on that date. The one-line note says what changed.",
     current: "current",
-    finalBadge: "final text",
     answeredComments: (n: number) => `answered ${n} comment${n === 1 ? "" : "s"}`,
     read: "Read",
     compareWithPrevious: "Compare with previous",
@@ -476,7 +481,7 @@ export const copy = {
       explanation: {
         sign: "Adds your name to the signatory list right away.",
         sign_conditional:
-          "Adds your name now; you'll be asked to confirm or remove it once the final text is published.",
+          "Adds your name now; we'll ask you to confirm or remove it before the letter is delivered.",
         comment: "Sends your comments without changing your signature.",
         decline: "Records that you won't be signing this document.",
       },

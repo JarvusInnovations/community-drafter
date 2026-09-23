@@ -16,7 +16,7 @@ import type {
   VersionDetail,
   VersionListItem,
 } from "../types.js";
-import { clientFrom, readFileOrStdin, render } from "./common.js";
+import { announceLine, clientFrom, readFileOrStdin, render } from "./common.js";
 
 const VERSIONS_FLAGS: Record<string, FlagSpec> = {
   list: { positionals: 1 },
@@ -24,7 +24,11 @@ const VERSIONS_FLAGS: Record<string, FlagSpec> = {
   publish: {
     positionals: 1,
     value: ["--file", "--summary", "--notes-file", "--dispositions"],
-    boolean: ["--final"],
+    boolean: ["--notify-commenters"],
+    deprecated: {
+      "--final":
+        "--final is gone: no version is final, and the team may publish until the statement is delivered (`docs delivered`)",
+    },
   },
   compare: { positionals: 3, boolean: ["--unchanged"] },
 };
@@ -33,13 +37,17 @@ export const VERSIONS_HELP = `usage: signatories-axi versions <list|show|publish
 
 list <slug>
 show <slug> <n> [--body]
-publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--final] [--dispositions <file.json>]
+publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--dispositions <file.json>] [--notify-commenters]
 compare <slug> <from> <to> [--unchanged]
 
 publish is one commit: the document body, disposition fields on any submissions
 named in --dispositions (a JSON array of {submission, comment, outcome, note?}),
 and a signing_closes_at extension if the document is mid-signing. Prints the
-version number, the commit subject, and notification counts.
+version number, the commit subject, and how many answered commenters would be
+told. Publishing mails NOBODY unless you pass --notify-commenters, which tells
+the authors whose comments this publish disposed (signers and decliners
+included) what happened to them. There is no --final: the team may publish
+until the statement is delivered.
 
 --dispositions outcomes — exactly one of these four; anything else is rejected:
   accepted  Incorporated in this version. Note optional.
@@ -113,7 +121,6 @@ export async function versionsCommand(args: string[]): Promise<string> {
               computed("number", (v) => v.number),
               computed("summary", (v) => v.summary),
               computed("published_at", (v) => v.published_at),
-              computed("final", (v) => v.final),
               computed("dispositions", (v) => v.dispositions),
             ]),
       );
@@ -142,7 +149,6 @@ export async function versionsCommand(args: string[]): Promise<string> {
             summary: version.summary,
             published_at: version.published_at,
             published_by: version.published_by,
-            final: version.final,
             notes: version.notes,
           }),
           bodyBlock,
@@ -194,7 +200,7 @@ export async function versionsCommand(args: string[]): Promise<string> {
           body,
           summary,
           notes,
-          final: bool(parsed, "--final") || undefined,
+          notify_commenters: bool(parsed, "--notify-commenters") || undefined,
           dispositions,
         },
       );
@@ -210,8 +216,12 @@ export async function versionsCommand(args: string[]): Promise<string> {
             // that was cleared (#60).
             ...(result.signing_closes_at ? { signing_closes_at: result.signing_closes_at } : {}),
           }),
-          renderObject({ notified: result.notified }),
-          renderHelp([`Run \`signatories-axi docs show ${slug}\` to see the updated dashboard`]),
+          renderObject({ commenters: announceLine(result.notified.commenters) }),
+          renderHelp([
+            !result.notified.commenters.requested && result.notified.commenters.would_notify > 0
+              ? `Nobody was told. To tell the ${result.notified.commenters.would_notify} answered commenter(s), publish with --notify-commenters next time`
+              : `Run \`signatories-axi docs show ${slug}\` to see the updated dashboard`,
+          ]),
         ),
       );
     }

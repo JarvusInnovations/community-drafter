@@ -6,13 +6,13 @@
 
 ## Data Requirements
 
-All versions derived from the document record's body-changing commits (number, date, summary, publisher label, disposition count, `final`), the current version number, and for comparison the server-computed block-aligned diff between two versions (`behaviors/versioning.md`).
+All versions derived from the document record's body-changing commits (number, date, summary, publisher label, disposition count), the current version number, and for comparison the server-computed block-aligned diff between two versions (`behaviors/versioning.md`).
 
 ## Display Rules
 
 **List**
-- Newest first. Each row: "Version 3 · Sep 20, 2026, 9:14 AM EDT", the summary in emphasis, "answered 12 comments" when dispositions exist, a "final text" badge when `final`, and two actions: "Read" and "Compare with previous" (absent on v1).
-- The current version row is marked "current".
+- Newest first. Each row: "Version 3 · Sep 20, 2026, 9:14 AM EDT", the summary in emphasis, "answered 12 comments" when dispositions exist, and two actions: "Read" and "Compare with previous" (absent on v1).
+- The current version row is marked "current". No row is ever labeled final (`behaviors/versioning.md` § No version is "final").
 - A short explainer at top: "Each version is the full text as published on that date. The one-line note says what changed."
 
 **Read a version**: the document screen layout in read-only form with the "you're reading an older version" banner (`screens/document.md`). Participants see their own comments made against that version.

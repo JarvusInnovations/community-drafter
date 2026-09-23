@@ -123,13 +123,26 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         summary: "Open commenting and signing, and send invitations.",
       },
       {
-        usage: "docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]",
-        summary: "Push a deadline later (never earlier).",
+        usage:
+          "docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>] [--notify] [--dry-run]",
+        summary:
+          "Push a deadline later (never earlier). Tells nobody unless --notify, which sends 'more time' to the people who opened it and have not signed or declined; the output always says how many that is. --dry-run checks and counts without writing.",
       },
-      { usage: "docs close <slug>", summary: "Close signing now." },
+      { usage: "docs close <slug>", summary: "Close signing now. Sends nothing." },
       {
-        usage: "docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>",
-        summary: "Reopen a closed document.",
+        usage:
+          "docs reopen <slug> [--comments-close <iso>] --signing-closes <iso> [--notify] [--dry-run]",
+        summary: "Reopen a closed document; --notify and --dry-run as for extend.",
+      },
+      {
+        usage: "docs confirm-call <slug> [--by <iso>] [--dry-run]",
+        summary:
+          "Ask every signer whose signature is behind the current version, and every conditional signer, to keep or remove their name by --by (default: when signing closes). Once per person per call; --dry-run lists who and why. Run it before delivering.",
+      },
+      {
+        usage: 'docs delivered <slug> [--note "<text>"] [--dry-run]',
+        summary:
+          "Record that the statement was delivered (once per document) and tell every current signer where it went and when. The PDF goes clean from that moment.",
       },
       {
         usage: 'docs withdraw <slug> --reason "<text>" [--public]',
@@ -139,7 +152,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         usage:
           "docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--citations links|footnotes|hybrid] [--draft]",
         summary:
-          "Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen.",
+          "Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until signing closes or the document is delivered; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen.",
       },
       { usage: "docs operators <slug>", summary: "List a document's operators." },
       {
@@ -160,9 +173,9 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       { usage: "versions show <slug> <n> [--body]", summary: "One version, with dispositions." },
       {
         usage:
-          'versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--final] [--dispositions <file.json>]',
+          'versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--dispositions <file.json>] [--notify-commenters]',
         summary:
-          "Publish a new version in one commit; prints the version number, commit subject, and notification counts. A --dispositions entry's outcome is one of accepted, partial, declined or noted.",
+          "Publish a new version in one commit; prints the version number, commit subject, and how many answered commenters would be told. Mails nobody unless --notify-commenters. A --dispositions entry's outcome is one of accepted, partial, declined or noted.",
       },
       {
         usage: "versions compare <slug> <from> <to> [--unchanged]",
@@ -202,7 +215,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
         usage:
           "people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]",
         summary:
-          "Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless).",
+          "Send reminders — the last call, naming the next deadline and asking them to sign or decline — to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). There is no automatic reminder.",
       },
       { usage: "people revoke-link <slug> <person>", summary: "Revoke one person's link." },
       {

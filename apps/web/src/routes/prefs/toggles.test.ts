@@ -1,36 +1,25 @@
 import { describe, expect, it } from "bun:test";
 
-import { ALWAYS_CONFIRM_NOTE, FORCED_EXPLANATION, TOGGLES } from "./toggles.ts";
+import { ALWAYS_SENT_NOTE, TOGGLES } from "./toggles.ts";
 
 describe("preferences toggle definitions", () => {
-  it("lists the five toggles in the spec's exact order", () => {
-    expect(TOGGLES.map((t) => t.key)).toEqual([
-      "every_revision",
-      "daily_digest",
-      "phase_changes",
-      "my_comments_addressed",
-      "reminders",
-    ]);
+  it("lists the two toggles in the spec's exact order", () => {
+    expect(TOGGLES.map((t) => t.key)).toEqual(["my_comments_addressed", "reminders"]);
   });
 
-  it("carries the spec's exact description for every toggle that has one", () => {
+  it("carries the spec's exact description for each toggle", () => {
     const byKey = Object.fromEntries(TOGGLES.map((t) => [t.key, t]));
-    expect(byKey.every_revision?.description).toBe(
-      "One email each time the text is revised, with what changed.",
-    );
-    expect(byKey.daily_digest?.description).toBe(
-      "At most one email a day, only on days something changed.",
-    );
-    expect(byKey.phase_changes?.description).toBe(
-      "When comments close, when the final text is published, when the signing window closes, and if a deadline moves.",
+    expect(byKey.my_comments_addressed?.description).toBe(
+      "When the team answers your comments in a new version and asks us to tell you.",
     );
     expect(byKey.reminders?.description).toBe(
-      "A nudge if you haven't acted yet. Turns off by itself once you sign, comment or decline.",
+      "A nudge before a deadline if you haven't answered yet. Turns off by itself once you sign, comment or decline.",
     );
   });
 
-  it("has the forced-toggle explanation and the always-confirm note", () => {
-    expect(FORCED_EXPLANATION).toContain("we'll always tell you");
-    expect(ALWAYS_CONFIRM_NOTE).toContain("confirm when you sign");
+  it("describes only what is always sent, and nothing retired", () => {
+    expect(ALWAYS_SENT_NOTE).toContain("confirm your signature");
+    expect(ALWAYS_SENT_NOTE).toContain("delivered");
+    expect(ALWAYS_SENT_NOTE).not.toContain("final");
   });
 });

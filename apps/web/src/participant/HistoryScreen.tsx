@@ -33,11 +33,6 @@ export function HistoryScreen(): JSX.Element {
                   {copy.history.current}
                 </span>
               ) : null}
-              {version.final ? (
-                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                  {copy.history.finalBadge}
-                </span>
-              ) : null}
             </p>
             <p className="mt-1 text-sm text-foreground italic">{version.summary}</p>
             {version.dispositions > 0 ? (

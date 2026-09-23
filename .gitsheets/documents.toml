@@ -105,7 +105,7 @@ format = 'email'
 
 # `specs/behaviors/notifications.md` § Operator digest: event -> value, the
 # operator messages this document has already produced (`digest` holds a
-# date, the two first-response notices a timestamp). Optional and
+# date, `first_signature` a timestamp; `first_comment` is a legacy key). Optional and
 # open-keyed, so a record written before it existed still validates.
 [gitsheet.schema.properties.operator_notified]
 type = 'object'
@@ -123,6 +123,14 @@ type = 'string'
 
 [gitsheet.schema.properties.withdraw_public]
 type = 'boolean'
+
+# `specs/behaviors/signatures.md` § Delivery: set once by `docs delivered`.
+[gitsheet.schema.properties.delivered_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.delivered_note]
+type = 'string'
 
 [gitsheet.schema.properties.tags]
 type = 'array'

@@ -54,15 +54,79 @@ export interface DocumentSummary {
     participations: number;
     signatures: SignatoryCounts;
     submissions: { submitted: number; draft: number };
+    /** `specs/behaviors/notifications.md` § Segments: who the operator commands reach. */
+    unopened?: number;
+    undecided?: number;
+    needs_confirmation?: number;
   };
+  /** `specs/behaviors/signatures.md` § Delivery. */
+  delivered_at?: string;
+  delivered_note?: string;
   commit?: string | null;
+}
+
+/**
+ * `specs/api/admin.md` § schedule / reopen / versions: an announcement the
+ * operator may ask for. `would_notify` is always reported, so a command run
+ * without the flag still says whom it did not tell.
+ */
+export interface AnnounceReport {
+  requested: boolean;
+  would_notify: number;
+  sent?: number;
+  failed?: number;
+  failures?: Array<{ person: string; error: string }>;
+}
+
+export interface DeadlineShift {
+  deadline: "comments_close_at" | "signing_closes_at";
+  from?: string;
+  to: string;
+}
+
+/** `POST .../schedule` and `.../reopen`. */
+export interface ScheduleResult extends DocumentSummary {
+  deadlines?: DeadlineShift[];
+  notify?: AnnounceReport;
+}
+
+export interface ScheduleDryRun {
+  dry_run: true;
+  deadlines: DeadlineShift[];
+  notify: AnnounceReport;
+}
+
+/** `POST .../confirm-call`. */
+export interface ConfirmCallResult {
+  by: string;
+  sent: number;
+  failed: number;
+  failures: Array<{ person: string; error: string }>;
+  commit: string | null;
+}
+
+export interface ConfirmCallDryRun {
+  dry_run: true;
+  by: string;
+  would_send: Array<{
+    person: string;
+    name: string;
+    reason: "behind" | "conditional";
+    signed_on_version?: number;
+  }>;
+}
+
+/** `POST .../delivered`. */
+export interface DeliveredResult extends DocumentSummary {
+  sent: number;
+  failed: number;
+  failures: Array<{ person: string; error: string }>;
 }
 
 export interface VersionListItem {
   number: number;
   summary: string;
   published_at: string;
-  final: boolean;
   dispositions: number;
 }
 
@@ -100,16 +164,9 @@ export interface VersionDetail {
   summary: string;
   published_at: string;
   published_by?: string;
-  final: boolean;
   notes?: string;
   body: string;
   dispositions: DispositionRecord[];
-}
-
-export interface NotifiedCounts {
-  every_revision: number;
-  dispositions: number;
-  signers: number;
 }
 
 export interface PublishResult {
@@ -117,7 +174,8 @@ export interface PublishResult {
   summary: string;
   commit: string | null;
   signing_closes_at?: string;
-  notified: NotifiedCounts;
+  /** `specs/api/admin.md` § Versions: nobody is mailed without `notify_commenters`. */
+  notified: { commenters: AnnounceReport };
 }
 
 export interface CompareBlock {
@@ -170,14 +228,11 @@ export interface SignatureView {
   resigned_at?: string;
 }
 
+/** `specs/behaviors/notifications.md` § Defaults: the two preferences. */
 export interface PrefsView {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
 }
 
 export interface InvitationRow {

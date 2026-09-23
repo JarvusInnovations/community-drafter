@@ -22,6 +22,11 @@ export const ACTIONS = [
   "publish",
   "invite",
   "send",
+  // `specs/behaviors/notifications.md` → `confirm-call-<ts>` and
+  // `specs/behaviors/signatures.md` § Delivery: two operator commands that
+  // reach participants, each recorded as its own action.
+  "confirm-call",
+  "deliver",
   "sign",
   "resign",
   "revoke",
@@ -137,6 +142,11 @@ export interface Trailers {
   Actor: string;
   Version?: number;
   Summary?: string;
+  /**
+   * Written by earlier builds on a publish declared final. No longer
+   * written; `specs/behaviors/versioning.md` § No version is "final" — the
+   * trailer is ignored when read.
+   */
   Final?: "true";
   Notes?: string;
   Submission?: string;

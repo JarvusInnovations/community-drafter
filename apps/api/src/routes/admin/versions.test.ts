@@ -84,6 +84,9 @@ describe("POST /admin/api/documents/:slug/versions", () => {
           person: "jane-doe",
           token: "f".repeat(20),
           source: "admin",
+          // Reached and opened, as anyone who commented has been.
+          sent_at: new Date(Date.now() - 3_600_000).toISOString(),
+          first_opened_at: new Date(Date.now() - 3_000_000).toISOString(),
         });
       },
     );
@@ -122,7 +125,8 @@ describe("POST /admin/api/documents/:slug/versions", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().notified.dispositions).toBe(1);
+    // Publishing tells nobody unless asked; it says how many it could have.
+    expect(response.json().notified.commenters).toEqual({ requested: false, would_notify: 1 });
 
     const submission = server.storage.readModel.getSubmission("doc-disposed", "jane-doe-aaaa");
     expect(submission?.record.comments?.[0]?.disposition).toBe("accepted");

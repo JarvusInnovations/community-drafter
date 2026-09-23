@@ -35,7 +35,7 @@ Success bodies are the resource or a domain-shaped object; no generic envelope. 
 | 401 | `unauthenticated` (operator routes only; participant tokens never 401), `operator_inactive` |
 | 403 | `forbidden`, `csrf_required` |
 | 404 | `not_found` (also used for unknown/revoked/expired tokens and non-public documents) |
-| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `already_exists`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
+| 409 | `phase_closed`, `version_stale`, `deadline_not_later`, `stale_edit`, `unsaved_items`, `no_change`, `already_delivered`, `already_exists`, `last_operator`, `refresh_busy`, `refresh_diverged`, `device_pending` |
 | 422 | `validation_failed` with field errors; `no_deadline_set`; a record the store rejects (schema `ValidationError`) is reported the same way, with `details.issues` |
 | 413 | `payload_too_large` |
 | 415 | `unsupported_media_type` |

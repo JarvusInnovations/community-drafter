@@ -267,7 +267,9 @@ export function SignForm({
       </button>
 
       <p className="rounded-xl border-l-[3px] border-amber bg-amber-soft px-3 py-2.5 text-sm text-muted-foreground">
-        {copy.signForm.reassurance(formatAbsolute(document.signing_closes_at))}
+        {document.delivered_at
+          ? copy.signForm.reassuranceDelivered(formatAbsolute(document.signing_closes_at))
+          : copy.signForm.reassurance(formatAbsolute(document.signing_closes_at))}
       </p>
     </form>
   );

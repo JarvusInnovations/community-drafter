@@ -28,7 +28,7 @@ describe("NotificationDispatcher", () => {
 
     const first = await server.notifications.deliver({
       document: "doc-idem",
-      eventKey: "closing-soon",
+      eventKey: "reminder-1",
       actor: { kind: "system" },
       targets: [
         {
@@ -43,7 +43,7 @@ describe("NotificationDispatcher", () => {
 
     const second = await server.notifications.deliver({
       document: "doc-idem",
-      eventKey: "closing-soon",
+      eventKey: "reminder-1",
       actor: { kind: "system" },
       targets: [
         {
@@ -57,7 +57,7 @@ describe("NotificationDispatcher", () => {
     expect(mailer.sent.length).toBe(1);
 
     const participation = server.storage.readModel.getParticipation("doc-idem", "jane-doe");
-    expect(participation?.record.notified?.["closing-soon"]).toBeTruthy();
+    expect(participation?.record.notified?.["reminder-1"]).toBeTruthy();
 
     await server.close();
   });

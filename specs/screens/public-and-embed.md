@@ -22,11 +22,13 @@ Every route here lives on the document's **site** hostname (`behaviors/sites.md`
 
 ## Data Requirements
 
-Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list. `audience` is here for one reason — it decides whether the footer offers the statement download — and it is the same stored value the admin API returns; `public_access` is not in this payload and never has been.
+Document (title, phase, deadlines, `show_signatories`, `reply_to`, `audience`, `delivered_at`, and `addressed_to` once delivered), the document's site (name, `logo_url`, `accent`), current version, signatory counts and list (listed, approved, unrevoked only), version list. `audience` is here for one reason — it decides whether the footer offers the statement download — and it is the same stored value the admin API returns; `public_access` is not in this payload and never has been.
 
 ## Display Rules
 
 **Public read view**: the document screen layout without the status card and identity line. In its place, a card: "Want to add your name? This document is open to invited signers. Ask the team for your personal link: *reply_to*." **[phase 2]** when `public_access = participate`, the card becomes "Sign or comment: enter your email and we'll send you your own link" with name and email fields, then a "check your email" state. The text itself renders exactly as it does on a personal link, including the *Sources as footnotes* reader toggle and `?citations=` (`screens/document.md` § Display Rules 5).
+
+**Delivered**: once the document has been delivered (`behaviors/signatures.md` § Delivery), the public read view says so under the title: "Delivered to *the State Board of Education* on *Sep 30*." — `addressed_to` joined as everywhere else, or "Delivered on *Sep 30*." when it names none. The operator's note is not shown here; it is written for the signers.
 
 **The statement download**: when `statement.pdf` would render rather than 404, the public read view's footer carries "Download the statement (PDF)", the same quiet link the participant page carries. When it would 404 — a `closed` audience — the link is absent, and nothing on the page says a download exists.
 

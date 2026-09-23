@@ -1,12 +1,6 @@
 import { type Bundle, type SignatureView } from "./types.ts";
 
-export type CardState =
-  | "not_signed"
-  | "signed"
-  | "signed_conditional"
-  | "signed_final_pending"
-  | "declined"
-  | "closed";
+export type CardState = "not_signed" | "signed" | "signed_conditional" | "declined" | "closed";
 
 /**
  * `specs/screens/document.md` § Display Rules 3 (the status card) as a
@@ -14,28 +8,19 @@ export type CardState =
  * (`plans/participant-sign-flow.md` § Approach). `closed` always wins —
  * the card's own-outcome line inside that state further distinguishes
  * signed/declined/never-signed. Otherwise: an unrevoked signature is
- * `signed`, refined to `signed_final_pending` when a `final` version has
- * published since the signer's `signed_on_version`, or
- * `signed_conditional` when `signature.conditional` and no later final
- * exists yet; a `decline` position with no live signature is `declined`;
- * anything else is `not_signed`.
+ * `signed`, or `signed_conditional` when `signature.conditional`; a
+ * `decline` position with no live signature is `declined`; anything else is
+ * `not_signed`. There is no "final" version to wait for
+ * (`specs/behaviors/versioning.md` § No version is "final").
  */
 export function computeCardState(bundle: Bundle): CardState {
-  const { document, signature, position, versions } = bundle;
+  const { document, signature, position } = bundle;
 
   if (document.phase === "closed") {
     return "closed";
   }
 
   if (signature && !signature.revoked) {
-    const finalVersion = versions.find((v) => v.final);
-    const predatesFinal =
-      finalVersion !== undefined &&
-      signature.signed_on_version !== undefined &&
-      signature.signed_on_version < finalVersion.number;
-    if (predatesFinal) {
-      return "signed_final_pending";
-    }
     if (signature.conditional) {
       return "signed_conditional";
     }

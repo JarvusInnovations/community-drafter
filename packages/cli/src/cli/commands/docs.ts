@@ -13,16 +13,23 @@ import {
 import { resolveConfig } from "../config.js";
 import { compact, computed, joinBlocks, renderHelp, renderList, renderObject } from "../output.js";
 import type {
+  ConfirmCallDryRun,
+  ConfirmCallResult,
+  DeliveredResult,
   DocOperatorAddResult,
   DocumentDetail,
   DocumentSummary,
   OpenResult,
   OperatorRecord,
+  ScheduleDryRun,
+  ScheduleResult,
 } from "../types.js";
+import type { SignatoriesClient } from "../client.js";
+import type { Parsed } from "../flags.js";
 import { AxiError } from "axi-sdk-js";
 
 import { parseDeadline } from "../deadline.js";
-import { clientFrom, render } from "./common.js";
+import { announceLine, clientFrom, render } from "./common.js";
 
 const DOCS_FLAGS: Record<string, FlagSpec> = {
   create: {
@@ -52,15 +59,25 @@ const DOCS_FLAGS: Record<string, FlagSpec> = {
     multi: ["--addressed-to"],
   },
   open: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
-  extend: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
+  extend: {
+    positionals: 1,
+    value: ["--comments-close", "--signing-closes"],
+    boolean: ["--notify", "--dry-run"],
+  },
   close: { positionals: 1 },
-  reopen: { positionals: 1, value: ["--comments-close", "--signing-closes"] },
+  reopen: {
+    positionals: 1,
+    value: ["--comments-close", "--signing-closes"],
+    boolean: ["--notify", "--dry-run"],
+  },
+  "confirm-call": { positionals: 1, value: ["--by"], boolean: ["--dry-run"] },
+  delivered: { positionals: 1, value: ["--note"], boolean: ["--dry-run"] },
   withdraw: { positionals: 1, value: ["--reason"], boolean: ["--public"] },
   operators: { positionals: 3 },
   export: { positionals: 1, value: ["--out", "--paper"], boolean: ["--pdf", "--draft"] },
 };
 
-export const DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|withdraw|export|operators> ...
+export const DOCS_HELP = `usage: signatories-axi docs <create|show|update|open|extend|close|reopen|confirm-call|delivered|withdraw|export|operators> ...
 
 create <slug> --title <text> --audience public|closed
        [--site <slug>] [--sender-name <text>] [--reply-to <email>]
@@ -92,9 +109,25 @@ another site you operate: the slug, tokens and history do not change, the
 hostname its participants are sent to does. --sender-name and --reply-to may
 be omitted, in which case the site's own are used.
 open <slug> --comments-close <when> --signing-closes <when>
-extend <slug> [--comments-close <when>] [--signing-closes <when>]
+extend <slug> [--comments-close <when>] [--signing-closes <when>] [--notify] [--dry-run]
 close <slug>
-reopen <slug> [--comments-close <when>] --signing-closes <when>
+reopen <slug> [--comments-close <when>] --signing-closes <when> [--notify] [--dry-run]
+
+Moving a deadline tells NOBODY unless you pass --notify, which sends "more time"
+to the people who opened the document and have not signed or declined. Either
+way the output says how many that is; --dry-run checks the change and prints the
+count without writing or sending anything. Closing sends nothing.
+
+confirm-call <slug> [--by <when>] [--dry-run]
+       Ask every signer whose signature is behind the current version, and
+       every conditional signer, to keep their name on the current text or
+       remove it by --by (default: when signing closes). Once per person per
+       call; nobody qualifying sends nothing and says so. --dry-run lists who
+       would be asked and why. Run it before delivering.
+delivered <slug> [--note "<text>"] [--dry-run]
+       Record that the statement was delivered and tell every current signer
+       where it went and when, with the note. Once per document; the PDF goes
+       clean from that moment. --dry-run prints how many signers would be told.
 
 <when> is ISO 8601 with a zone (2026-10-01T21:00:00Z, 2026-10-01T17:00:00-04:00) or a
 zone-less time read in this machine's local zone (2026-10-01T17:00); the CLI prints
@@ -108,8 +141,8 @@ export <slug> --pdf [--out <file>] [--paper letter|a4]
 
        Without --out the file is <slug>-v<n>.pdf in the working directory, or
        <slug>-v<n>-draft.pdf while the copy is still a draft. A copy is a
-       draft — watermarked DRAFT, with the version number — until the
-       document has a final version AND signing has closed. --draft forces
+       draft — watermarked DRAFT, with the version number — until signing
+       closes or the document is delivered, whichever first. --draft forces
        the watermark back on; there is deliberately no flag the other way.
 
        --citations picks how the citation links in the text are presented.
@@ -178,6 +211,8 @@ function detailObject(doc: DocumentSummary, instanceUrl: string): Record<string,
     public_url: publicUrl(doc, instanceUrl),
     show_signatories: doc.show_signatories,
     tags: doc.tags,
+    delivered_at: doc.delivered_at,
+    delivered_note: doc.delivered_note,
     commit: doc.commit,
     counts: doc.counts,
   });
@@ -255,7 +290,6 @@ export async function docsCommand(args: string[]): Promise<string> {
                 computed("number", (v) => v.number),
                 computed("summary", (v) => v.summary),
                 computed("published_at", (v) => v.published_at),
-                computed("final", (v) => v.final),
                 computed("dispositions", (v) => v.dispositions),
               ]),
           renderHelp([
@@ -357,14 +391,9 @@ export async function docsCommand(args: string[]): Promise<string> {
     }
 
     case "extend": {
-      const slug = requirePositional(
-        parsed,
-        0,
-        "slug",
-        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]",
-      );
       const extendUsage =
-        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>]";
+        "signatories-axi docs extend <slug> [--comments-close <when>] [--signing-closes <when>] [--notify] [--dry-run]";
+      const slug = requirePositional(parsed, 0, "slug", extendUsage);
       const rawComments = str(parsed, "--comments-close");
       const rawSigning = str(parsed, "--signing-closes");
       const comments = rawComments
@@ -376,17 +405,11 @@ export async function docsCommand(args: string[]): Promise<string> {
       const body = compact({
         comments_close_at: comments?.iso,
         signing_closes_at: signing?.iso,
+        notify: bool(parsed, "--notify") || undefined,
+        dry_run: bool(parsed, "--dry-run") || undefined,
       });
-      const doc = await client.post<DocumentSummary>(
-        `/documents/${encodeURIComponent(slug)}/schedule`,
-        body,
-      );
-      return render(parsed, doc, () =>
-        joinBlocks(
-          renderObject(detailObject(doc, instanceUrl)),
-          renderHelp([comments?.note, signing?.note].filter((n): n is string => Boolean(n))),
-        ),
-      );
+      const notes = [comments?.note, signing?.note].filter((n): n is string => Boolean(n));
+      return scheduleChange(parsed, client, slug, "schedule", body, notes, instanceUrl);
     }
 
     case "close": {
@@ -398,14 +421,9 @@ export async function docsCommand(args: string[]): Promise<string> {
     }
 
     case "reopen": {
-      const slug = requirePositional(
-        parsed,
-        0,
-        "slug",
-        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>",
-      );
       const reopenUsage =
-        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when>";
+        "signatories-axi docs reopen <slug> [--comments-close <when>] --signing-closes <when> [--notify] [--dry-run]";
+      const slug = requirePositional(parsed, 0, "slug", reopenUsage);
       const rawComments = str(parsed, "--comments-close");
       const comments = rawComments
         ? parseDeadline(rawComments, "--comments-close", reopenUsage)
@@ -415,15 +433,116 @@ export async function docsCommand(args: string[]): Promise<string> {
         "--signing-closes",
         reopenUsage,
       );
-      const body = compact({ comments_close_at: comments?.iso, signing_closes_at: signing.iso });
-      const doc = await client.post<DocumentSummary>(
-        `/documents/${encodeURIComponent(slug)}/reopen`,
-        body,
-      );
-      return render(parsed, doc, () =>
+      const body = compact({
+        comments_close_at: comments?.iso,
+        signing_closes_at: signing.iso,
+        notify: bool(parsed, "--notify") || undefined,
+        dry_run: bool(parsed, "--dry-run") || undefined,
+      });
+      const notes = [comments?.note, signing.note].filter((n): n is string => Boolean(n));
+      return scheduleChange(parsed, client, slug, "reopen", body, notes, instanceUrl);
+    }
+
+    case "confirm-call": {
+      const usage = "signatories-axi docs confirm-call <slug> [--by <when>] [--dry-run]";
+      const slug = requirePositional(parsed, 0, "slug", usage);
+      const rawBy = str(parsed, "--by");
+      const by = rawBy ? parseDeadline(rawBy, "--by", usage) : undefined;
+      const path = `/documents/${encodeURIComponent(slug)}/confirm-call`;
+      if (bool(parsed, "--dry-run")) {
+        const preview = await client.post<ConfirmCallDryRun>(
+          path,
+          compact({ by: by?.iso, dry_run: true }),
+        );
+        type Row = ConfirmCallDryRun["would_send"][number];
+        return render(parsed, preview, () =>
+          joinBlocks(
+            renderObject({ dry_run: true, by: preview.by, would_ask: preview.would_send.length }),
+            preview.would_send.length > 0
+              ? renderList("would_ask", preview.would_send, [
+                  computed<Row>("person", (r) => r.person),
+                  computed<Row>("name", (r) => r.name),
+                  computed<Row>("why", (r) =>
+                    r.reason === "conditional"
+                      ? "conditional"
+                      : `behind v${r.signed_on_version ?? "?"}`,
+                  ),
+                ])
+              : "",
+            renderHelp(
+              [
+                by?.note,
+                preview.would_send.length === 0
+                  ? "Nobody needs to confirm: every signature is on the current text and unconditional"
+                  : `Run \`${cli} docs confirm-call ${slug}${rawBy ? ` --by ${rawBy}` : ""}\` to ask them`,
+              ].filter((n): n is string => Boolean(n)),
+            ),
+          ),
+        );
+      }
+      const result = await client.post<ConfirmCallResult>(path, compact({ by: by?.iso }));
+      type Failure = ConfirmCallResult["failures"][number];
+      return render(parsed, result, () =>
         joinBlocks(
-          renderObject(detailObject(doc, instanceUrl)),
-          renderHelp([comments?.note, signing.note].filter((n): n is string => Boolean(n))),
+          renderObject(
+            compact({
+              by: result.by,
+              asked: result.sent,
+              failed: result.failed,
+              commit: result.commit ?? undefined,
+            }),
+          ),
+          result.failures.length > 0
+            ? renderList("failures", result.failures, [
+                computed<Failure>("person", (f) => f.person),
+                computed<Failure>("error", (f) => f.error),
+              ])
+            : "",
+          renderHelp(
+            [
+              by?.note,
+              result.sent === 0 && result.failed === 0
+                ? "Nobody needed to confirm; nothing was sent"
+                : `Run \`${cli} signatures list ${slug}\` to see who has kept their name`,
+            ].filter((n): n is string => Boolean(n)),
+          ),
+        ),
+      );
+    }
+
+    case "delivered": {
+      const usage = 'signatories-axi docs delivered <slug> [--note "..."] [--dry-run]';
+      const slug = requirePositional(parsed, 0, "slug", usage);
+      const path = `/documents/${encodeURIComponent(slug)}/delivered`;
+      if (bool(parsed, "--dry-run")) {
+        const preview = await client.post<{ dry_run: true; would_send: number }>(path, {
+          dry_run: true,
+        });
+        return render(parsed, preview, () =>
+          joinBlocks(
+            renderObject({ dry_run: true, would_tell: preview.would_send }),
+            renderHelp([
+              `Run \`${cli} docs delivered ${slug} --note "..."\` to record the delivery and tell them`,
+            ]),
+          ),
+        );
+      }
+      const result = await client.post<DeliveredResult>(
+        path,
+        compact({ note: str(parsed, "--note") }),
+      );
+      type Failure = DeliveredResult["failures"][number];
+      return render(parsed, result, () =>
+        joinBlocks(
+          renderObject(detailObject(result, instanceUrl)),
+          renderObject({ signers_told: result.sent, failed: result.failed }),
+          result.failures.length > 0
+            ? renderList("failures", result.failures, [
+                computed<Failure>("person", (f) => f.person),
+                computed<Failure>("error", (f) => f.error),
+              ])
+            : "",
+          renderHelp([`Run \`${cli} docs export ${slug} --pdf\` for the clean copy`]),
         ),
       );
     }
@@ -508,7 +627,7 @@ export async function docsCommand(args: string[]): Promise<string> {
           renderObject(compact(result)),
           renderHelp([
             draftCopy
-              ? `This copy is watermarked DRAFT; it goes clean once ${slug} has a final version and signing has closed`
+              ? `This copy is watermarked DRAFT; it goes clean once signing closes or \`${cli} docs delivered ${slug}\` records the delivery`
               : `Run \`${cli} signatures list ${slug}\` to read the names on this copy`,
           ]),
         ),
@@ -564,4 +683,56 @@ export async function docsCommand(args: string[]): Promise<string> {
     default:
       return sub; // unreachable — parseSubcommand already validated `sub`
   }
+}
+
+/**
+ * `docs extend` and `docs reopen` share one output: each deadline's old and
+ * new time, then the announcement — what it sent when `--notify` was given,
+ * and how many it did not tell when it was not (`specs/api/admin-cli.md`).
+ */
+async function scheduleChange(
+  parsed: Parsed,
+  client: SignatoriesClient,
+  slug: string,
+  endpoint: "schedule" | "reopen",
+  body: Record<string, unknown>,
+  notes: string[],
+  instanceUrl: string,
+): Promise<string> {
+  const path = `/documents/${encodeURIComponent(slug)}/${endpoint}`;
+  const result = await client.post<ScheduleResult | ScheduleDryRun>(path, body);
+  const deadlines = result.deadlines ?? [];
+  const notify = result.notify;
+  const dryRun = "dry_run" in result && result.dry_run === true;
+  const hint =
+    notify && !notify.requested && notify.would_notify > 0
+      ? `Nobody was told. Re-run with --notify to tell the ${notify.would_notify} ${notify.would_notify === 1 ? "person" : "people"} who opened it and have not answered`
+      : undefined;
+  return render(parsed, result, () =>
+    joinBlocks(
+      dryRun
+        ? renderObject({ dry_run: true })
+        : renderObject(detailObject(result as ScheduleResult, instanceUrl)),
+      deadlines.length > 0
+        ? renderList("deadlines", deadlines, [
+            computed("deadline", (d) => d.deadline),
+            computed("from", (d) => d.from ?? "(unset)"),
+            computed("to", (d) => d.to),
+          ])
+        : "",
+      notify
+        ? renderObject({
+            announce: dryRun
+              ? `${notify.would_notify} would be told${notify.requested ? "" : " with --notify"}`
+              : announceLine(notify),
+          })
+        : "",
+      renderHelp(
+        [
+          ...notes,
+          dryRun ? `Run without --dry-run to ${endpoint === "reopen" ? "reopen" : "extend"}` : hint,
+        ].filter((n): n is string => Boolean(n)),
+      ),
+    ),
+  );
 }

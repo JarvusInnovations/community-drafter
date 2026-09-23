@@ -84,12 +84,14 @@ export function buildParticipantBundle(
       addressed_to: document.record.addressed_to ?? [],
       reply_to: document.record.reply_to,
       sender_name: document.record.sender_name,
+      // `specs/behaviors/signatures.md` § Delivery: the card's delivered line.
+      delivered_at: document.record.delivered_at,
+      delivered_note: document.record.delivered_note,
     },
     version: {
       number: version.number,
       summary: version.summary,
       published_at: version.published_at,
-      final: version.final,
       html: rendered.html,
       is_current: version.number === latest?.number,
     },
