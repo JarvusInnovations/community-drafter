@@ -2558,7 +2558,7 @@ var PEOPLE_FLAGS = {
   links: { positionals: 1, value: ["--person", "--out"] },
   send: { positionals: 1, value: ["--person"], boolean: ["--only-unsent", "--dry-run"] },
   remove: { positionals: 2 },
-  remind: { positionals: 1, value: ["--target", "--min-age"], boolean: ["--dry-run"] },
+  remind: { positionals: 1, value: ["--target", "--person", "--min-age"], boolean: ["--dry-run"] },
   "revoke-link": { positionals: 2 },
   "reissue-link": { positionals: 2 },
   expire: { positionals: 2, value: ["--expires-at"] }
@@ -2610,10 +2610,13 @@ send <slug> [--only-unsent] [--person a,b] [--dry-run]
        Prints how many the mailer accepted and names the ones it rejected; a
        rejected invitee stays not_sent, so running send again picks them up.
        --dry-run lists who would receive one and who is skipped and why.
-remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]
+remind <slug> --target unopened|opened-not-acted [--person a,b] [--min-age <hours>] [--dry-run]
        Skips anyone this document has messaged within --min-age hours (default
        48; pass 0 to send regardless) and reports what it actually sent,
        counting recently-messaged and reminders-off invitees separately.
+       --person limits the run to those people; --target, --min-age and the
+       reminders preference still apply, and each named person not reminded
+       is listed with why. A name with no invitation here is refused.
 revoke-link <slug> <person>
 reissue-link <slug> <person>
        Prints the new link once.
@@ -2904,10 +2907,12 @@ async function peopleCommand(args) {
           "Valid targets: unopened, opened-not-acted"
         ]);
       }
+      const person = csv(str(parsed, "--person"));
       const result = await client.post(
         `/documents/${encodeURIComponent(slug)}/invitations/remind`,
         {
           target,
+          person: person.length > 0 ? person : void 0,
           min_age_hours: minAgeHours(parsed),
           dry_run: bool(parsed, "--dry-run") || void 0
         }
@@ -2945,6 +2950,10 @@ async function peopleCommand(args) {
               commit: result.commit ?? void 0
             }
           ),
+          result.skipped && result.skipped.length > 0 ? renderList("skipped", result.skipped, [
+            computed("person", (s) => s.person),
+            computed("reason", (s) => s.reason)
+          ]) : "",
           remindFailures.length > 0 ? renderList("failures", remindFailures, [
             computed("person", (f) => f.person),
             computed("error", (f) => f.error)
@@ -3793,8 +3802,8 @@ var COMMAND_GROUPS = [
         summary: "Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why."
       },
       {
-        usage: "people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]",
-        summary: "Send reminders \u2014 the last call, naming the next deadline and asking them to sign or decline \u2014 to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). There is no automatic reminder."
+        usage: "people remind <slug> --target unopened|opened-not-acted [--person a,b] [--min-age <hours>] [--dry-run]",
+        summary: "Send reminders \u2014 the last call, naming the next deadline and asking them to sign or decline \u2014 to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). --person limits the run to named people, still subject to the target, interval and preference, and lists each one skipped with why. There is no automatic reminder."
       },
       { usage: "people revoke-link <slug> <person>", summary: "Revoke one person's link." },
       {
@@ -3911,7 +3920,7 @@ function renderTopLevelHelp() {
 }
 
 // src/cli/cli.ts
-var VERSION = true ? "06b4229" : "dev";
+var VERSION = true ? "6b8942d" : "dev";
 var COMMAND_HELP = {
   login: LOGIN_HELP,
   logout: LOGOUT_HELP,

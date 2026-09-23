@@ -72,8 +72,23 @@ interface ExpireBody {
 
 interface RemindBody {
   target: "unopened" | "opened_not_acted";
+  person?: string[];
   min_age_hours?: number;
   dry_run?: boolean;
+}
+
+/**
+ * `specs/api/admin.md`: a reminder's `person` is a list of person slugs; an
+ * empty or absent list means "everyone in the target".
+ */
+function parsePersonList(value: unknown): string[] | null {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.some((p) => typeof p !== "string" || p.length === 0)) {
+    throw new ApiError("validation_failed", "person must be a list of person slugs.", {
+      field: "person",
+    });
+  }
+  return value.length > 0 ? [...new Set(value as string[])] : null;
 }
 
 /**
@@ -781,21 +796,51 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       const slug = document.record.slug;
       const { target, dry_run } = request.body;
       const minAgeHours = parseMinAgeHours(request.body.min_age_hours);
+      const named = parsePersonList(request.body.person);
       const cutoff = Date.now() - minAgeHours * 3_600_000;
 
-      const inTarget = fastify.storage.readModel
-        .listParticipationsForDocument(slug)
-        .filter((entry) => !entry.record.link_revoked)
-        .filter((entry) => {
-          // `specs/behaviors/notifications.md` § Messages: reminders reach
-          // U and O only — someone who removed their name is in D and hears
-          // nothing but their own receipts, even though their derived
-          // status reads `opened` again.
-          const segment = segmentOf(fastify, entry, document.versions.length);
-          const status = participationStatus(fastify, entry);
-          if (target === "unopened") return status === "unopened" && segment === "U";
-          return status === "opened" && segment === "O";
-        });
+      let participations = fastify.storage.readModel.listParticipationsForDocument(slug);
+      if (named) {
+        // `specs/api/admin.md`: a name with no invitation on this document is
+        // refused before anything is sent, naming every unknown slug.
+        const invited = new Set(participations.map((entry) => entry.record.person));
+        const unknown = named.filter((p) => !invited.has(p));
+        if (unknown.length > 0) {
+          throw new ApiError(
+            "validation_failed",
+            `No invitation on '${slug}' for: ${unknown.join(", ")}.`,
+            { field: "person", unknown },
+          );
+        }
+        const wanted = new Set(named);
+        participations = participations.filter((entry) => wanted.has(entry.record.person));
+      }
+
+      // Naming people narrows the run and overrides nothing: each named
+      // person who is not reminded is reported with the reason.
+      const skipped: Array<{
+        person: string;
+        reason: "not_in_target" | "link_revoked" | "recently_messaged" | "reminders_off";
+      }> = [];
+
+      const inTarget = participations.filter((entry) => {
+        if (entry.record.link_revoked) {
+          skipped.push({ person: entry.record.person, reason: "link_revoked" });
+          return false;
+        }
+        // `specs/behaviors/notifications.md` § Messages: reminders reach
+        // U and O only — someone who removed their name is in D and hears
+        // nothing but their own receipts, even though their derived
+        // status reads `opened` again.
+        const segment = segmentOf(fastify, entry, document.versions.length);
+        const status = participationStatus(fastify, entry);
+        const hit =
+          target === "unopened"
+            ? status === "unopened" && segment === "U"
+            : status === "opened" && segment === "O";
+        if (!hit) skipped.push({ person: entry.record.person, reason: "not_in_target" });
+        return hit;
+      });
 
       // `specs/behaviors/notifications.md` § Sending: a reminder never goes
       // to someone this document messaged within `min_age_hours`, and the
@@ -807,15 +852,18 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
       for (const entry of inTarget) {
         if (!prefOn(entry, "reminders")) {
           skippedPref += 1;
+          skipped.push({ person: entry.record.person, reason: "reminders_off" });
           continue;
         }
         const last = lastMessagedAt(entry);
         if (last !== undefined && new Date(last).getTime() > cutoff) {
           skippedRecent += 1;
+          skipped.push({ person: entry.record.person, reason: "recently_messaged" });
           continue;
         }
         candidates.push(entry);
       }
+      const namedSkips = named ? { skipped } : {};
 
       if (dry_run) {
         return {
@@ -824,6 +872,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           skipped_recent: skippedRecent,
           skipped_pref: skippedPref,
           min_age_hours: minAgeHours,
+          ...namedSkips,
         };
       }
 
@@ -890,6 +939,7 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         skipped_recent: skippedRecent,
         skipped_pref: skippedPref,
         min_age_hours: minAgeHours,
+        ...namedSkips,
         failures: delivery.failures,
         commit: commitHash,
       };

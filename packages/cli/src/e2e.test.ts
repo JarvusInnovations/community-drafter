@@ -391,6 +391,48 @@ describe("signatories-axi end to end (real API, temp data repo)", () => {
     expect(remindForced.exitCode).toBe(0);
     expect(remindForced.output).toContain("sent: 2");
 
+    // `--person` narrows the run to the named people and nothing else.
+    const remindNamed = await run([
+      "people",
+      "remind",
+      slug,
+      "--target",
+      "unopened",
+      "--person",
+      "ada-lovelace",
+      "--min-age",
+      "0",
+    ]);
+    expect(remindNamed.exitCode).toBe(0);
+    expect(remindNamed.output).toContain("sent: 1");
+
+    const remindNamedSkip = await run([
+      "people",
+      "remind",
+      slug,
+      "--target",
+      "opened-not-acted",
+      "--person",
+      "ada-lovelace",
+      "--dry-run",
+    ]);
+    expect(remindNamedSkip.exitCode).toBe(0);
+    expect(remindNamedSkip.output).toContain("targeted: 0");
+    expect(remindNamedSkip.output).toContain("ada-lovelace");
+    expect(remindNamedSkip.output).toContain("not_in_target");
+
+    const remindUnknown = await run([
+      "people",
+      "remind",
+      slug,
+      "--target",
+      "unopened",
+      "--person",
+      "nobody-here",
+    ]);
+    expect(remindUnknown.exitCode).toBe(2);
+    expect(remindUnknown.output).toContain("nobody-here");
+
     // 5. people links round trip — the one command allowed to print tokens
     const links = await run(["people", "links", slug]);
     expect(links.exitCode).toBe(0);
