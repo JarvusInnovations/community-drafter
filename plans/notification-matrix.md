@@ -1,5 +1,6 @@
 ---
-status: in-progress
+status: done
+pr: 119
 depends: [quiet-declines]
 issues: [115]
 specs:
@@ -117,28 +118,28 @@ command).
 
 ## Validation
 
-- [ ] One test per matrix row proving exactly who receives it: invitation, signing
+- [x] One test per matrix row proving exactly who receives it: invitation, signing
       receipt, revocation receipt, listing-changed, review receipt (comment, decline,
       combined-with-signature), reminder, schedule-changed, disposition, confirm-call,
       delivered.
-- [ ] Nothing is sent by: signing opening, signing closing (clock or `docs close`),
+- [x] Nothing is sent by: signing opening, signing closing (clock or `docs close`),
       an extend or reopen without `notify`, a publish without `notify_commenters`.
-- [ ] `schedule-changed` reaches O only (not U, S, D), reports its count on dry run
+- [x] `schedule-changed` reaches O only (not U, S, D), reports its count on dry run
       and on the real call, and a second `--notify` on a later change reaches the same
       people again.
-- [ ] `disposition-v<n>` reaches answered authors in O/S/S-behind/C/D and nobody
+- [x] `disposition-v<n>` reaches answered authors in O/S/S-behind/C/D and nobody
       else; publish reports would/sent either way.
-- [ ] `confirm-call` dry run lists S-behind and C only; the real call mails them once
+- [x] `confirm-call` dry run lists S-behind and C only; the real call mails them once
       per call and commits `Action: confirm-call`; nobody qualifying sends nothing and
       says so; "Keep my name" clears drift and conditional.
-- [ ] `delivered` writes `delivered_at`, mails every current signer once, 409
+- [x] `delivered` writes `delivered_at`, mails every current signer once, 409
       `already_delivered` on a second call; refused before signing opens.
-- [ ] The signing receipt's "What happens next" names the confirm-call and delivery
+- [x] The signing receipt's "What happens next" names the confirm-call and delivery
       promises before delivery and omits them after.
-- [ ] The deliverable is clean after signing closes or after delivery, draft before.
-- [ ] `final` gone from the API, CLI and UI; a stored `Final: true` version reads fine.
-- [ ] Prefs: only `reminders` and `my_comments_addressed`; stop-optional turns both off.
-- [ ] Gates: lint, format:check, typecheck, tests in `apps/api`, `apps/web`,
+- [x] The deliverable is clean after signing closes or after delivery, draft before.
+- [x] `final` gone from the API, CLI and UI; a stored `Final: true` version reads fine.
+- [x] Prefs: only `reminders` and `my_comments_addressed`; stop-optional turns both off.
+- [x] Gates: lint, format:check, typecheck, tests in `apps/api`, `apps/web`,
       `packages/cli`, `packages/shared`; web build + `check:bundle-size`; CLI bundle
       rebuilt and drift gate clean.
 
@@ -154,4 +155,35 @@ command).
 
 ## Notes
 
+- **`schedule-changed`, `confirm-call` and `delivered` are not preference-gated.**
+  The brief leaves only `reminders` and `my_comments_addressed`; `reminders` is
+  switched off automatically when someone comments, so gating "more time" on it
+  would have dropped the commenters the O segment explicitly includes. They are
+  operator-requested, counted before sending, and rare. The preferences page says
+  the team may write about these.
+- **Reminders now filter by segment too.** A person who removed their name derives
+  status `opened` again, so `opened-not-acted` used to reach them; the matrix puts
+  them in D, so the route now also requires segment U or O.
+- **Delivery does not close signing.** It is a fact on the document, allowed from
+  the signing phase on; the message counts the list at the moment of delivery, and
+  the deliverable stays a live render.
+- **Confirm-call** is refused after delivery (409 `already_delivered`) and outside
+  the commenting/signing phases; `--by` must be in the future and no later than
+  `signing_closes_at`. Its commit is `Action: confirm-call` with the count in the
+  subject; the recipients' `notified."confirm-call-<ts>"` marks ride in it.
+- **The card:** a conditional signer is offered "Confirm my signature" at any time
+  (it also clears drift); an unconditional signer behind the text gets "Keep my
+  name". The reassurance line drops the confirm promise once delivered.
+- **Every template keeps the clock sentence** (§ Content rules "Shape"), except
+  the reminder, whose first sentence already is the deadline.
+- The review receipt for a signing submission is replaced by one signing receipt
+  that mentions the comments.
+- Tests: `apps/api/src/notifications/matrix.test.ts` stages one person per segment
+  and asserts exactly who each row reaches. At bun's default 5 s timeout two API
+  tests timed out on the loaded host; all 311 pass with `--timeout 30000`.
+
 ## Follow-ups
+
+- None. The live document's team needs to know that `docs confirm-call` and
+  `docs delivered` are now the only way its signers hear anything further; that is
+  an operator briefing, not code.
