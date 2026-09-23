@@ -35,7 +35,6 @@ export interface CommitInput {
   person?: string;
   version?: number;
   summary?: string;
-  final?: boolean;
   notes?: string;
   submission?: string;
   judgement?: Judgement;
@@ -79,7 +78,6 @@ function buildTrailers(action: Action, input: CommitInput): Trailers {
   if (input.person !== undefined) trailers.Person = input.person;
   if (input.version !== undefined) trailers.Version = input.version;
   if (input.summary !== undefined) trailers.Summary = input.summary;
-  if (input.final) trailers.Final = "true";
   if (input.notes !== undefined) trailers.Notes = input.notes;
   if (input.submission !== undefined) trailers.Submission = input.submission;
   if (input.judgement !== undefined) trailers.Judgement = input.judgement;

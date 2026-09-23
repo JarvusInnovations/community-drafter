@@ -10,14 +10,10 @@ export interface DeliverTarget {
   /**
    * `true`: this dispatcher owns the `notified` check-and-mark for this
    * recipient, writing it only for messages the mailer accepted — the
-   * normal path (`invitation`, `signing-opened`, `closed`, `closing-soon`,
-   * `schedule-changed`, digest, sign/revoke/review-receipt confirmations,
-   * `final-published` for commenters). `false`: the caller marked
-   * `notified` itself in the commit that triggered this send
-   * (publish-triggered `v<n>`/`disposition-v<n>`/`final-published` for
-   * signers — see `lib/notify.ts`) or records its own bookkeeping from the
-   * `sentPeople` this call returns (`remind`) — the dispatcher only renders
-   * and sends, never marks.
+   * normal path (`invitation`, the receipts, `schedule-changed`,
+   * `disposition-v<n>`, `confirm-call`, `delivered`). `false`: the caller
+   * records its own bookkeeping from the `sentPeople` this call returns
+   * (`remind`) — the dispatcher only renders and sends, never marks.
    */
   markNotified: boolean;
   render: (ctx: RecipientContext) => TemplateResult;
@@ -55,6 +51,14 @@ export interface DeliverOptions {
    * rejected is left genuinely unsent rather than merely unrecorded.
    */
   alsoSet?: Record<string, unknown>;
+  /**
+   * The `Action` and subject of the success commit, when it is not an
+   * ordinary `send` — a confirm-call is recorded as `Action: confirm-call`
+   * naming how many signers it reached (`specs/data-model.md`). The subject
+   * is built from the number of people actually marked.
+   */
+  commitAction?: "send" | "confirm-call";
+  commitSubject?: (marked: number) => string;
 }
 
 export interface DeliverSummary {
@@ -285,6 +289,8 @@ export class NotificationDispatcher {
         actor,
         requestId,
         opts.alsoSet,
+        opts.commitAction ?? "send",
+        opts.commitSubject,
       );
     }
 
@@ -306,12 +312,16 @@ export class NotificationDispatcher {
     actor: Actor,
     requestId: string | undefined,
     alsoSet: Record<string, unknown> | undefined,
+    action: "send" | "confirm-call" = "send",
+    subject?: (marked: number) => string,
   ): Promise<string | null> {
     const result = await this.fastify.storage.commit(
-      "send",
+      action,
       {
         actor,
-        subject: `send: ${notifiedField} for ${document} (${people.length} recipients)`,
+        subject:
+          subject?.(people.length) ??
+          `send: ${notifiedField} for ${document} (${people.length} recipients)`,
         document,
         requestId,
       },

@@ -84,7 +84,6 @@ export interface DocumentVersion {
   summary: string;
   published_at: string;
   published_by: string;
-  final: boolean;
   notes?: string;
   body: string;
 }
@@ -485,7 +484,6 @@ export class ReadModel {
         summary: entry.trailers.Summary ?? stripPublishPrefix(entry.subject, slug),
         published_at: entry.committerDate,
         published_by: entry.trailers.Actor ?? entry.authorName,
-        final: entry.trailers.Final === "true",
         notes: entry.trailers.Notes,
         body,
       });

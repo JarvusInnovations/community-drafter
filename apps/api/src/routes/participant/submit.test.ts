@@ -293,7 +293,11 @@ describe("POST /i/:token/api/submit", () => {
     const { server, cleanup, mailer } = await buildTestServer();
     cleanups.push(cleanup);
 
-    await seedDocument(server, { slug: "doc-receipt" });
+    await seedDocument(server, {
+      slug: "doc-receipt",
+      comments_close_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+      signing_closes_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+    });
     await seedParticipant(server, { document: "doc-receipt", person: "jane-doe", token: TOKEN_A });
 
     await server.inject({
@@ -311,9 +315,10 @@ describe("POST /i/:token/api/submit", () => {
 
     const { FakeMailer } = await import("../../lib/mailer/index.ts");
     const fakeMailer = mailer as InstanceType<typeof FakeMailer>;
-    const receipt = fakeMailer.sent.filter((m) => m.subject.includes("we received your review"));
+    const receipt = fakeMailer.sent.filter((m) => m.subject.includes("we received your comments"));
     expect(receipt).toHaveLength(1);
     expect(receipt[0]?.to.email).toBe("jane-doe@example.org");
+    expect(receipt[0]?.text).toMatch(/You can add more comments until /u);
 
     await server.close();
   });

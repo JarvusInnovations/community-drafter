@@ -8,8 +8,8 @@
  */
 export const deliverableCopy = {
   addressedTo: (names: string[]): string => `To: ${joinNames(names)}`,
-  meta: (version: number, date: string, final: boolean): string =>
-    `Version ${version} · ${date}${final ? " · final text" : ""}`,
+  meta: (version: number, date: string, deliveredOn?: string): string =>
+    `Version ${version} · ${date}${deliveredOn ? ` · delivered ${deliveredOn}` : ""}`,
   draftNote: (version: number): string =>
     `Draft of version ${version} — the text and the signatory list may still change.`,
   watermark: "DRAFT",

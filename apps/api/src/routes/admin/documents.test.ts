@@ -75,11 +75,11 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
   });
 
   /**
-   * Issue #71 — `specs/behaviors/document-lifecycle.md` § Extension: the
-   * change is "announced ... with old and new times", so the event the
-   * notification dispatcher consumes has to carry the previous values.
+   * `specs/api/admin.md` § schedule: the response names each deadline that
+   * moved with its old and new value — the payload `schedule-changed`
+   * quotes when the operator asks for it — and says whom it did not tell.
    */
-  it("publishes schedule-changed with the old and new value of each deadline that moved", async () => {
+  it("reports the old and new value of each deadline that moved, and tells nobody without notify", async () => {
     const { server, cleanup } = await buildTestServer();
     cleanups.push(cleanup);
 
@@ -91,11 +91,6 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
       signing_closes_at: signingClosesAt,
     });
 
-    const seen: unknown[] = [];
-    const off = server.events.on((event) => {
-      if (event.type === "schedule-changed") seen.push(event);
-    });
-
     const laterSigning = new Date(Date.now() + 10_800_000).toISOString();
     const response = await server.inject({
       method: "POST",
@@ -104,13 +99,9 @@ describe("POST /admin/api/documents/:slug/schedule", () => {
       payload: { signing_closes_at: laterSigning },
     });
     expect(response.statusCode).toBe(200);
-    off();
-
-    expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({
-      type: "schedule-changed",
-      document: "doc-schedule-event",
-      changes: [{ deadline: "signing_closes_at", from: signingClosesAt, to: laterSigning }],
+    expect(response.json()).toMatchObject({
+      deadlines: [{ deadline: "signing_closes_at", from: signingClosesAt, to: laterSigning }],
+      notify: { requested: false, would_notify: 0 },
     });
 
     await server.close();

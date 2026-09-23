@@ -1,22 +1,21 @@
 import type { FastifyInstance } from "fastify";
 
-import { derivePhase, type Phase } from "../phase/phase.ts";
+import { derivePhase } from "../phase/phase.ts";
 
 const OBSERVER_ACTOR = { kind: "system" } as const;
 
 /**
  * `specs/behaviors/document-lifecycle.md`: "closed (state is also flipped
- * to `closed` by the first read or the scheduler that observes it)" and
- * "Comments close on the clock" / signing-opened boundary. `derivePhase` is
- * a pure read-time function (never mutates); this timer is "the scheduler
- * that observes it" — it walks every open document each tick, flips
- * `state = closed` the moment `signing_closes_at` passes (an ordinary
- * `close`-action commit, attributed to the `cli:phase-observer` actor), and
- * emits `signing-opened` / `closed` bus events exactly once per crossing.
+ * to `closed` by the first read or the scheduler that observes it)".
+ * `derivePhase` is a pure read-time function (never mutates); this timer is
+ * "the scheduler that observes it" — it walks every open document each
+ * tick and flips `state = closed` the moment `signing_closes_at` passes (an
+ * ordinary `close`-action commit, attributed to `system`). It announces
+ * nothing: a phase change is a state change, and state changes don't speak
+ * (`specs/principles.md` § Operators speak; state changes don't).
  */
 export class PhaseObserver {
   private timer: ReturnType<typeof setInterval> | undefined;
-  private readonly lastPhase = new Map<string, Phase>();
 
   constructor(
     private readonly fastify: FastifyInstance,
@@ -45,14 +44,7 @@ export class PhaseObserver {
       const { record } = entry;
       if (record.state !== "open") continue;
 
-      const phase = derivePhase(record, now);
-      const previous = this.lastPhase.get(record.slug);
-
-      if (phase === "signing" && previous === "commenting") {
-        await this.fastify.events.publish({ type: "signing-opened", document: record.slug });
-      }
-
-      if (phase === "closed") {
+      if (derivePhase(record, now) === "closed") {
         await this.fastify.storage.commit(
           "close",
           {
@@ -64,10 +56,7 @@ export class PhaseObserver {
             await tx.documents.patch({ slug: record.slug }, { state: "closed" });
           },
         );
-        await this.fastify.events.publish({ type: "closed", document: record.slug });
       }
-
-      this.lastPhase.set(record.slug, phase);
     }
   }
 }

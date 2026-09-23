@@ -1,27 +1,19 @@
 import type { FastifyInstance } from "fastify";
 
-import { prefOn } from "../lib/notify.ts";
-import { computeSignatories } from "../lib/signatories.ts";
-import { digestTemplate } from "./templates.ts";
 import { dateInTimezone, hourInTimezone } from "./format.ts";
 import { sendOperatorDigest } from "./operator-digest.ts";
 
-const OBSERVER_ACTOR = { kind: "system" } as const;
-
 /**
- * `specs/behaviors/notifications.md` § Sending: "The digest job runs once
- * daily at a configured hour in the instance time zone" and § Messages:
- * `digest-<date>`, "only if anything changed that day". "Changed" is read
- * as "a version was published today" — dispositions and signatory counts
- * only ever change alongside a publish (`admin.md`'s `POST .../versions` is
- * the only writer of both), so gating on "any version today" also gates
- * the other two facts the digest reports.
+ * `specs/behaviors/notifications.md` § Sending: "The operator digest runs
+ * once daily at a configured hour in the instance time zone. It is the only
+ * scheduled sender; nothing scheduled ever mails a participant." The
+ * participant digest that used to share this tick is gone
+ * (`specs/principles.md` § Every email asks something of its reader).
  *
- * The idempotency field is `participations.notified.digest`, holding the
- * *last date sent* rather than a boolean — `specs/data-model.md`:
- * `notified.digest = "2026-09-21"` — so re-running after the configured
- * hour on the same day is a no-op (already sent today) and a new day's run
- * sends again even though the field is already set.
+ * A document is considered when it is open, or when its signing window
+ * closed inside the last 24 hours — so the day signing closes is reported
+ * to the team even though the phase observer has already flipped the
+ * record to `closed`, and likewise a delivery recorded on a closed document.
  */
 export class DigestScheduler {
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -52,84 +44,29 @@ export class DigestScheduler {
     if (hourInTimezone(now, timezone) !== this.fastify.config.INSTANCE_DIGEST_HOUR) return;
 
     const today = dateInTimezone(now, timezone);
-    const since = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
+    const sinceMs = now.getTime() - 24 * 60 * 60_000;
+    const since = new Date(sinceMs).toISOString();
 
     for (const documentEntry of this.fastify.storage.readModel.listDocuments()) {
-      if (documentEntry.record.state !== "open") continue;
-      const slug = documentEntry.record.slug;
+      const { record } = documentEntry;
+      const closedInWindow =
+        record.state === "closed" &&
+        record.signing_closes_at !== undefined &&
+        new Date(record.signing_closes_at).getTime() >= sinceMs;
+      const deliveredInWindow =
+        record.delivered_at !== undefined && new Date(record.delivered_at).getTime() >= sinceMs;
+      if (record.state !== "open" && !closedInWindow && !deliveredInWindow) continue;
 
-      // `specs/behaviors/notifications.md` § Sending: the participant
-      // digest and the operator digest (§ Operator digest) both run on this
-      // tick. The operator one is not preference-gated and goes to the
-      // document's own operators, so it runs whatever the participants'
-      // preferences say — and sends nothing on a quiet day.
       try {
         await sendOperatorDigest(this.fastify, documentEntry, today, since, now);
       } catch (err) {
         // Operator mail is logged and never allowed to fail anything
         // (§ Operator mail); one document's digest must not stop the rest.
         this.fastify.log.warn(
-          { document: slug, err: err instanceof Error ? err.message : String(err) },
+          { document: record.slug, err: err instanceof Error ? err.message : String(err) },
           "operator digest: failed",
         );
       }
-
-      const versionsToday = documentEntry.versions.filter(
-        (version) => dateInTimezone(new Date(version.published_at), timezone) === today,
-      );
-      if (versionsToday.length === 0) continue;
-
-      const participations = this.fastify.storage.readModel.listParticipationsForDocument(slug);
-      const recipients = participations
-        .filter((entry) => !entry.record.link_revoked)
-        .filter((entry) => prefOn(entry, "daily_digest"))
-        .filter((entry) => entry.record.notified?.digest !== today)
-        .map((entry) => entry.record.person);
-      if (recipients.length === 0) continue;
-
-      const signatoryCounts = computeSignatories(participations, "count") ?? {
-        organizations: 0,
-        individuals: 0,
-        unlisted: 0,
-      };
-      const versionNumbersToday = new Set(versionsToday.map((v) => v.number));
-
-      await this.fastify.notifications.deliver({
-        document: slug,
-        eventKey: `digest-${today}`,
-        notifiedField: "digest",
-        notifiedValue: today,
-        isAlreadyNotified: (current) => current === today,
-        actor: OBSERVER_ACTOR,
-        targets: recipients.map((person) => ({
-          person,
-          markNotified: true,
-          render: (ctx) => {
-            const participation = participations.find((entry) => entry.record.person === person);
-            // `principles.md`/`notifications.md` § Local: "a person hears
-            // about a version at most once per channel" — a version this
-            // person already got via `every_revision`'s `v<n>` send is
-            // omitted from their own digest, even though it's still listed
-            // for everyone else who hasn't.
-            const versions = versionsToday
-              .filter((v) => participation?.record.notified?.[`v${v.number}`] === undefined)
-              .map((v) => ({ number: v.number, summary: v.summary }));
-
-            const dispositions = this.fastify.storage.readModel
-              .listSubmissionsForDocument(slug)
-              .filter((s) => s.record.person === person)
-              .flatMap((s) => s.record.comments ?? [])
-              .filter(
-                (c) =>
-                  c.disposition !== undefined &&
-                  c.disposition_version !== undefined &&
-                  versionNumbersToday.has(c.disposition_version),
-              )
-              .map((c) => ({ outcome: c.disposition as string, note: c.disposition_note }));
-            return digestTemplate(ctx, { versions, dispositions, signatoryCounts });
-          },
-        })),
-      });
     }
   }
 }

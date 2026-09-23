@@ -44,6 +44,8 @@ export type LifecycleAction =
   | "change_prefs"
   | "admin_publish"
   | "admin_invite"
+  | "admin_confirm_call"
+  | "admin_deliver"
   | "save_comment"
   | "submit_with_comments";
 
@@ -55,6 +57,8 @@ const DEADLINE_KEY: Record<LifecycleAction, "comments_close_at" | "signing_close
   change_prefs: "signing_closes_at",
   admin_publish: "signing_closes_at",
   admin_invite: "signing_closes_at",
+  admin_confirm_call: "signing_closes_at",
+  admin_deliver: "comments_close_at",
   save_comment: "comments_close_at",
   submit_with_comments: "comments_close_at",
 };
@@ -66,6 +70,12 @@ const ALLOWED: Record<LifecycleAction, ReadonlySet<Phase>> = {
   change_prefs: new Set(["commenting", "signing", "closed", "withdrawn"]),
   admin_publish: new Set(["draft", "commenting", "signing"]),
   admin_invite: new Set(["draft", "commenting", "signing"]),
+  // `specs/behaviors/document-lifecycle.md` § What each phase allows: a
+  // confirm-call asks people to act on their signature, which they can do
+  // only while signing is possible; delivery is recorded any time after
+  // signing opens.
+  admin_confirm_call: new Set(["commenting", "signing"]),
+  admin_deliver: new Set(["signing", "closed"]),
   // `specs/behaviors/review-and-judgement.md`: comment saves and any
   // submission that carries comments are commenting-phase only; a
   // comment-less `decline` (or a plain `sign`) reuses the `decline`/`sign`
@@ -108,6 +118,10 @@ function phaseClosedMessage(action: LifecycleAction, phase: Phase): string {
       return "This document is closed; reopen it to invite more people.";
     case "change_prefs":
       return "Preferences can no longer be changed.";
+    case "admin_confirm_call":
+      return "Signing has closed; nobody can keep or remove their name now.";
+    case "admin_deliver":
+      return "Delivery can be recorded once signing has opened.";
     case "save_comment":
     case "submit_with_comments":
       return "Comments have closed for this document.";

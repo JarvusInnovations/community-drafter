@@ -12,7 +12,10 @@ import { buildSignatureView } from "../../lib/signature-view.ts";
 import { uniqueSlug } from "../../lib/slug.ts";
 import { mintUniqueToken } from "../../lib/tokens.ts";
 import { personalLink } from "../../notifications/links.ts";
+import { segmentOf } from "../../notifications/segments.ts";
+import { formatWhen } from "../../notifications/format.ts";
 import { invitationTemplate, reminderTemplate } from "../../notifications/templates.ts";
+import { derivePhase } from "../../phase/phase.ts";
 import { siteForDocument } from "../../sites/site.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
 
@@ -90,6 +93,25 @@ function parseMinAgeHours(value: unknown): number {
     );
   }
   return value;
+}
+
+/**
+ * The reminder's opening sentence: "Signing closes Wed, Sep 23 · 2 PM EDT."
+ * — during the comment period, "Comments close …, and signing closes …".
+ */
+function reminderDeadline(
+  fastify: FastifyInstance,
+  document: { comments_close_at?: string; signing_closes_at?: string; state: string },
+): string | undefined {
+  const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+  const phase = derivePhase(document as Parameters<typeof derivePhase>[0], new Date());
+  const signing = formatWhen(document.signing_closes_at, timezone);
+  if (!signing) return undefined;
+  const comments = formatWhen(document.comments_close_at, timezone);
+  if (phase === "commenting" && comments) {
+    return `Comments close ${comments}, and signing closes ${signing}.`;
+  }
+  return `Signing closes ${signing}.`;
 }
 
 /**
@@ -765,9 +787,14 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         .listParticipationsForDocument(slug)
         .filter((entry) => !entry.record.link_revoked)
         .filter((entry) => {
+          // `specs/behaviors/notifications.md` § Messages: reminders reach
+          // U and O only — someone who removed their name is in D and hears
+          // nothing but their own receipts, even though their derived
+          // status reads `opened` again.
+          const segment = segmentOf(fastify, entry, document.versions.length);
           const status = participationStatus(fastify, entry);
-          if (target === "unopened") return status === "unopened";
-          return status === "opened";
+          if (target === "unopened") return status === "unopened" && segment === "U";
+          return status === "opened" && segment === "O";
         });
 
       // `specs/behaviors/notifications.md` § Sending: a reminder never goes
@@ -810,6 +837,10 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
         reminderNumber.set(entry.record.person, prior + 1);
       }
 
+      // `specs/behaviors/notifications.md` § What each message says: the
+      // reminder is the last call, so it opens with the deadline and the ask.
+      const deadline = reminderDeadline(fastify, document.record);
+
       const delivery = await fastify.notifications.deliver({
         document: slug,
         eventKey: "reminder",
@@ -819,7 +850,10 @@ const invitationsRoute: FastifyPluginAsync = async (fastify) => {
           person: entry.record.person,
           markNotified: false,
           render: (ctx) =>
-            reminderTemplate(ctx, { n: reminderNumber.get(entry.record.person) ?? 1 }),
+            reminderTemplate(ctx, {
+              n: reminderNumber.get(entry.record.person) ?? 1,
+              deadline,
+            }),
         })),
       });
 

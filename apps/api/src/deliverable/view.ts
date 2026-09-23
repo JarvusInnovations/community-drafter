@@ -32,7 +32,8 @@ export interface DeliverableView {
   addressedTo: string[];
   versionNumber: number;
   versionDate: string;
-  final: boolean;
+  /** "Sep 30, 2026" once the document has been delivered. */
+  deliveredOn?: string;
   draft: boolean;
   bodyHtml: string;
   showSignatories: ShowSignatories;
@@ -45,14 +46,13 @@ export interface DeliverableView {
 }
 
 /**
- * `specs/screens/deliverable.md` § Draft and clean: "draft until the
- * document has a version marked `final` **and** signing has closed, and
- * clean from that moment on." Both conditions — either alone leaves
- * something still moving.
+ * `specs/screens/deliverable.md` § Draft and clean: draft until signing has
+ * closed or the document has been delivered, whichever comes first. There
+ * is no "final" version to wait for; a stored `Final: true` trailer is
+ * ignored.
  */
 export function isDeliverableDraft(document: DocumentEntry, phase: Phase): boolean {
-  const hasFinal = document.versions.some((version) => version.final);
-  return !(hasFinal && phase === "closed");
+  return !(phase === "closed" || Boolean(document.record.delivered_at));
 }
 
 /**
@@ -147,7 +147,9 @@ export function buildDeliverableView(
     addressedTo: document.record.addressed_to ?? [],
     versionNumber: version.number,
     versionDate: formatDeliverableDate(version.published_at, fastify.config.INSTANCE_TIMEZONE),
-    final: version.final,
+    deliveredOn: document.record.delivered_at
+      ? formatDeliverableDate(document.record.delivered_at, fastify.config.INSTANCE_TIMEZONE)
+      : undefined,
     draft,
     bodyHtml: rendered.html,
     showSignatories,
@@ -159,6 +161,7 @@ export function buildDeliverableView(
       version.commit,
       signatureHash,
       draft ? "draft" : "clean",
+      document.record.delivered_at ?? "",
       paper,
       citations,
     ].join(":"),

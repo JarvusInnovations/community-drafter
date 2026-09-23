@@ -5,7 +5,8 @@ import type { FastifyInstance } from "fastify";
 import { computeSignatories } from "../lib/signatories.ts";
 import type { Actor } from "../storage/actor.ts";
 import type { DocumentEntry } from "../storage/read-model.ts";
-import { clockLine, formatWhen } from "./format.ts";
+import { joinNames } from "../deliverable/copy.ts";
+import { clockLine, formatDay, formatWhen } from "./format.ts";
 import { sendToDocumentOperators } from "./operator-mail.ts";
 import { derivePhase } from "../phase/phase.ts";
 
@@ -15,14 +16,15 @@ import { derivePhase } from "../phase/phase.ts";
  * signatures, an opt-out and two participant actions produced no message to
  * the team running the document, and the dashboard was the only signal.
  *
- * Three messages, all of them operator mail (§ Operator mail: never
+ * Two messages, both of them operator mail (§ Operator mail: never
  * preference-gated, nothing written to any participation, delivery logged
  * rather than parked in the dispatcher's retry bucket):
  *
  * - `operator-digest-<date>`, daily at the instance digest hour, and only
  *   when something actually happened;
- * - `operator-first-signature` and `operator-first-comment`, once each per
- *   document, the moment they happen.
+ * - `operator-first-signature`, once per document, the moment it happens.
+ *   (There is no first-comment notice any more; comments reach the team in
+ *   the next digest.)
  */
 
 const DIGEST_ACTOR: Actor = { kind: "system" };
@@ -44,6 +46,12 @@ export interface OperatorDigestSummary {
   signaturesRemoved: { count: number; names: string[] };
   declines: number;
   deadlines: string[];
+  /** "Thu, Oct 1 · 5:00 PM EDT" when signing closed inside the window. */
+  signingClosed?: string;
+  /** How many signers each confirm-call in the window reached. */
+  confirmCalls: number[];
+  /** "the State Board of Education on Sep 30" when the document was delivered inside the window. */
+  delivered?: string;
   signatories: { organizations: number; individuals: number; unlisted: number };
 }
 
@@ -75,7 +83,10 @@ function isEmpty(summary: OperatorDigestSummary): boolean {
     summary.signaturesAdded.count === 0 &&
     summary.signaturesRemoved.count === 0 &&
     summary.declines === 0 &&
-    summary.deadlines.length === 0
+    summary.deadlines.length === 0 &&
+    summary.signingClosed === undefined &&
+    summary.confirmCalls.length === 0 &&
+    summary.delivered === undefined
   );
 }
 
@@ -112,12 +123,26 @@ export function collectOperatorDigest(
     signaturesRemoved: { count: 0, names: [] },
     declines: 0,
     deadlines: [],
+    confirmCalls: [],
     signatories: computeSignatories(participations, "count") ?? {
       organizations: 0,
       individuals: 0,
       unlisted: 0,
     },
   };
+
+  // `specs/behaviors/notifications.md` § Operator digest: signing closing is
+  // reported the day it happens — the one state change nobody is mailed
+  // about, so the team hears it here.
+  const closesAt = document.record.signing_closes_at;
+  if (within(closesAt) && new Date(closesAt as string).getTime() <= now.getTime()) {
+    summary.signingClosed = formatWhen(closesAt, timezone, now);
+  }
+  if (within(document.record.delivered_at)) {
+    const to = document.record.addressed_to ?? [];
+    const on = formatDay(document.record.delivered_at, timezone, now);
+    summary.delivered = to.length > 0 ? `to ${joinNames([...to])} on ${on}` : `on ${on}`;
+  }
 
   for (const entry of fastify.storage.readModel.listActivitySince(slug, sinceIso)) {
     const person = entry.trailers.Person;
@@ -165,6 +190,12 @@ export function collectOperatorDigest(
             change.deadline === "comments_close_at" ? "Comments close" : "Signatures are due";
           summary.deadlines.push(from ? `${label}: ${from} → ${to}` : `${label}: ${to}`);
         }
+        break;
+      }
+      case "confirm-call": {
+        // The subject names the count: "confirm-call: <slug> (4 signers)".
+        const match = /\((\d+) signers?\)/u.exec(entry.subject);
+        summary.confirmCalls.push(match ? Number(match[1]) : 0);
         break;
       }
       default:
@@ -236,6 +267,11 @@ export function operatorDigestBody(
     body.push(`- ${summary.declines} decline${summary.declines === 1 ? "" : "s"}`);
   }
   for (const deadline of summary.deadlines) body.push(`- Deadline moved — ${deadline}`);
+  if (summary.signingClosed) body.push(`- Signing closed ${summary.signingClosed}`);
+  for (const reached of summary.confirmCalls) {
+    body.push(`- Confirm-call sent to ${reached} signer${reached === 1 ? "" : "s"}`);
+  }
+  if (summary.delivered) body.push(`- Delivered ${summary.delivered}`);
 
   const unlisted =
     summary.signatories.unlisted > 0 ? ` (${summary.signatories.unlisted} unlisted)` : "";
@@ -318,15 +354,15 @@ export async function sendOperatorDigest(
 }
 
 /**
- * `operator-first-signature` / `operator-first-comment` — the first response
- * is the thing a team is waiting for after it sends a document out, and a
- * day is a long time to wonder whether the link even works. Once each per
- * document, whatever the digest reports later the same day.
+ * `operator-first-signature` — the first signature is the thing a team is
+ * waiting for after it sends a document out, and a day is a long time to
+ * wonder whether the link even works. Once per document, whatever the
+ * digest reports later the same day.
  */
 export async function sendFirstResponseNotice(
   fastify: FastifyInstance,
   slug: string,
-  kind: "first_signature" | "first_comment",
+  kind: "first_signature",
   person: string,
 ): Promise<boolean> {
   const document = fastify.storage.readModel.getDocument(slug);
@@ -346,19 +382,17 @@ export async function sendFirstResponseNotice(
 async function deliverFirstResponseNotice(
   fastify: FastifyInstance,
   document: DocumentEntry,
-  kind: "first_signature" | "first_comment",
+  kind: "first_signature",
   person: string,
 ): Promise<boolean> {
   const slug = document.record.slug;
   const who = operatorFacingName(fastify, slug, person);
   const title = document.record.title;
-  const [subject, sentence] =
-    kind === "first_signature"
-      ? [`${title} — first signature`, `${who} is the first person to sign "${title}".`]
-      : [`${title} — first comments`, `${who} is the first person to comment on "${title}".`];
+  const subject = `${title} — first signature`;
+  const sentence = `${who} is the first person to sign "${title}".`;
 
   const { delivered } = await sendToDocumentOperators(fastify, {
-    eventKey: kind === "first_signature" ? "operator-first-signature" : "operator-first-comment",
+    eventKey: "operator-first-signature",
     document: document.record,
     subject,
     body: [sentence, "The dashboard has the rest as it arrives."],

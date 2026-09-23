@@ -15,7 +15,6 @@ function view(overrides: Partial<DeliverableView> = {}): DeliverableView {
     addressedTo: [],
     versionNumber: 3,
     versionDate: "Sep 20, 2026",
-    final: false,
     draft: true,
     bodyHtml: "<p>We, the undersigned.</p>",
     showSignatories: "list",
@@ -64,7 +63,7 @@ describe("the print document", () => {
     const html = renderDeliverableHtml(
       view({
         addressedTo: ["the State Board of Education", "the County Commission"],
-        final: true,
+        deliveredOn: "Sep 30, 2026",
         draft: false,
         filename: "coalition-charter-v3.pdf",
         signatories: {
@@ -90,7 +89,7 @@ describe("the print document", () => {
 
     expect(html).toContain("To: the State Board of Education and the County Commission");
     expect(html).toContain("Charter of the Save the Academy Coalition");
-    expect(html).toContain("Version 3 · Sep 20, 2026 · final text");
+    expect(html).toContain("Version 3 · Sep 20, 2026 · delivered Sep 30, 2026");
     expect(html).toContain("We, the undersigned.");
     expect(html).toContain("Skype a Scientist");
     expect(html).toContain("Jane Doe, Executive Director");

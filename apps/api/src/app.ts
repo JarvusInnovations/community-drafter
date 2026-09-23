@@ -85,7 +85,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   //     canonical-host redirect for `/d/*` and `/i/*` runs first.
   await fastify.register(sitesPlugin);
 
-  // 3b. The mailer + dispatcher + digest/closing-soon schedulers
+  // 3b. The mailer + dispatcher + operator-digest scheduler
   //     (`notifications` plan). Needs storage + events + config; every
   //     route below (`versions.ts`'s publish handler in particular) calls
   //     `fastify.notifications`, so this must land before routes register.
@@ -184,7 +184,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   await fastify.register(staticRoutes, opts.static ?? {});
 
   // 7. The lifecycle clock's scheduler (`specs/behaviors/document-lifecycle.md`
-  //    § Closing / signing-opened; `events/phase-observer.ts`).
+  //    § Closing; `events/phase-observer.ts`).
   const phaseObserver = new PhaseObserver(fastify, opts.phaseObserverIntervalMs);
   fastify.decorate("phaseObserver", phaseObserver);
   if (!opts.disablePhaseObserver) {

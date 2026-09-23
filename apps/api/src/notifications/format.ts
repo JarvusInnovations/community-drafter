@@ -43,6 +43,23 @@ export function formatWhen(
   return `${day} · ${time}`;
 }
 
+/** "Sep 30" (with the year outside the current year) — a day, for "delivered on …". */
+export function formatDay(
+  iso: string | undefined,
+  timezone: string,
+  now: Date = new Date(),
+): string | undefined {
+  if (!iso) return undefined;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const sameYear = yearIn(date, timezone) === yearIn(now, timezone);
+  return formatter(timezone, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
 /** @deprecated kept for callers outside the templates; new code uses `formatWhen`. */
 export function formatDeadline(iso: string | undefined, timezone: string): string | undefined {
   return formatWhen(iso, timezone);

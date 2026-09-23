@@ -26,6 +26,7 @@ export type ErrorCode =
   | "no_version"
   | "already_exists"
   | "already_sent"
+  | "already_delivered"
   | "has_activity"
   | "last_operator"
   | "hostname_taken"
@@ -78,6 +79,9 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   already_exists: 409,
   // `specs/api/admin.md` § People and invitations: `DELETE .../invitations/:person`.
   already_sent: 409,
+  // `specs/api/admin.md` § Documents → `POST .../delivered`: delivery is
+  // recorded once per document.
+  already_delivered: 409,
   has_activity: 409,
   validation_failed: 422,
   rate_limited: 429,

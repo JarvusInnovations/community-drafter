@@ -2,14 +2,10 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { ApiError } from "../../errors.ts";
 import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
-import { dispatchPublishNotifications } from "../../lib/notify.ts";
+import { personDispositionOutcomes } from "../../lib/notify.ts";
 import { resolveVersion, versionListView } from "../../lib/versions.ts";
-import {
-  dispositionTemplate,
-  finalPublishedTemplate,
-  versionTemplate,
-} from "../../notifications/templates.ts";
-import { finalPublishedCommenterRecipients } from "../../notifications/triggers.ts";
+import { dispositionRecipients } from "../../notifications/segments.ts";
+import { dispositionTemplate } from "../../notifications/templates.ts";
 import { assertPhase } from "../../phase/phase.ts";
 import type { DocumentEntry } from "../../storage/read-model.ts";
 import { adminActor, notFoundDocument } from "./context.ts";
@@ -33,7 +29,12 @@ interface PublishBody {
   body: string;
   summary: string;
   notes?: string;
-  final?: boolean;
+  /**
+   * `specs/api/admin.md` § Versions: publishing mails nobody unless this is
+   * true, and then only the authors this publish answered
+   * (`specs/behaviors/notifications.md` → `disposition-v<n>`).
+   */
+  notify_commenters?: boolean;
   dispositions?: DispositionInput[];
 }
 
@@ -67,7 +68,6 @@ function adminVersionView(fastify: FastifyInstance, entry: DocumentEntry, number
     summary: version.summary,
     published_at: version.published_at,
     published_by: version.published_by,
-    final: version.final,
     notes: version.notes,
     body: version.body,
     dispositions: dispositionsForVersion(fastify, entry.record.slug, version.number),
@@ -111,6 +111,9 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
             body: { type: "string" },
             summary: { type: "string", minLength: 1, maxLength: 200 },
             notes: { type: "string" },
+            notify_commenters: { type: "boolean" },
+            // A retired flag from earlier CLIs: accepted and ignored
+            // (`specs/api/admin.md` § Versions — no version is "final").
             final: { type: "boolean" },
             dispositions: {
               type: "array",
@@ -134,7 +137,7 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
       const slug = entry.record.slug;
       const now = new Date();
       const phaseBeforePublish = assertPhase(entry.record, now, "admin_publish");
-      const { body, summary, notes, final, dispositions = [] } = request.body;
+      const { body, summary, notes, notify_commenters, dispositions = [] } = request.body;
 
       if (body === entry.record.body) {
         throw new ApiError("no_change", "The new text is identical to the current version.");
@@ -201,7 +204,6 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
           document: slug,
           version: newVersionNumber,
           summary,
-          final,
           notes,
           disposed: disposedRefs.length > 0 ? disposedRefs.join(",") : undefined,
           requestId: request.requestId,
@@ -232,86 +234,43 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
         },
       );
 
+      // `specs/principles.md` § Operators speak; state changes don't: a
+      // publish mails nobody by itself. The answered commenters are counted
+      // either way, so the operator reads whom they did — or did not — tell.
       const actor = adminActor(request);
-      const { counts, recipients } = await dispatchPublishNotifications({
-        fastify,
-        document: slug,
-        version: newVersionNumber,
-        final: final === true,
-        dispositionedPersons: [...dispositionedPersons],
-        actor,
-        requestId: request.requestId,
-      });
-
-      // Render + send what `dispatchPublishNotifications` just marked
-      // (`notifications` plan) — `markNotified: false` on every target
-      // below because the marking commit already happened, synchronously,
-      // inside that call.
-      const fromVersion = Math.max(1, newVersionNumber - 1);
-      if (recipients.every_revision.length > 0) {
-        await fastify.notifications.deliver({
-          document: slug,
-          eventKey: `v${newVersionNumber}`,
-          actor,
-          requestId: request.requestId,
-          targets: recipients.every_revision.map((person) => ({
-            person,
-            markNotified: false,
-            render: (ctx) =>
-              versionTemplate(ctx, {
-                version: newVersionNumber,
-                summary,
-                compareLink:
-                  newVersionNumber === 1
-                    ? ctx.personalLink
-                    : `${ctx.personalLink}/history/compare?from=${fromVersion}&to=${newVersionNumber}`,
-              }),
-          })),
-        });
-      }
-      if (recipients.dispositions.length > 0) {
-        await fastify.notifications.deliver({
+      const commenterRecipients = dispositionRecipients(fastify, slug, [...dispositionedPersons]);
+      const commenters: {
+        requested: boolean;
+        would_notify: number;
+        sent?: number;
+        failed?: number;
+        failures?: Array<{ person: string; error: string }>;
+      } = { requested: notify_commenters === true, would_notify: commenterRecipients.length };
+      if (notify_commenters === true && commenterRecipients.length > 0) {
+        const fromVersion = Math.max(1, newVersionNumber - 1);
+        const delivery = await fastify.notifications.deliver({
           document: slug,
           eventKey: `disposition-v${newVersionNumber}`,
           actor,
           requestId: request.requestId,
-          targets: recipients.dispositions.map(({ person, outcomes }) => ({
+          targets: commenterRecipients.map((person) => ({
             person,
-            markNotified: false,
-            render: (ctx) => dispositionTemplate(ctx, { version: newVersionNumber, outcomes }),
-          })),
-        });
-      }
-      if (recipients.final_published.length > 0) {
-        await fastify.notifications.deliver({
-          document: slug,
-          eventKey: "final-published",
-          actor,
-          requestId: request.requestId,
-          targets: recipients.final_published.map(({ person, conditional }) => ({
-            person,
-            markNotified: false,
+            markNotified: true,
             render: (ctx) =>
-              finalPublishedTemplate(ctx, { version: newVersionNumber, conditional }),
+              dispositionTemplate(ctx, {
+                version: newVersionNumber,
+                outcomes: personDispositionOutcomes(fastify, slug, person, newVersionNumber),
+                compareLink: `${ctx.personalLink}/history/compare?from=${fromVersion}&to=${newVersionNumber}`,
+              }),
           })),
         });
-      }
-      if (final === true) {
-        const commenterRecipients = finalPublishedCommenterRecipients(fastify, slug);
-        if (commenterRecipients.length > 0) {
-          await fastify.notifications.deliver({
-            document: slug,
-            eventKey: "final-published",
-            actor,
-            requestId: request.requestId,
-            targets: commenterRecipients.map((person) => ({
-              person,
-              markNotified: true,
-              render: (ctx) =>
-                finalPublishedTemplate(ctx, { version: newVersionNumber, conditional: false }),
-            })),
-          });
-        }
+        commenters.sent = delivery.sent;
+        commenters.failed = delivery.failed;
+        commenters.failures = delivery.failures;
+      } else if (notify_commenters === true) {
+        commenters.sent = 0;
+        commenters.failed = 0;
+        commenters.failures = [];
       }
 
       await fastify.events.publish({
@@ -319,7 +278,6 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
         document: slug,
         version: newVersionNumber,
         commit: result.commitHash ?? "",
-        final: final === true,
       });
 
       return {
@@ -327,7 +285,7 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
         summary,
         commit: result.commitHash,
         signing_closes_at: extendedSigningClosesAt,
-        notified: counts,
+        notified: { commenters },
       };
     },
   );

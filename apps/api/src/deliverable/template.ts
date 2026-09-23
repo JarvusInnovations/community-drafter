@@ -50,7 +50,7 @@ function titleBlock(view: DeliverableView): string {
     view.addressedTo.length > 0
       ? `<p class="addressed">${escapeHtml(deliverableCopy.addressedTo(view.addressedTo))}</p>`
       : "";
-  const meta = deliverableCopy.meta(view.versionNumber, view.versionDate, view.final);
+  const meta = deliverableCopy.meta(view.versionNumber, view.versionDate, view.deliveredOn);
   const draftNote = view.draft
     ? `<p class="draft-note">${escapeHtml(deliverableCopy.draftNote(view.versionNumber))}</p>`
     : "";

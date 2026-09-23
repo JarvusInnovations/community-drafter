@@ -1,14 +1,17 @@
 import type { ParticipationEntry } from "../storage/read-model.ts";
-import { isCurrentSigner, prefOn } from "./notify.ts";
+import { prefOn } from "./notify.ts";
 
+/**
+ * `specs/api/participant.md` § prefs: the `notify` table — `channel`,
+ * `my_comments_addressed`, `reminders` — plus the masked email. There are
+ * no forced keys: every message a preference could have forced on is
+ * either a receipt or an operator's deliberate send
+ * (`specs/behaviors/notifications.md` § Defaults).
+ */
 export interface PrefsView {
   channel: string;
-  every_revision: boolean;
-  daily_digest: boolean;
-  phase_changes: boolean;
   my_comments_addressed: boolean;
   reminders: boolean;
-  forced: string[];
   /** `specs/screens/preferences.md` § Data Requirements: "email shown masked, e.g. `j***@example.org`." */
   email_masked?: string;
 }
@@ -22,37 +25,11 @@ export function maskEmail(email: string): string {
   return `${local.slice(0, 1)}${"*".repeat(Math.max(local.length - 1, 1))}@${domain}`;
 }
 
-/**
- * `specs/behaviors/notifications.md` § Messages: `signing-opened`,
- * `final-published` and `closing-soon` are "forced on" for current
- * signers, and all three ride on the `phase_changes` toggle for anyone
- * else. There is no dedicated toggle for those three events in
- * `NotifyPrefsSchema`, so a current signer's `phase_changes` key is the one
- * this plan reports as forced — `plans/api-core.md` doesn't spell out the
- * mapping; this is the reading that matches "the preference toggle is
- * shown disabled" (one toggle, not three).
- */
-export function forcedKeys(entry: ParticipationEntry): string[] {
-  return isCurrentSigner(entry) ? ["phase_changes"] : [];
-}
-
 export function buildPrefsView(entry: ParticipationEntry, email?: string): PrefsView {
-  const forced = forcedKeys(entry);
-  const forcedSet = new Set(forced);
-  // `specs/screens/preferences.md` § Display Rules: "'Milestones' is shown
-  // on and disabled" for a current signer — a forced key always displays
-  // (and behaves) as on, regardless of what was stored before the person
-  // became a forced signer (e.g. turned off, then signed).
-  const on = (key: "phase_changes"): boolean => forcedSet.has(key) || prefOn(entry, key);
-
   return {
     channel: entry.record.notify?.channel ?? "email",
-    every_revision: prefOn(entry, "every_revision"),
-    daily_digest: prefOn(entry, "daily_digest"),
-    phase_changes: on("phase_changes"),
     my_comments_addressed: prefOn(entry, "my_comments_addressed"),
     reminders: prefOn(entry, "reminders"),
-    forced,
     email_masked: email ? maskEmail(email) : undefined,
   };
 }

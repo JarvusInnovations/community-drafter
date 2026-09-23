@@ -214,7 +214,7 @@ describe("GET /admin/api/documents/:slug/statement.pdf — the operator door", (
 });
 
 describe("draft and clean", () => {
-  it("is a draft until a final version and a closed signing phase, and clean after", async () => {
+  it("is a draft until signing closes, and clean after — a new version changes nothing", async () => {
     const harness = await buildTestServer();
     const { server } = harness;
     cleanups.push(closing(harness));
@@ -230,7 +230,8 @@ describe("draft and clean", () => {
     expect(before.draft).toBe(true);
     expect(before.filename).toBe("charter-v1-draft.pdf");
 
-    // A final version alone is not enough — the list is still taking names.
+    // There is no "final" version: publishing (even with the retired flag)
+    // leaves the deliverable a draft while the list is still taking names.
     const published = await server.inject({
       method: "POST",
       url: "/admin/api/documents/charter/versions",
@@ -250,8 +251,38 @@ describe("draft and clean", () => {
 
     const after = server.deliverable.view(server.storage.readModel.getDocument("charter")!);
     expect(after.draft).toBe(false);
-    expect(after.final).toBe(true);
     expect(after.filename).toBe("charter-v2.pdf");
+    expect(renderDeliverableHtml(after)).not.toContain(">DRAFT<");
+  });
+
+  it("goes clean on delivery, even while signing is still open", async () => {
+    const harness = await buildTestServer();
+    const { server } = harness;
+    cleanups.push(closing(harness));
+    await seedDocument(server, {
+      slug: "letter",
+      title: "Letter to the Board",
+      body: "The text.",
+      comments_close_at: new Date(Date.now() - 3_600_000).toISOString(),
+      signing_closes_at: new Date(Date.now() + 48 * 3_600_000).toISOString(),
+      addressed_to: ["the Board"],
+    });
+    expect(server.deliverable.view(server.storage.readModel.getDocument("letter")!).draft).toBe(
+      true,
+    );
+
+    const delivered = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/letter/delivered",
+      headers: adminHeaders(),
+      payload: {},
+    });
+    expect(delivered.statusCode).toBe(200);
+
+    const after = server.deliverable.view(server.storage.readModel.getDocument("letter")!);
+    expect(after.draft).toBe(false);
+    expect(after.deliveredOn).toBeDefined();
+    expect(renderDeliverableHtml(after)).toContain("· delivered ");
     expect(renderDeliverableHtml(after)).not.toContain(">DRAFT<");
   });
 
@@ -264,7 +295,7 @@ describe("draft and clean", () => {
       method: "POST",
       url: "/admin/api/documents/charter2/versions",
       headers: adminHeaders(),
-      payload: { body: "Final text.", summary: "Final", final: true },
+      payload: { body: "Final text.", summary: "Final" },
     });
     await server.inject({
       method: "POST",

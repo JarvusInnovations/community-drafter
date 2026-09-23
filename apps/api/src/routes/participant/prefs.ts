@@ -1,26 +1,19 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 
 import { PARTICIPANT_ROUTE } from "../../gateway/gateway.ts";
-import { buildPrefsView, forcedKeys } from "../../lib/prefs.ts";
+import { NOTIFY_PREF_KEYS } from "../../lib/notify.ts";
+import { buildPrefsView } from "../../lib/prefs.ts";
 import { assertPhase } from "../../phase/phase.ts";
 import { loadParticipantContext } from "./context.ts";
 
-interface PrefsPutBody {
-  channel?: string;
-  every_revision?: boolean;
-  daily_digest?: boolean;
-  phase_changes?: boolean;
-  my_comments_addressed?: boolean;
-  reminders?: boolean;
-}
+type PrefsPutBody = Record<string, unknown>;
 
-const OPTIONAL_KEYS = [
-  "every_revision",
-  "daily_digest",
-  "phase_changes",
-  "my_comments_addressed",
-  "reminders",
-] as const;
+/**
+ * `specs/api/participant.md` § prefs: `PUT` accepts only `channel` and the
+ * two preferences; any other key (including the retired `every_revision`,
+ * `daily_digest` and `phase_changes`) is ignored and named in `ignored`.
+ */
+const ACCEPTED_KEYS = new Set<string>(["channel", ...NOTIFY_PREF_KEYS]);
 
 function emailFor(fastify: FastifyInstance, document: string, person: string): string | undefined {
   // `specs/behaviors/sites.md` § People are per site: the person is resolved
@@ -43,21 +36,15 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
 
     const slug = document.record.slug;
     const person = participation.record.person;
-    const forced = new Set(forcedKeys(participation));
     const current = participation.record.notify ?? {};
-    const body = request.body;
-    const ignored: string[] = [];
+    const body = request.body ?? {};
+    const ignored = Object.keys(body).filter((key) => !ACCEPTED_KEYS.has(key));
 
     const next = { ...current };
-    if (body.channel !== undefined) next.channel = body.channel;
-    for (const key of OPTIONAL_KEYS) {
+    if (typeof body.channel === "string") next.channel = body.channel;
+    for (const key of NOTIFY_PREF_KEYS) {
       const requested = body[key];
-      if (requested === undefined) continue;
-      if (forced.has(key) && requested === false) {
-        ignored.push(key);
-        continue;
-      }
-      next[key] = requested;
+      if (typeof requested === "boolean") next[key] = requested;
     }
 
     await fastify.storage.commit(
@@ -84,14 +71,10 @@ const prefsRoute: FastifyPluginAsync = async (fastify) => {
 
     const slug = document.record.slug;
     const person = participation.record.person;
-    const forced = new Set(forcedKeys(participation));
     const current = participation.record.notify ?? {};
 
     const next = { ...current };
-    for (const key of OPTIONAL_KEYS) {
-      if (forced.has(key)) continue;
-      next[key] = false;
-    }
+    for (const key of NOTIFY_PREF_KEYS) next[key] = false;
 
     await fastify.storage.commit(
       "prefs",

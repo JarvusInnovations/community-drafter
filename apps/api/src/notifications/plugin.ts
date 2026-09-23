@@ -1,24 +1,21 @@
-import type { Judgement, Signature } from "@signatories/shared";
+import type { Signature } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
+import { joinNames } from "../deliverable/copy.ts";
 import { createMailer, type Mailer } from "../lib/mailer/index.ts";
+import { derivePhase } from "../phase/phase.ts";
 import type { Actor } from "../storage/actor.ts";
-import { ClosingSoonScheduler } from "./closing-soon.ts";
 import { NotificationDispatcher } from "./dispatcher.ts";
 import { DigestScheduler } from "./digest.ts";
-import { formatWhen } from "./format.ts";
+import { formatDay, formatWhen } from "./format.ts";
 import { sendFirstResponseNotice } from "./operator-digest.ts";
-import { clockMessageRecipients, closedRecipients } from "./triggers.ts";
 import {
-  closedTemplate,
   listingChangedTemplate,
   reviewReceiptTemplate,
   revocationConfirmationTemplate,
-  type ScheduleChangeLine,
-  scheduleChangedTemplate,
+  type SignatureReceiptData,
   signatureConfirmationTemplate,
-  signingOpenedTemplate,
 } from "./templates.ts";
 
 const DISPATCHER_ACTOR: Actor = { kind: "system" };
@@ -39,28 +36,24 @@ declare module "fastify" {
 }
 
 export interface NotificationsPluginOptions {
-  /** Test-only override for the digest/closing-soon schedulers' poll interval. */
+  /** Test-only override for the operator-digest scheduler's poll interval. */
   schedulerIntervalMs?: number;
-  /** Test-only: skip starting the digest/closing-soon timers (tests drive `tick()` directly). */
+  /** Test-only: skip starting the operator-digest timer (tests drive `tick()` directly). */
   disableSchedulers?: boolean;
   /** Test-only: inject a `Mailer` (e.g. `FakeMailer`) instead of building one from `MAILER`. */
   mailer?: Mailer;
 }
 
 /**
- * `plans/notifications.md`: the real dispatcher and mailers behind
- * `api-core`'s stub (`lib/notify.ts`'s synchronous `notified` marking is
- * kept — see that file's doc comment — this plugin is what actually
- * renders and sends). Wires the bus events that don't already carry their
- * own richer recipient computation (`sign`/`resign`/`revoke`/`decline`,
- * `signing-opened`/`closed`/`schedule-changed`) to the dispatcher.
- * Publish-triggered sends (`v<n>`, `disposition-v<n>`, `final-published`)
- * are called directly from `routes/admin/versions.ts`, which already has
- * the exact recipient lists `lib/notify.ts` computed; invitations and
- * reminders likewise, from `routes/admin/documents.ts` and
- * `routes/admin/invitations.ts`, because those responses must report what
- * the mailer accepted (`specs/behaviors/notifications.md` § Sending) and a
- * fire-and-forget bus event cannot tell them.
+ * The dispatcher and mailer, and the **receipts** — the only messages sent
+ * without an operator asking (`specs/principles.md` § Operators speak;
+ * state changes don't). Every other participant message is sent by the
+ * route that ran the operator's command, because that response has to
+ * report what the mailer accepted: invitations and reminders
+ * (`routes/admin/invitations.ts`, `documents.ts`), `schedule-changed`,
+ * `confirm-call` and `delivered` (`documents.ts`), `disposition-v<n>`
+ * (`versions.ts`). Phase changes and publishes have no listener here on
+ * purpose.
  */
 const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = async (
   fastify,
@@ -75,12 +68,6 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
     switch (event.type) {
       case "sign":
       case "resign": {
-        const participation = fastify.storage.readModel.getParticipation(
-          event.document,
-          event.person,
-        );
-        const signature = participation?.record.signature;
-        if (!signature) return;
         if (event.type === "sign") {
           // `specs/behaviors/notifications.md` § Operator digest: the first
           // signature is told to the document's operators the moment it
@@ -88,23 +75,7 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
           // follows a sign, so it is never the first.
           await sendFirstResponseNotice(fastify, event.document, "first_signature", event.person);
         }
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: `signature-confirmation-${new Date().toISOString()}`,
-          actor: DISPATCHER_ACTOR,
-          targets: [
-            {
-              person: event.person,
-              markNotified: true,
-              render: (ctx) =>
-                signatureConfirmationTemplate(ctx, {
-                  capacity: signature.capacity,
-                  conditional: signature.conditional === true,
-                  listed: listingStatus(fastify, event.document, signature.listed !== false),
-                }),
-            },
-          ],
-        });
+        await deliverSignatureReceipt(fastify, dispatcher, event.document, event.person);
         return;
       }
       case "listing-changed": {
@@ -150,72 +121,35 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
         });
         return;
       }
-      case "decline":
-      case "submit": {
+      case "decline": {
         await deliverReviewReceipt(fastify, dispatcher, event.document, event.person);
-        if (event.type === "submit") await notifyFirstResponses(fastify, event);
         return;
       }
-      case "signing-opened": {
-        const recipients = clockMessageRecipients(fastify, event.document);
-        if (recipients.length === 0) return;
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: "signing-opened",
-          actor: DISPATCHER_ACTOR,
-          targets: recipients.map((person) => ({
-            person,
-            markNotified: true,
-            render: (ctx) => signingOpenedTemplate(ctx),
-          })),
-        });
-        return;
-      }
-      case "closed": {
-        const recipients = closedRecipients(fastify, event.document);
-        if (recipients.length === 0) return;
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: "closed",
-          actor: DISPATCHER_ACTOR,
-          targets: recipients.map((person) => ({
-            person,
-            markNotified: true,
-            render: (ctx) => closedTemplate(ctx),
-          })),
-        });
-        return;
-      }
-      case "schedule-changed": {
-        const recipients = clockMessageRecipients(fastify, event.document);
-        if (recipients.length === 0) return;
-        // `specs/behaviors/notifications.md` § Content rules: the message
-        // names each deadline that moved with its old and new time. The
-        // absolute times are formatted here (one instance clock) so the
-        // templates keep taking plain strings.
-        const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
-        const changes: ScheduleChangeLine[] = [];
-        for (const change of event.changes ?? []) {
-          const to = formatWhen(change.to, timezone);
-          if (!to) continue;
-          const from = formatWhen(change.from, timezone);
-          changes.push({
-            label:
-              change.deadline === "comments_close_at" ? "Comments close" : "Signatures are due",
-            ...(from ? { from } : {}),
-            to,
-          });
+      case "submit": {
+        // `specs/behaviors/notifications.md` § What each message says: a
+        // signing submission sends the signing receipt (mentioning its
+        // comments) and nothing else; `comment` and `decline` send a review
+        // receipt that names what the author can still do.
+        if (event.judgement === "sign" || event.judgement === "sign_conditional") {
+          const signature = fastify.storage.readModel.getParticipation(event.document, event.person)
+            ?.record.signature;
+          if (signature && !signature.revoked) {
+            await sendFirstResponseNotice(fastify, event.document, "first_signature", event.person);
+          }
+          const submission = fastify.storage.readModel.getSubmission(
+            event.document,
+            event.submission,
+          );
+          await deliverSignatureReceipt(
+            fastify,
+            dispatcher,
+            event.document,
+            event.person,
+            submission?.record.comments?.length ?? 0,
+          );
+          return;
         }
-        await dispatcher.deliver({
-          document: event.document,
-          eventKey: "schedule-changed",
-          actor: DISPATCHER_ACTOR,
-          targets: recipients.map((person) => ({
-            person,
-            markNotified: true,
-            render: (ctx) => scheduleChangedTemplate(ctx, { changes }),
-          })),
-        });
+        await deliverReviewReceipt(fastify, dispatcher, event.document, event.person);
         return;
       }
       default:
@@ -224,38 +158,23 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
   });
 
   const digest = new DigestScheduler(fastify, opts.schedulerIntervalMs);
-  const closingSoon = new ClosingSoonScheduler(fastify, opts.schedulerIntervalMs);
   if (!opts.disableSchedulers) {
     fastify.addHook("onReady", async () => {
       digest.start();
-      closingSoon.start();
     });
     fastify.addHook("onClose", async () => {
       digest.stop();
-      closingSoon.stop();
     });
   }
   fastify.decorate("digestScheduler", digest);
-  fastify.decorate("closingSoonScheduler", closingSoon);
 };
 
 declare module "fastify" {
   interface FastifyInstance {
     digestScheduler: DigestScheduler;
-    closingSoonScheduler: ClosingSoonScheduler;
   }
 }
 
-/**
- * `specs/behaviors/notifications.md` § Messages: `review-receipt-<ts>`, "a
- * review submitted" → the author. Fired for both the dedicated `decline`
- * route and `comment-mode`'s general `submit` endpoint (`sign` /
- * `sign_conditional` / `comment` / `decline`) — this reads the person's
- * current position (`ReadModel.getPosition`, already "the latest
- * `submitted` record") rather than threading a submission id through each
- * event, since a person may submit more than once and the position is
- * always the most recent one.
- */
 /**
  * How a signature currently reads on the list
  * (`specs/behaviors/signatures.md` § Display), for the one message that
@@ -285,28 +204,61 @@ function listingStatus(
   return show === "list" ? listed : undefined;
 }
 
-/**
- * `specs/behaviors/notifications.md` § Operator digest — comment mode is
- * the one path that can produce a document's first comment *and* its first
- * signature in a single commit (`specs/data-model.md` → `Signature`
- * trailer), so both notices are considered here.
- */
-async function notifyFirstResponses(
-  fastify: FastifyInstance,
-  event: { document: string; person: string; submission: string; judgement: Judgement },
-): Promise<void> {
-  const submission = fastify.storage.readModel.getSubmission(event.document, event.submission);
-  if ((submission?.record.comments?.length ?? 0) > 0) {
-    await sendFirstResponseNotice(fastify, event.document, "first_comment", event.person);
-  }
-
-  const signature = fastify.storage.readModel.getParticipation(event.document, event.person)?.record
-    .signature;
-  if (signature && !signature.revoked) {
-    await sendFirstResponseNotice(fastify, event.document, "first_signature", event.person);
-  }
+/** "the State Board of Education" — `addressed_to` joined, or "its recipients". */
+export function deliveredTo(addressedTo: readonly string[] | undefined): string {
+  return addressedTo && addressedTo.length > 0 ? joinNames([...addressedTo]) : "its recipients";
 }
 
+/**
+ * `specs/behaviors/notifications.md` → `signature-confirmation-<ts>`: the
+ * receipt names the capacity and the listing, then "What happens next" —
+ * the confirm-call and delivery promises until delivery, the delivery
+ * itself after, and the change-or-remove deadline.
+ */
+async function deliverSignatureReceipt(
+  fastify: FastifyInstance,
+  dispatcher: NotificationDispatcher,
+  document: string,
+  person: string,
+  commentCount?: number,
+): Promise<void> {
+  const participation = fastify.storage.readModel.getParticipation(document, person);
+  const signature = participation?.record.signature;
+  const documentEntry = fastify.storage.readModel.getDocument(document);
+  if (!signature || signature.revoked || !documentEntry) return;
+  const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+  const record = documentEntry.record;
+  const data: SignatureReceiptData = {
+    capacity: signature.capacity,
+    conditional: signature.conditional === true,
+    listed: listingStatus(fastify, document, signature.listed !== false),
+    deliveredTo: deliveredTo(record.addressed_to),
+    deliveredOn: formatDay(record.delivered_at, timezone),
+    removeBy: formatWhen(record.signing_closes_at, timezone),
+    commentCount,
+  };
+  await dispatcher.deliver({
+    document,
+    eventKey: `signature-confirmation-${new Date().toISOString()}`,
+    actor: DISPATCHER_ACTOR,
+    targets: [
+      {
+        person,
+        markNotified: true,
+        render: (ctx) => signatureConfirmationTemplate(ctx, data),
+      },
+    ],
+  });
+}
+
+/**
+ * `specs/behaviors/notifications.md` → `review-receipt-<ts>`: sent only when
+ * it can name an action. For `comment`, "you can add more comments until
+ * <comments close>", and not at all once comments have closed; for
+ * `decline`, "you can still sign until <signing closes>", and not at all
+ * once signing has closed. The position read is the person's latest
+ * submitted submission, which is the one this event is about.
+ */
 async function deliverReviewReceipt(
   fastify: FastifyInstance,
   dispatcher: NotificationDispatcher,
@@ -314,7 +266,23 @@ async function deliverReviewReceipt(
   person: string,
 ): Promise<void> {
   const position = fastify.storage.readModel.getPosition(document, person);
-  if (!position) return;
+  const documentEntry = fastify.storage.readModel.getDocument(document);
+  if (!position || !documentEntry) return;
+  const judgement = position.judgement;
+  if (judgement !== "comment" && judgement !== "decline") return;
+
+  const phase = derivePhase(documentEntry.record, new Date());
+  const timezone = fastify.config.INSTANCE_TIMEZONE || "UTC";
+  const until =
+    judgement === "comment"
+      ? phase === "commenting"
+        ? formatWhen(documentEntry.record.comments_close_at, timezone)
+        : undefined
+      : phase === "commenting" || phase === "signing"
+        ? formatWhen(documentEntry.record.signing_closes_at, timezone)
+        : undefined;
+  if (!until) return;
+
   const submission = fastify.storage.readModel.getSubmission(document, position.submissionId);
   const commentCount = submission?.record.comments?.length ?? 0;
 
@@ -326,8 +294,7 @@ async function deliverReviewReceipt(
       {
         person,
         markNotified: true,
-        render: (ctx) =>
-          reviewReceiptTemplate(ctx, { judgement: position.judgement, commentCount }),
+        render: (ctx) => reviewReceiptTemplate(ctx, { judgement, commentCount, until }),
       },
     ],
   });

@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 
 import { computeSignatories } from "./signatories.ts";
 import { isSignatureBehind } from "./signature-view.ts";
+import { segmentCounts } from "../notifications/segments.ts";
 import { derivePhase } from "../phase/phase.ts";
 import { documentSiteSlug, siteForDocument } from "../sites/site.ts";
 import type { DocumentEntry } from "../storage/read-model.ts";
@@ -33,13 +34,17 @@ export function documentSummary(
   };
   // `specs/api/admin.md`: the signature counts carry `behind` — live
   // signatures attached to a version older than the current one, the number
-  // the team needs before marking anything final (`specs/screens/admin-dashboard.md`).
+  // the team needs before delivering (`specs/screens/admin-dashboard.md`).
   const behind = participations.filter((p) => isSignatureBehind(p, entry.versions.length)).length;
   const submissions = fastify.storage.readModel.listSubmissionsForDocument(entry.record.slug);
   const submitted = submissions.filter((s) => s.record.state === "submitted").length;
   const draft = submissions.filter((s) => s.record.state === "draft").length;
 
   const site = siteForDocument(fastify, entry.record);
+  // `specs/api/admin.md`: the segments the operator commands reach
+  // (`specs/behaviors/notifications.md` § Segments) — reminders (U, O), a
+  // `--notify` (O) and a confirm-call (S-behind + C).
+  const segments = segmentCounts(fastify, entry.record.slug);
 
   return {
     slug: entry.record.slug,
@@ -71,12 +76,17 @@ export function documentSummary(
     show_signatories: entry.record.show_signatories,
     revocation_window_hours: entry.record.revocation_window_hours,
     tags: entry.record.tags,
+    delivered_at: entry.record.delivered_at,
+    delivered_note: entry.record.delivered_note,
     commit,
     counts: {
       versions: entry.versions.length,
       participations: participations.length,
       signatures: { ...signatories, behind },
       submissions: { submitted, draft },
+      unopened: segments.U,
+      undecided: segments.O,
+      needs_confirmation: segments["S-behind"] + segments.C,
     },
   };
 }
