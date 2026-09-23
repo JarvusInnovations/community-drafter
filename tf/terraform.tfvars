@@ -1,6 +1,6 @@
 # Operator-facing values so a bare `tofu apply -concise` never regresses the
 # running service. Update image_tag on every manual deploy (or pass -var).
-image_tag                = "sha-a5b0470"
+image_tag                = "sha-e83f85d"
 public_url               = "https://signatories.app"
 mailer                   = "postmark"
 bootstrap_operator_email = "chris@jarv.us"
