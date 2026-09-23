@@ -112,12 +112,25 @@ record's key fields and the commit subject, so you can cite exactly what changed
 
 ## What participants are emailed
 
-- **Always:** the invitation when you send it, and a receipt for each of their own actions (review, signature added or removed, listing changed). No preference stops receipts.
-- **Opened, not signed, not declined:** `signing-opened`, `closing-soon` and `schedule-changed`, with `phase_changes` on. Never-opened people get reminders instead.
-- **Signed:** nothing about the clock. Then two separate events:
-  - `final-published` when you run `versions publish --final`: the **text** stops changing. Forced on for signers; conditional signers are asked to confirm or remove.
-  - `closed` when the signing window ends on the clock: the **list** stops changing. Follows `phase_changes`.
-- **Declined:** nothing further about the clock or outcome; only their own receipts, and `disposition-v<n>` if they commented. Signing later makes them an ordinary signer.
+Nothing reaches participants unless a person acted or you ran a command with its flag. Opening or
+closing the signing window, `docs extend`, `docs reopen` and `versions publish` send **nothing**
+by default; each prints how many people its flag would reach.
+
+| Message | Sent by | Reaches |
+| --- | --- | --- |
+| invitation | `docs open`, `people send` | invitees never sent one |
+| signing receipt | the person signing | the signer; says a confirm-call may follow and that they will hear when it is delivered |
+| removal / listing-changed / comment / decline receipts | the person's own action | that person, each naming what they can do next |
+| reminder | `people remind --target unopened\|opened-not-acted` | never-opened, or opened and undecided; names the deadline and asks them to sign or decline. The last call: nothing automatic follows |
+| more time | `docs extend … --notify` (or `docs reopen … --notify`) | opened, not signed, not declined |
+| your comments were answered | `versions publish … --notify-commenters` | authors this publish disposed, signers and decliners included |
+| confirm-call | `docs confirm-call <slug> [--by <when>]` | signers behind the current version, and conditional signers: keep or remove your name |
+| delivered | `docs delivered <slug> [--note "…"]` | every current signer; once per document, and the PDF goes clean |
+
+There is no "final" version (`--final` is gone): publish until delivery, run `docs confirm-call`
+before delivering if anyone is behind or conditional (the dashboard shows the count), then
+`docs delivered`. Someone who declined or removed their name hears only their own receipts, and
+the answer to their comments if you publish with `--notify-commenters`.
 
 ## Writing the text
 
@@ -233,11 +246,13 @@ every-session use instead.
 - `scripts/signatories-axi docs show <slug>` — Dashboard numbers, versions, and schedule; prints the site and the canonical host its links are built on, the audience, who the statement is addressed to, and public_url when the document is publicly readable.
 - `scripts/signatories-axi docs update <slug> [--audience public|closed] [--addressed-to "<name>"]... [--site <slug>]` — Change the audience, who the statement is addressed to, and the site, and nothing else. --site moves the document to another site you operate: the slug, tokens and history do not change, the hostname its participants are sent to does. --addressed-to replaces the recipients.
 - `scripts/signatories-axi docs open <slug> --comments-close <iso> --signing-closes <iso>` — Open commenting and signing, and send invitations.
-- `scripts/signatories-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>]` — Push a deadline later (never earlier).
-- `scripts/signatories-axi docs close <slug>` — Close signing now.
-- `scripts/signatories-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso>` — Reopen a closed document.
+- `scripts/signatories-axi docs extend <slug> [--comments-close <iso>] [--signing-closes <iso>] [--notify] [--dry-run]` — Push a deadline later (never earlier). Tells nobody unless --notify, which sends 'more time' to the people who opened it and have not signed or declined; the output always says how many that is. --dry-run checks and counts without writing.
+- `scripts/signatories-axi docs close <slug>` — Close signing now. Sends nothing.
+- `scripts/signatories-axi docs reopen <slug> [--comments-close <iso>] --signing-closes <iso> [--notify] [--dry-run]` — Reopen a closed document; --notify and --dry-run as for extend.
+- `scripts/signatories-axi docs confirm-call <slug> [--by <iso>] [--dry-run]` — Ask every signer whose signature is behind the current version, and every conditional signer, to keep or remove their name by --by (default: when signing closes). Once per person per call; --dry-run lists who and why. Run it before delivering.
+- `scripts/signatories-axi docs delivered <slug> [--note "<text>"] [--dry-run]` — Record that the statement was delivered (once per document) and tell every current signer where it went and when. The PDF goes clean from that moment.
 - `scripts/signatories-axi docs withdraw <slug> --reason "<text>" [--public]` — Withdraw the document.
-- `scripts/signatories-axi docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--citations links|footnotes|hybrid] [--draft]` — Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until the document has a final version and signing has closed; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen.
+- `scripts/signatories-axi docs export <slug> --pdf [--out <file>] [--paper letter|a4] [--citations links|footnotes|hybrid] [--draft]` — Write the deliverable — the current version's text, a title block naming who it is addressed to, and the signatory list as it stands — to a PDF file, and print the path, the version, the paper, the citation mode and whether the copy is a draft or clean. A copy is watermarked DRAFT until signing closes or the document is delivered; --draft forces the watermark back on and there is no flag the other way. --citations picks how the citation links read: hybrid (the default) keeps every link clickable and numbers it with a Sources list at the end, footnotes drops the links and keeps the numbers, links is the plain form. The list is computed at the moment of the render and never frozen.
 - `scripts/signatories-axi docs operators <slug>` — List a document's operators.
 - `scripts/signatories-axi docs operators add <slug> <email>` — Add an operator to a document, drawing only from the document's site's operator group.
 - `scripts/signatories-axi docs operators remove <slug> <email>` — Remove an operator from a document (refused for the last one).
@@ -246,7 +261,7 @@ every-session use instead.
 
 - `scripts/signatories-axi versions list <slug>` — Every published version, newest last.
 - `scripts/signatories-axi versions show <slug> <n> [--body]` — One version, with dispositions.
-- `scripts/signatories-axi versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--final] [--dispositions <file.json>]` — Publish a new version in one commit; prints the version number, commit subject, and notification counts. A --dispositions entry's outcome is one of accepted, partial, declined or noted.
+- `scripts/signatories-axi versions publish <slug> --file <path> --summary "<text>" [--notes-file <path>] [--dispositions <file.json>] [--notify-commenters]` — Publish a new version in one commit; prints the version number, commit subject, and how many answered commenters would be told. Mails nobody unless --notify-commenters. A --dispositions entry's outcome is one of accepted, partial, declined or noted.
 - `scripts/signatories-axi versions compare <slug> <from> <to> [--unchanged]` — A text redline between two versions.
 
 ### People
@@ -256,7 +271,7 @@ every-session use instead.
 - `scripts/signatories-axi people links <slug> [--person a,b] [--out <file.csv>]` — Export personal sign-in links (recorded).
 - `scripts/signatories-axi people remove <slug> <person>` — Take back a staged invitation that was never sent.
 - `scripts/signatories-axi people send <slug> [--only-unsent] [--person a,b] [--dry-run]` — Send invitations, reporting what was delivered and what the mailer rejected; --dry-run lists who would receive one and who is skipped and why.
-- `scripts/signatories-axi people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]` — Send reminders to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless).
+- `scripts/signatories-axi people remind <slug> --target unopened|opened-not-acted [--min-age <hours>] [--dry-run]` — Send reminders — the last call, naming the next deadline and asking them to sign or decline — to a target segment, skipping anyone messaged within --min-age hours (default 48; 0 sends regardless). There is no automatic reminder.
 - `scripts/signatories-axi people revoke-link <slug> <person>` — Revoke one person's link.
 - `scripts/signatories-axi people reissue-link <slug> <person>` — Reissue one person's link (prints it once).
 - `scripts/signatories-axi people expire <slug> <person> --expires-at <when>` — Set when one person's link stops working; <when> takes the same grammar as docs open (ISO 8601 with a zone, or a zone-less time read locally) and the resolved instant is printed back.

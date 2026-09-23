@@ -46,3 +46,25 @@ function readStdin(): Promise<string> {
     process.stdin.on("error", reject);
   });
 }
+
+/**
+ * One line for an announcement a command may make (`specs/api/admin.md` §
+ * schedule / versions): what it did when asked, and whom it did not tell
+ * when not — so an operator always reads the count before or instead of
+ * the send.
+ */
+export function announceLine(report: {
+  requested: boolean;
+  would_notify: number;
+  sent?: number;
+  failed?: number;
+}): string {
+  if (!report.requested) {
+    return report.would_notify === 0
+      ? "not sent (nobody to tell)"
+      : `not sent (${report.would_notify} would be told with the flag)`;
+  }
+  return `sent ${report.sent ?? 0} of ${report.would_notify}${
+    report.failed ? `, ${report.failed} failed` : ""
+  }`;
+}
