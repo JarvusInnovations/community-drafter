@@ -83,7 +83,8 @@ export const DocumentRecordSchema = z.object({
    * `specs/behaviors/notifications.md` § Operator digest: the operator
    * messages this document has already produced — `digest` = the last date
    * (`YYYY-MM-DD`, instance time zone) a digest was delivered,
-   * `first_signature` / `first_comment` = when those once-per-document
+   * `first_signature` = when that once-per-document notice went out
+   * (`first_comment`, written by earlier builds, is ignored).
    * notices went out. Optional for the same reason every other added field
    * is: a record written before it existed still has to parse.
    */
@@ -92,6 +93,13 @@ export const DocumentRecordSchema = z.object({
   reply_to: z.string().optional(),
   withdraw_reason: z.string().optional(),
   withdraw_public: z.boolean().optional(),
+  /**
+   * `specs/behaviors/signatures.md` § Delivery: when an operator recorded
+   * that the statement was delivered, and their note on it. Set once, never
+   * cleared; absent = not delivered.
+   */
+  delivered_at: z.iso.datetime().optional(),
+  delivered_note: z.string().optional(),
   tags: z.array(z.string()).optional(),
   body: z.string(),
 });
