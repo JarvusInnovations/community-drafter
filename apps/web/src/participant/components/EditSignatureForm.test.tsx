@@ -18,6 +18,17 @@ const SIGNATURE = {
   signed_at: "2026-09-20T17:23:00Z",
 };
 
+const PERSONAL = {
+  capacity: "personal" as const,
+  display_name: "Jane Doe",
+  descriptor: "Neighbor",
+  conditional: false,
+  listed: true,
+  signed_on_version: 1,
+  revoked: false,
+  signed_at: "2026-09-20T17:23:00Z",
+};
+
 const DOCUMENT = makeBundle({}).document;
 
 /**
@@ -85,5 +96,45 @@ describe("EditSignatureForm — Save takes one press", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Signing has closed.");
+  });
+});
+
+/**
+ * Issue #116: emptying the descriptor and saving kept the old one, because
+ * the form dropped an empty value from the patch and the server read the
+ * missing field as "unchanged". An emptied field is sent empty.
+ */
+describe("EditSignatureForm — emptying the descriptor", () => {
+  it("sends an empty descriptor rather than leaving it out", async () => {
+    let body: Record<string, unknown> | undefined;
+    globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+      body = JSON.parse(init?.body as string);
+      return new Response(JSON.stringify({ ...PERSONAL, descriptor: undefined }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    let saved = 0;
+    render(
+      <EditSignatureForm
+        signature={PERSONAL}
+        document={DOCUMENT}
+        token="test-token"
+        onSaved={() => {
+          saved += 1;
+          return Promise.resolve();
+        }}
+        onCancel={() => {}}
+      />,
+    );
+
+    const descriptor = screen.getByDisplayValue("Neighbor");
+    fireEvent.change(descriptor, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await screen.findByRole("button", { name: /Save|Saving…/u });
+    expect(saved).toBe(1);
+    expect(body).toHaveProperty("descriptor", "");
   });
 });
