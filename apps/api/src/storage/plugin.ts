@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type { Action, Trailers } from "@signatories/shared";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import type { PushDaemon, Repository } from "gitsheets";
+import type { Repository } from "gitsheets";
 
 import {
   commit as commitFn,
@@ -17,6 +17,7 @@ import {
   migrateLegacyDocuments,
 } from "./operators-bootstrap.ts";
 import { migratePeopleToSites } from "./people-site-migration.ts";
+import { Pusher } from "./pusher.ts";
 import { openDataRepo } from "./repo.ts";
 import { ReadModel } from "./read-model.ts";
 import type { DataStore } from "./schemas.ts";
@@ -29,8 +30,17 @@ export interface StorageDecoration {
   dataDir: string;
   readModel: ReadModel;
   tracker: OpenTracker;
-  pushDaemon: PushDaemon | null;
-  /** Bound `commit()` — commits, then refreshes the read model incrementally. */
+  /**
+   * The push path to the remote (`specs/architecture.md` § Storage, "Pushed
+   * before acknowledged"); `null` when the data repo has no `origin`
+   * (tests, a local-only dev checkout).
+   */
+  pusher: Pusher | null;
+  /**
+   * Bound `commit()` — commits, refreshes the read model incrementally,
+   * then waits (bounded) for the commit to reach the remote before
+   * resolving. A failed or slow push never fails the write.
+   */
   commit<T>(
     action: Action,
     input: CommitInput,
@@ -49,6 +59,20 @@ export interface StoragePluginOptions {
   dataDir?: string;
   /** Override the write-behind tracker's flush interval (tests). */
   trackerIntervalMs?: number;
+  /** How long a write waits for its push before responding anyway (default 10 s). */
+  pushWaitMs?: number;
+  /** How long the shutdown sequence waits for its final push (default 7 s). */
+  shutdownPushWaitMs?: number;
+}
+
+async function currentBranch(dataDir: string): Promise<string | null> {
+  const proc = Bun.spawn(["git", "symbolic-ref", "--short", "HEAD"], {
+    cwd: dataDir,
+    stdout: "pipe",
+    stderr: "ignore",
+  });
+  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? out.trim() || null : null;
 }
 
 async function hasRemote(dataDir: string, remote: string): Promise<boolean> {
@@ -78,6 +102,12 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
   await readModel.build();
   fastify.log.info({ ...readModel.summary() }, "storage: read model built");
 
+  // Assigned once the boot-time commits below are made; until then a
+  // commit only counts toward the backlog the first push carries.
+  let pusher: Pusher | null = null;
+  let shuttingDown = false;
+  const pushWaitMs = opts.pushWaitMs ?? 10_000;
+
   const boundCommit = async <T>(
     action: Action,
     input: CommitInput,
@@ -86,6 +116,14 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
     const result = await commitFn(store, action, input, fn);
     if (result.commitHash) {
       await readModel.applyCommit(result.trailers as Trailers);
+      if (pusher) {
+        pusher.notifyCommit();
+        // `specs/architecture.md` § Storage: a write is acknowledged once
+        // its commit is on the remote, or once the wait runs out — never
+        // failed because the push did. During shutdown the final push
+        // right after the flush carries it instead.
+        if (!shuttingDown) await pusher.pushWithin(pushWaitMs);
+      }
     }
     return result;
   };
@@ -134,34 +172,20 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
   );
   tracker.start();
 
-  let pushDaemon: PushDaemon | null = null;
   if (await hasRemote(resolvedDataDir, "origin")) {
-    pushDaemon = await repo.startPushDaemon({
-      remote: "origin",
-      branch: fastify.config.DATA_REPO_BRANCH,
-    });
-
-    const status = pushDaemon.status();
+    const branch =
+      fastify.config.DATA_REPO_BRANCH || (await currentBranch(resolvedDataDir)) || "main";
+    pusher = new Pusher({ dataDir: resolvedDataDir, branch, log: fastify.log });
+    // Boot-time commits (sheet-config sync, bootstrap, migrations) are
+    // already made; push them before serving, like any other write.
+    const backlog = await pusher.countBacklog();
+    if (backlog > 0) await pusher.pushWithin(pushWaitMs);
     fastify.log.info(
-      { pendingCommits: status.pendingCommits },
-      "storage: push daemon started (startup backlog check complete)",
+      { backlog, pendingCommits: pusher.status().pendingCommits },
+      "storage: pusher ready",
     );
-
-    pushDaemon.on("push", ({ commit, durationMs }) => {
-      fastify.log.info({ commit, durationMs }, "storage: pushed commit");
-    });
-    pushDaemon.on("error", ({ commit, err, attempt, reason }) => {
-      if (reason === "non-fast-forward") {
-        fastify.log.error(
-          { commit, err: String(err) },
-          "storage: push daemon diverged from remote",
-        );
-      } else {
-        fastify.log.warn({ commit, err: String(err), attempt }, "storage: push retry");
-      }
-    });
   } else {
-    fastify.log.info("storage: no 'origin' remote configured; push daemon not started");
+    fastify.log.info("storage: no 'origin' remote configured; commits stay local");
   }
 
   const storage: StorageDecoration = {
@@ -170,17 +194,32 @@ const storagePlugin: FastifyPluginAsync<StoragePluginOptions> = async (fastify, 
     dataDir: resolvedDataDir,
     readModel,
     tracker,
-    pushDaemon,
+    pusher,
     commit: boundCommit,
   };
 
   fastify.decorate("storage", storage);
 
+  // `specs/architecture.md` § Deployment, "Shutdown": by the time this
+  // runs, `server.close()` has stopped taking requests and let in-flight
+  // ones finish. Commit the pending open counts, then push everything
+  // synchronously; `index.ts` bounds the whole sequence.
   fastify.addHook("onClose", async (instance: FastifyInstance) => {
+    shuttingDown = true;
     instance.storage.tracker.stop();
     await instance.storage.tracker.flush();
-    if (instance.storage.pushDaemon) {
-      await instance.storage.pushDaemon.stop({ timeoutMs: 30_000 });
+    const finalPusher = instance.storage.pusher;
+    if (finalPusher) {
+      const outcome = await finalPusher.pushWithin(opts.shutdownPushWaitMs ?? 7_000);
+      const { pendingCommits } = finalPusher.status();
+      if (pendingCommits > 0) {
+        instance.log.error(
+          { pendingCommits, reason: outcome.reason },
+          "shutdown: commits not pushed; they are lost with this instance",
+        );
+      } else {
+        instance.log.info({ durationMs: outcome.durationMs ?? 0 }, "shutdown: pushed");
+      }
     }
   });
 };

@@ -39,7 +39,6 @@ describe("GET /d/:slug/widget.js", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -67,7 +66,6 @@ describe("GET /d/:slug/widget.js", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();

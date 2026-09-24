@@ -43,7 +43,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -82,7 +81,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -106,7 +104,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -160,7 +157,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -209,7 +205,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -239,7 +234,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -304,7 +298,6 @@ describe("share preview metadata", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();

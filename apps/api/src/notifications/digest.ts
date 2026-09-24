@@ -14,32 +14,17 @@ import { sendOperatorDigest } from "./operator-digest.ts";
  * closed inside the last 24 hours — so the day signing closes is reported
  * to the team even though the phase observer has already flipped the
  * record to `closed`, and likewise a delivery recorded on a closed document.
+ *
+ * Nothing here keeps time. The scheduler tick (`POST /internal/tick`,
+ * `specs/architecture.md` § Deployment) calls `run()` every 15 minutes
+ * whether or not the service was running; the hour check below and the
+ * per-document, per-day `operator_notified` record make the first tick in
+ * the digest hour that finds activity the only one that sends.
  */
-export class DigestScheduler {
-  private timer: ReturnType<typeof setInterval> | undefined;
+export class OperatorDigestJob {
+  constructor(private readonly fastify: FastifyInstance) {}
 
-  constructor(
-    private readonly fastify: FastifyInstance,
-    private readonly intervalMs = 15 * 60_000,
-  ) {}
-
-  start(): void {
-    if (this.timer) return;
-    this.timer = setInterval(() => {
-      void this.tick();
-    }, this.intervalMs);
-    this.timer.unref?.();
-  }
-
-  stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = undefined;
-    }
-  }
-
-  async tick(): Promise<void> {
-    const now = new Date();
+  async run(now: Date = new Date()): Promise<void> {
     const timezone = this.fastify.config.INSTANCE_TIMEZONE || "UTC";
     if (hourInTimezone(now, timezone) !== this.fastify.config.INSTANCE_DIGEST_HOUR) return;
 

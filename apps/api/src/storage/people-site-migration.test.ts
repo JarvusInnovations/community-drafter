@@ -37,7 +37,6 @@ async function boot(dataDir: string) {
   const server = Fastify();
   await server.register(app, {
     storage: { dataDir, trackerIntervalMs: 3_600_000 },
-    disablePhaseObserver: true,
   });
   await server.ready();
   return server;

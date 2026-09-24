@@ -19,9 +19,9 @@ async function runGit(args: string[], cwd: string): Promise<string> {
 
 /**
  * `git fetch` updates `refs/remotes/<remote>/<branch>` with a compare-and-
- * swap ref transaction — the push daemon's own startup backlog check
- * (gitsheets) can run its own concurrent fetch of the same ref, which loses
- * that race with a transient "incorrect old value provided" error. Retrying
+ * swap ref transaction, and a push running at the same moment (a scheduler
+ * tick's retry) updates the same remote-tracking ref, which loses that race
+ * with a transient "incorrect old value provided" error. Retrying
  * a couple of times clears it without a caller-visible failure.
  */
 async function fetchWithRetry(dataDir: string, branch: string, attempts = 3): Promise<void> {
@@ -102,14 +102,11 @@ const instanceRoute: FastifyPluginAsync = async (fastify) => {
    * operator token (`gateway.ts`'s `resolveWebhook`).
    */
   fastify.post("/refresh", { config: WEBHOOK_ROUTE }, async () => {
-    const { repo, dataDir, readModel, pushDaemon } = fastify.storage;
+    const { repo, dataDir, readModel, pusher } = fastify.storage;
 
     return repo.withLock(async () => {
-      if (pushDaemon && pushDaemon.status().pendingCommits > 0) {
-        throw new ApiError(
-          "refresh_busy",
-          "The push daemon has commits pending; try again shortly.",
-        );
+      if (pusher && pusher.status().pendingCommits > 0) {
+        throw new ApiError("refresh_busy", "Commits are waiting to be pushed; try again shortly.");
       }
 
       const branch = (await runGit(["symbolic-ref", "--short", "HEAD"], dataDir)).trim();

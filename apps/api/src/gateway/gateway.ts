@@ -13,6 +13,7 @@ export {
   OPERATOR_ROUTE,
   PARTICIPANT_ROUTE,
   PUBLIC_ROUTE,
+  SCHEDULER_ROUTE,
   WEBHOOK_ROUTE,
   type Capability,
   type OperatorPrincipal,
@@ -193,6 +194,19 @@ function resolveWebhook(request: FastifyRequest, fastify: FastifyInstance): void
 }
 
 /**
+ * `specs/architecture.md` § Deployment, "The scheduler": a bearer OIDC ID
+ * token from Google for the tick invoker's service account, checked by
+ * `fastify.tick.verify`. Anything else is 401, whatever it carries.
+ */
+async function resolveScheduler(request: FastifyRequest, fastify: FastifyInstance): Promise<void> {
+  const header = request.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+  if (!token || !(await fastify.tick.verify(token))) {
+    throw new ApiError("unauthenticated", "A scheduler token is required.");
+  }
+}
+
+/**
  * `specs/behaviors/access-and-identity.md` § Personal links: unknown,
  * `link_revoked` or expired tokens all render the same 404 — "existence is
  * never disclosed" — so every failure branch below throws the one shared
@@ -262,6 +276,10 @@ const gatewayPlugin: FastifyPluginAsync = async (fastify) => {
     }
     if (capability === "webhook") {
       resolveWebhook(request, fastify);
+      return;
+    }
+    if (capability === "scheduler") {
+      await resolveScheduler(request, fastify);
       return;
     }
     if (capability === "operator") {

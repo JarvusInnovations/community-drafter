@@ -4,7 +4,7 @@ import { PUBLIC_ROUTE } from "../gateway/gateway.ts";
 
 const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", { config: PUBLIC_ROUTE }, async (_request, _reply) => {
-    const { readModel, pushDaemon } = fastify.storage;
+    const { readModel, pusher } = fastify.storage;
 
     return {
       status: "healthy",
@@ -14,7 +14,9 @@ const healthRoutes: FastifyPluginAsync = async (fastify) => {
       storage: {
         ready: true,
         ...readModel.summary(),
-        pushDaemon: pushDaemon ? pushDaemon.status() : null,
+        // `specs/architecture.md` § Storage: pending commits and the last
+        // push error, so an unpushed backlog is visible before a shutdown.
+        push: pusher ? pusher.status() : null,
       },
     };
   });

@@ -7,7 +7,7 @@ import { createMailer, type Mailer } from "../lib/mailer/index.ts";
 import { derivePhase } from "../phase/phase.ts";
 import type { Actor } from "../storage/actor.ts";
 import { NotificationDispatcher } from "./dispatcher.ts";
-import { DigestScheduler } from "./digest.ts";
+import { OperatorDigestJob } from "./digest.ts";
 import { formatDay, formatWhen } from "./format.ts";
 import { sendFirstResponseNotice } from "./operator-digest.ts";
 import {
@@ -36,10 +36,6 @@ declare module "fastify" {
 }
 
 export interface NotificationsPluginOptions {
-  /** Test-only override for the operator-digest scheduler's poll interval. */
-  schedulerIntervalMs?: number;
-  /** Test-only: skip starting the operator-digest timer (tests drive `tick()` directly). */
-  disableSchedulers?: boolean;
   /** Test-only: inject a `Mailer` (e.g. `FakeMailer`) instead of building one from `MAILER`. */
   mailer?: Mailer;
 }
@@ -157,21 +153,13 @@ const notificationsPlugin: FastifyPluginAsync<NotificationsPluginOptions> = asyn
     }
   });
 
-  const digest = new DigestScheduler(fastify, opts.schedulerIntervalMs);
-  if (!opts.disableSchedulers) {
-    fastify.addHook("onReady", async () => {
-      digest.start();
-    });
-    fastify.addHook("onClose", async () => {
-      digest.stop();
-    });
-  }
-  fastify.decorate("digestScheduler", digest);
+  // Run by the scheduler tick (`tick/plugin.ts`), never by a timer here.
+  fastify.decorate("operatorDigest", new OperatorDigestJob(fastify));
 };
 
 declare module "fastify" {
   interface FastifyInstance {
-    digestScheduler: DigestScheduler;
+    operatorDigest: OperatorDigestJob;
   }
 }
 

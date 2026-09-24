@@ -26,7 +26,7 @@ describe("GET /_health", () => {
     expect(body.status).toBe("healthy");
     expect(body.storage.ready).toBe(true);
     expect(body.storage.documents).toBe(0);
-    expect(body.storage.pushDaemon).toBeNull(); // no 'origin' remote configured in this fixture
+    expect(body.storage.push).toBeNull(); // no 'origin' remote configured in this fixture
 
     await server.close();
   });

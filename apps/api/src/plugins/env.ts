@@ -88,6 +88,12 @@ const schema = {
     // Optional: unset, the renderer probes the usual Debian locations, which
     // is what the image provides (`specs/architecture.md` § Deployment).
     CHROMIUM_PATH: { type: "string" },
+
+    // --- The scheduler tick (specs/architecture.md § Deployment) ---
+    // The audience and service-account email a tick's Google-signed OIDC
+    // ID token must carry. Either unset: every tick is refused.
+    TICK_AUDIENCE: { type: "string" },
+    TICK_INVOKER_EMAIL: { type: "string" },
   },
 };
 
@@ -125,6 +131,9 @@ declare module "fastify" {
       INSTANCE_DIGEST_HOUR: number;
 
       CHROMIUM_PATH?: string;
+
+      TICK_AUDIENCE?: string;
+      TICK_INVOKER_EMAIL?: string;
     };
   }
 }

@@ -41,7 +41,6 @@ async function buildServer() {
   const server = Fastify();
   await server.register(app, {
     storage: { dataDir, trackerIntervalMs: 3_600_000 },
-    disablePhaseObserver: true,
   });
 
   // Test-only routes exercising each capability, added after `app` so the

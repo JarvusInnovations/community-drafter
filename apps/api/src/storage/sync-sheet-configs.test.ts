@@ -41,7 +41,6 @@ describe("sheet-config sync at boot", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
     cleanups.push(() => void server.close());

@@ -20,15 +20,14 @@ import healthRoutes from "./routes/health.ts";
 import participantRoutes from "./routes/participant/index.ts";
 import { publicApiRoutes, publicAssetRoutes } from "./routes/public/index.ts";
 import staticRoutes, { type StaticRoutesOptions } from "./routes/static.ts";
+import tickPlugin, { tickRoutes, type TickPluginOptions } from "./tick/plugin.ts";
 import storagePlugin, { type StoragePluginOptions } from "./storage/plugin.ts";
 
 export interface AppOptions {
   /** Test-only override for where/how the storage plugin opens its data repo. */
   storage?: StoragePluginOptions;
-  /** Test-only override for the phase observer's poll interval. */
-  phaseObserverIntervalMs?: number;
-  /** Test-only: skip starting the phase observer's timer (tests drive `tick()` directly). */
-  disablePhaseObserver?: boolean;
+  /** Test-only: how the scheduler tick verifies its OIDC token (`tick/plugin.ts`). */
+  tick?: TickPluginOptions;
   /** Test-only overrides for the notifications plugin's schedulers (`notifications/plugin.ts`). */
   notifications?: NotificationsPluginOptions;
   /** Test-only override for where the built SPA lives (`routes/static.ts`). */
@@ -91,10 +90,20 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   //     `fastify.notifications`, so this must land before routes register.
   await fastify.register(notificationsPlugin, opts.notifications ?? {});
 
+  // 3b, continued. The lifecycle clock's observer (`specs/behaviors/document-lifecycle.md`;
+  //     `events/phase-observer.ts`), run by the scheduler tick below.
+  fastify.decorate("phaseObserver", new PhaseObserver(fastify));
+
   // 3c. Operator auth (`operators-auth`): token mint/verify, device codes,
   //     used-magic-jti store. Must land before the gateway below — its
   //     operator-resolution branch reads `fastify.auth`.
   await fastify.register(authPlugin);
+
+  // 3d. The scheduler tick (`specs/architecture.md` § Deployment): the
+  //     `scheduler` capability's OIDC verifier and the runner. Needs
+  //     storage, notifications and the phase observer; must land before
+  //     the gateway, whose `scheduler` branch calls `fastify.tick.verify`.
+  await fastify.register(tickPlugin, opts.tick ?? {});
 
   // 4. The deny-by-default gateway. Must come after storage/config (token
   //    resolution and the admin bearer compare both read them) and after
@@ -163,6 +172,7 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   // 6. Routes.
   await fastify.register(healthRoutes, { prefix: "/_health" });
   await fastify.register(authRoutes, { prefix: "/auth" });
+  await fastify.register(tickRoutes, { prefix: "/internal" });
   await fastify.register(participantRoutes, { prefix: "/i/:token/api" });
   await fastify.register(adminRoutes, { prefix: "/admin/api" });
   // `public-and-embed`: the anonymous `/d/:slug/*` family
@@ -182,19 +192,6 @@ export const app: FastifyPluginAsync<AppOptions> = async (fastify, opts) => {
   // precedence itself comes from find-my-way ranking a parametric-then-
   // static route over a wildcard regardless of registration order.
   await fastify.register(staticRoutes, opts.static ?? {});
-
-  // 7. The lifecycle clock's scheduler (`specs/behaviors/document-lifecycle.md`
-  //    § Closing; `events/phase-observer.ts`).
-  const phaseObserver = new PhaseObserver(fastify, opts.phaseObserverIntervalMs);
-  fastify.decorate("phaseObserver", phaseObserver);
-  if (!opts.disablePhaseObserver) {
-    fastify.addHook("onReady", async () => {
-      phaseObserver.start();
-    });
-    fastify.addHook("onClose", async () => {
-      phaseObserver.stop();
-    });
-  }
 
   fastify.addHook("onReady", async () => {
     fastify.log.info("signatories API initialized");
