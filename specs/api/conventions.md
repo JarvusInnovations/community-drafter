@@ -11,9 +11,10 @@
 | `/admin/api/*` | admin API | operator token as `Authorization: Bearer` **or** session cookie + CSRF header |
 | `/admin/api/refresh` | data-repo refresh webhook | HMAC signature (`DATA_REPO_WEBHOOK_SECRET`) |
 | `/auth/*` | magic-link request and callback, device-code flow, session, refresh, logout | none / cookie / bearer (see `api/auth.md`) |
+| `/internal/tick` | the scheduler tick (`POST`; `architecture.md` § Deployment): flush, push retry, phase observer, operator digest | Google-signed OIDC ID token for the tick invoker service account (`scheduler` capability) |
 | `/_health` | liveness | none |
 
-The gateway is deny-by-default: every route declares `participant`, `operator`, `webhook`, or `public`; undeclared routes fail closed.
+The gateway is deny-by-default: every route declares `participant`, `operator`, `webhook`, `scheduler`, or `public`; undeclared routes fail closed.
 
 Deny-by-default is about *routes*, not about *addresses a person typed*. A `GET` for a path that matches nothing at all — `/login`, `/sign-in`, a mistyped personal link — is a 404, and when the request accepts HTML it is answered with the app's own "this isn't available" page rather than a JSON error body. A visitor who guessed at a URL is shown a page; only a client that asked for JSON is given JSON. The app's pages are served for the page routes only: a path under one of the API prefixes above (`/i/:token/api/*`, `/d/:slug/api/*`, `/admin/api/*`) that matches no route is a 404 like any other unrouted path, and never the app's shell with a 200 — a mistyped endpoint must come back as an error the caller can read, not as HTML that looks like it worked. Bearer and cookie are never mixed on one request; a present `Authorization` header is decisive. Operator routes that name a document also require the caller to be one of its operators; otherwise 404.
 

@@ -6,11 +6,11 @@ Operator sign-in and sessions. All under `/auth`, `public` capability unless sta
 
 ## `POST /auth/login`
 
-Body `{ email, return? }`. Always 202 `{ ok: true }` regardless of whether the email is an operator **of this site** — an operator of another site gets the same response and no mail. When it is an active operator of the resolved site, emails a magic link to `https://<the resolved site's hostname>/auth/callback?code=<code>` whose return path is `return` (validated) or `/admin`. The **code** is 24 random base62 characters that maps, in memory and for 15 minutes, to the signed magic token; the token itself never appears in a URL or an email, so the link stays short and does not look like a credential payload. Rate limits: 5 per address and 5 per source IP per 15 minutes by default (`AUTH_LOGIN_RATE_LIMIT` sets the per-window count, for test environments that sign many operators in from one machine) → 429 `rate_limited`.
+Body `{ email, return? }`. Always 202 `{ ok: true }` regardless of whether the email is an operator **of this site** — an operator of another site gets the same response and no mail. When it is an active operator of the resolved site, emails a magic link to `https://<the resolved site's hostname>/auth/callback?op=<operator id>&code=<code>`, plus `&return=<path>` when the return path is `return` (validated) rather than the default `/admin`. The **code** is 24 base62 characters: 6 encode the link's expiry (15 minutes after it was sent) and 18 are an HMAC-SHA256 with `AUTH_SECRET` over the resolved site, the operator's id and email, the expiry and the return path. The link carries its own proof, so **no server state is needed to honor it**, and a link followed after the instance that sent it has been stopped still works (`architecture.md` § Deployment). It stays short and does not look like a credential payload. Rate limits: 5 per address and 5 per source IP per 15 minutes by default (`AUTH_LOGIN_RATE_LIMIT` sets the per-window count, for test environments that sign many operators in from one machine) → 429 `rate_limited`.
 
-## `GET /auth/callback?code=`
+## `GET /auth/callback?op=&code=&return=`
 
-Resolves the code to its magic token (unknown or expired code → failure page), verifies the token (signature, `purpose: magic`, expiry 15 min, unused `jti`, operator still active), deletes the code and marks the `jti` used, sets the session cookie, redirects 302 to the return path. Invalid, expired, used or inactive → an HTML page "This sign-in link isn't valid any more" with a link to `/admin/login`.
+Looks up the operator by `op`, recomputes the HMAC for the request's resolved site, that operator's current email, the code's expiry and `return` (absent means `/admin`), and compares it in constant time. It then checks that the expiry has not passed, that this code has not been used, and that the operator is still active. It marks the code used, sets the session cookie and redirects 302 to the return path. A link is good only on the host that sent it, because the site is inside the MAC. Used codes are remembered in memory until they expire, so a replay after a restart within the 15 minutes is accepted as a known limitation; replaying needs the link, and the link is the credential. Invalid, expired, used or inactive → an HTML page "This sign-in link isn't valid any more" with a link to `/admin/login`.
 
 ## `GET /auth/session`
 
@@ -33,17 +33,19 @@ Bearer only. Returns a new 90-day CLI token for the same operator if the present
 - `POST /auth/device/approve` `{ user_code }` (cookie + CSRF) → binds the pending code to the session's operator; 404 for unknown/expired codes.
 - `POST /auth/device/token` `{ device_code }` → 200 `{ token, expires_at, email }` once approved; 409 `device_pending` while waiting; 404 when expired or unknown. Clients poll at `interval`.
 
-Pending device codes, magic-link codes and used magic-link `jti`s are in memory; a restart drops them (the CLI reports "sign-in expired, run login again").
+Pending device codes are in memory. The flow keeps the instance alive while one is pending, because the CLI polls every 3 seconds and an instance that is receiving requests is not idle, so the approval arrives at the instance that holds the code. A restart mid-flow (a deploy) drops the code, and the CLI reports "sign-in expired, run login again".
 
 ## Token shape
 
-JWT, HS256 with `AUTH_SECRET`. Claims: `sub` (operator email, lowercase), `kind`, `name`, `purpose` (`session` | `cli` | `magic`), `site` (the slug of the site it was minted on), `sid` or `jti`, `iat`, `exp`. A token whose `site` is not the request's resolved site is 401 `unauthenticated`, exactly as no credential at all; a token minted before the claim existed carries none and reads as `default`, which is where it was minted; the session cookie is host-only anyway, and the claim is what gives a bearer token the same property. `purpose` is enforced per endpoint (a magic token never authenticates a request; a session token never approves a device from the bearer transport). Tokens carry no permissions. Magic tokens are internal: the emailed link carries only the short code.
+JWT, HS256 with `AUTH_SECRET`. Claims: `sub` (operator email, lowercase), `kind`, `name`, `purpose` (`session` | `cli`), `site` (the slug of the site it was minted on), `sid`, `iat`, `exp`. A token whose `site` is not the request's resolved site is 401 `unauthenticated`, exactly as no credential at all; a token minted before the claim existed carries none and reads as `default`, which is where it was minted; the session cookie is host-only anyway, and the claim is what gives a bearer token the same property. `purpose` is enforced per endpoint (a session token never approves a device from the bearer transport). Tokens carry no permissions. A magic link is not a token of this shape: it is the signed code described under `POST /auth/login`, and nothing but the callback accepts it.
 
 ## Principles
 
 **Inherited**
+
 - [The link is the identity](../principles.md#the-link-is-the-identity) applies to participants only; operators are the one place the system asks a person to prove an email, because they act on others' behalf.
 
 **Local**
+
 - **A credential belongs to one hostname.** A session or CLI token is good on the host that minted it and nowhere else, so an operator on two sites holds two of them and nothing about site scoping depends on a handler remembering to check.
 - **No token outlives its record.** Every authenticated request re-reads the operator; a deactivated record turns every outstanding token into a 401 immediately.
