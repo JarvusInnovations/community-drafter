@@ -1,4 +1,4 @@
-# community-drafter image — single Cloud Run singleton (specs/architecture.md § Deployment).
+# community-drafter image — the single-writer Cloud Run service, scaled to zero when idle (specs/architecture.md § Deployment).
 #
 # Debian variant of the official Bun image (not -slim/-alpine/-distroless): we
 # need `git` + `openssh-client` for the entrypoint's deploy-key clone of the

@@ -48,8 +48,8 @@ Also load the user-level `gitsheets` skill before touching `.gitsheets/*.toml`, 
 
 - **Bun** everywhere: runtime, package manager, test runner. TypeScript run directly; `tsc` type-checks only.
 - **API**: Fastify 5 with a deny-by-default auth gateway. **Web**: React 19 + Vite + Tailwind v4 + React Router v7, built to static assets the API serves. **CLI**: AXI-style `signatories-axi`, shipped as a **skill with the bundle embedded** (`skills/signatories-axi/`, built from `packages/cli/`), installed into adopting repos with `npx skills add`; not an npm package. This skill is the primary admin interface.
-- **Storage**: a private git data repo of four flat gitsheets sheets, single writer, push daemon. **No database. Commits are the data model**: records hold current state, paths name things (never moments or statuses), and git trailers carry the structured facts; versions, dates and activity come from `git log`. Open counts are write-behind; everything else commits immediately.
-- **Deploy**: Cloud Run, `max_instance_count = 1`, OpenTofu under `tf/`.
+- **Storage**: a private git data repo of four flat gitsheets sheets, single writer, every commit pushed before the write is acknowledged (the instance scales to zero and its disk goes with it). **No database. Commits are the data model**: records hold current state, paths name things (never moments or statuses), and git trailers carry the structured facts; versions, dates and activity come from `git log`. Open counts are write-behind; everything else commits immediately.
+- **Deploy**: Cloud Run, `max_instance_count = 1`, `min_instance_count = 0`; scheduled work arrives as `POST /internal/tick` from Cloud Scheduler, never an in-process timer. OpenTofu under `tf/`.
 
 ## Tooling rules (mirrors the user-level CLAUDE.md; keep in sync)
 
