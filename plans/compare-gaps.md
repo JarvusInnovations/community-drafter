@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 depends: [redline-quality, admin-dashboard]
 specs:
   - specs/behaviors/versioning.md
@@ -9,6 +9,7 @@ specs:
   - specs/api/admin.md
   - specs/api/participant.md
 issues: [84, 107]
+pr: 121
 ---
 
 # Plan: compare-gaps
@@ -35,11 +36,11 @@ Two gaps in the version comparison. (1) A fenced code block that changed between
 
 ## Validation
 
-- [ ] Shared diff tests: a changed code block is one "code block changed" stacked Removed/Added; an unchanged one appears once as `same`; added/removed are counted; a code block inside a list item stays part of that item.
-- [ ] A render test proves every non-code block's id and text are identical for a document with and without its code blocks, including a code block whose text equals a paragraph's.
-- [ ] API test: `GET /admin/api/documents/:slug/compare` returns the diff for a two-version document and `invalid_request` for `from == to`.
-- [ ] Web test: the admin compare screen renders the summary line and redline from the admin API, and the versions table links "Compare with previous" for every version but v1.
-- [ ] Lint, format:check, typecheck and tests pass in `packages/shared`, `apps/api` and `apps/web`; `apps/web` builds and `check:bundle-size` passes.
+- [x] Shared diff tests: a changed code block is one "code block changed" stacked Removed/Added; an unchanged one appears once as `same`; added/removed are counted; a code block inside a list item stays part of that item.
+- [x] A render test proves every non-code block's id and text are identical for a document with and without its code blocks, including a code block whose text equals a paragraph's.
+- [x] API test: `GET /admin/api/documents/:slug/compare` returns the diff for a two-version document and `invalid_request` for `from == to`.
+- [x] Web test: the admin compare screen renders the summary line and redline from the admin API, and the versions table links "Compare with previous" for every version but v1.
+- [x] Lint, format:check, typecheck and tests pass in `packages/shared`, `apps/api` and `apps/web`; `apps/web` builds and `check:bundle-size` passes.
 - [ ] #84 and #107 closed by the PR.
 
 ## Risks / unknowns
@@ -48,4 +49,13 @@ Two gaps in the version comparison. (1) A fenced code block that changed between
 
 ## Notes
 
+- **Code rides beside the blocks, not on them.** `redline-quality` hung tables off their cells as a `container`. A code block has no commentable block to hang from, so the render result gains a `code` list. Each entry records its position among `blocks`, and `toUnits` slots it back in. `diffVersions` still accepts a bare `Block[]` and then compares the commentable blocks alone, so anything that calls it with blocks only (older tests, anchoring) behaves exactly as before.
+- **Code keeps its whitespace.** Code text is taken verbatim, minus the fence's trailing newline, and is never normalized the way block text is. Indentation is meaning in code.
+- **Similarity still decides whether two code blocks pair up.** A short snippet that changed almost completely falls below the threshold and shows as removed plus added rather than as one change, the same as a paragraph. The API test uses code that stays similar for that reason.
+- **The compare body is one component now.** The participant and public screens were near-copies. `CompareView` holds the selectors, summary, toggle, URL state and redline, and each screen supplies only its frame classes, heading level, fetcher and back link.
+- "#84 and #107 closed by the PR" is left unchecked. It can only be checked once the PR merges, and this plan's PR is not merged yet.
+- `Timeline.test.tsx` "commenting: first segment active…" fails on develop too. It is unrelated to this plan.
+
 ## Follow-ups
+
+- Issue [#122](https://github.com/JarvusInnovations/signatories/issues/122): the CLI's `versions compare` loses the removed/added markers on a stacked table or code block.
