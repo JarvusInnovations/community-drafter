@@ -27,7 +27,7 @@ anchor = {
 
 ## Block identity
 
-Every commentable block in a rendered version carries `data-block="b-<8 hex>"` where the hex is the leading bytes of a hash of the block's **normalized text** (Unicode NFC, whitespace collapsed, case preserved, markdown syntax and inline formatting removed). If two blocks in the same version normalize identically, the second and later get an ordinal suffix (`b-7f3a9c2e-2`). Commentable blocks: paragraphs, headings, list items, blockquote paragraphs, table cells. Container elements (lists, tables, blockquotes) are not themselves commentable.
+Every commentable block in a rendered version carries `data-block="b-<8 hex>"` where the hex is the leading bytes of a hash of the block's **normalized text** (Unicode NFC, whitespace collapsed, case preserved, markdown syntax and inline formatting removed). If two blocks in the same version normalize identically, the second and later get an ordinal suffix (`b-7f3a9c2e-2`). Commentable blocks: paragraphs, headings, list items, blockquote paragraphs, table cells. Container elements (lists, tables, blockquotes) are not themselves commentable. Nor are code blocks: they carry no `data-block`, and adding, removing or editing one never changes another block's id or text. The comparison view still compares them, as units of their own (`versioning.md` § Diff).
 
 The consequence, which is the point: a block whose text does not change keeps its id across versions, so comments on untouched passages re-anchor exactly with no text search.
 

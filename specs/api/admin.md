@@ -34,7 +34,7 @@ All routes under `/admin/api`. Auth: an operator token as `Authorization: Bearer
   ```
 
   One transaction, one commit: the document body, disposition fields on the affected submissions (`Disposed` trailer), and the `signing_closes_at` extension if in signing phase. Nobody is mailed unless `notify_commenters` is true, and then only the authors whose comments this publish disposed, with `my_comments_addressed` on (`behaviors/notifications.md` → `disposition-v<n>`). Errors: `validation_failed` (summary length, unknown comment id, `declined` without note), `no_change` (text identical to current), `phase_closed` when `state` is `closed` or `withdrawn`. Response: the version (number, summary, commit), `signing_closes_at` when the publish moved it, and `notified: { commenters: { requested, would_notify, sent?, failed? } }` — `would_notify` is always reported, so a publish without the flag says how many it did not tell. A `final` field in the body is ignored.
-- `GET /documents/:slug/compare?from=&to=` → same shape as the participant compare.
+- `GET /documents/:slug/compare?from=&to=` → same shape, defaults and errors as the participant compare (`participant.md`): `to` defaults to the current version and `from` to the one before it, `invalid_request` when both name the same version, `not_found` for a version that does not exist.
 
 ## The deliverable
 
