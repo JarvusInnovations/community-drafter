@@ -631,7 +631,7 @@ describe("auth is per host", () => {
     expect(own.statusCode).toBe(202);
     const message = mailer.sent.at(-1)!;
     expect(message.subject).toBe("Sign in to Site A");
-    expect(message.personalLink).toContain(`https://${A_HOST}/auth/callback?code=`);
+    expect(message.personalLink).toContain(`https://${A_HOST}/auth/callback?op=`);
 
     await server.close();
   });

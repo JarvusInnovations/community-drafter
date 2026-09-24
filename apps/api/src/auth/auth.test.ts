@@ -9,7 +9,7 @@ import {
 } from "../routes/test-support.ts";
 import { FixedWindowLimiter } from "../gateway/rate-limit.ts";
 import { FakeMailer } from "../lib/mailer/index.ts";
-import { mintOperatorToken, verifyOperatorToken } from "./tokens.ts";
+import { mintOperatorToken } from "./tokens.ts";
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -25,10 +25,16 @@ function setCookieHeader(response: { headers: { "set-cookie"?: string | string[]
   return value.split(";")[0] as string;
 }
 
-/** The emailed link carries a 24-char code, never the token (`specs/api/auth.md`). */
-function extractMagicCode(text: string): string {
-  const match = /callback\?code=([A-Za-z0-9]{24})(?![A-Za-z0-9])/u.exec(text);
-  if (!match?.[1]) throw new Error(`no magic code found in: ${text}`);
+/**
+ * The emailed link's path and query (`specs/api/auth.md`): `op`, a 24-char
+ * signed `code`, and `return` only when it is not `/admin` — never a token.
+ */
+function extractMagicLink(text: string): string {
+  const match =
+    /https?:\/\/[^/\s]+(\/auth\/callback\?op=[\w-]+&code=[A-Za-z0-9]{24}(?:&return=[^\s]+)?)/u.exec(
+      text,
+    );
+  if (!match?.[1]) throw new Error(`no magic link found in: ${text}`);
   return match[1];
 }
 
@@ -127,12 +133,10 @@ describe("GET /auth/callback", () => {
       url: "/auth/login",
       payload: { email: TEST_ACTOR.email, return: "/admin/d/x" },
     });
-    const token = extractMagicCode(mailer.sent[0]!.text);
+    const link = extractMagicLink(mailer.sent[0]!.text);
+    expect(link).toContain("&return=%2Fadmin%2Fd%2Fx");
 
-    const callback = await server.inject({
-      method: "GET",
-      url: `/auth/callback?code=${token}`,
-    });
+    const callback = await server.inject({ method: "GET", url: link });
     expect(callback.statusCode).toBe(302);
     expect(callback.headers.location).toBe("/admin/d/x");
     const cookie = setCookieHeader(callback);
@@ -192,12 +196,14 @@ describe("GET /auth/callback", () => {
       url: "/auth/login",
       payload: { email: TEST_ACTOR.email },
     });
-    const token = extractMagicCode(mailer.sent[0]!.text);
+    const link = extractMagicLink(mailer.sent[0]!.text);
+    expect(link).not.toContain("return=");
 
-    const first = await server.inject({ method: "GET", url: `/auth/callback?code=${token}` });
+    const first = await server.inject({ method: "GET", url: link });
     expect(first.statusCode).toBe(302);
+    expect(first.headers.location).toBe("/admin");
 
-    const second = await server.inject({ method: "GET", url: `/auth/callback?code=${token}` });
+    const second = await server.inject({ method: "GET", url: link });
     expect(second.statusCode).toBe(400);
     expect(second.body).toContain("isn't valid any more");
 
@@ -482,13 +488,11 @@ describe("device-code flow", () => {
     expect(user_code).toHaveLength(8);
     expect(expires_in).toBe(900);
     expect(interval).toBe(3);
-    // The device return path travels inside the signed magic token's
-    // `return` claim, not in the visible email text.
-    const magicCode = extractMagicCode(mailer.sent[0]!.text);
-    const magicToken = server.auth.magicCodes.peek(magicCode);
-    expect(magicToken).not.toBeNull();
-    const verified = await verifyOperatorToken(magicToken!, TEST_AUTH_SECRET, "magic");
-    expect(verified?.returnPath).toBe(`/auth/device?code=${user_code}`);
+    // The device return path rides in the link and is covered by the code's MAC.
+    const magicLink = extractMagicLink(mailer.sent[0]!.text);
+    expect(new URL(magicLink, "http://x").searchParams.get("return")).toBe(
+      `/auth/device?code=${user_code}`,
+    );
     // The device email names the user code and never the token itself.
     expect(mailer.sent[0]!.text).toContain(user_code);
     expect(mailer.sent[0]!.text).not.toContain("eyJ");
@@ -598,7 +602,7 @@ describe("operator-magic-link email", () => {
     const sent = mailer.sent[0]!;
     expect(sent.subject).toBe("Sign in to Signatories");
     expect(sent.text).toContain("on the web");
-    expect(sent.text).toMatch(/\/auth\/callback\?code=[A-Za-z0-9]{24}\b/u);
+    expect(sent.text).toMatch(/\/auth\/callback\?op=[\w-]+&code=[A-Za-z0-9]{24}\b/u);
     expect(sent.text).not.toContain("eyJ");
     expect(sent.html).toContain("Sign in to Signatories");
     expect(sent.text).toContain("If you didn't request this");

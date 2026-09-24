@@ -9,6 +9,7 @@ import { isSiteOperator } from "../sites/site.ts";
 import { resolveSender } from "../notifications/sender.ts";
 import { isSafeReturnPath } from "./cookie.ts";
 import { DEVICE_POLL_INTERVAL_SECONDS } from "./device.ts";
+import { DEFAULT_RETURN_PATH, magicLinkUrl, signMagicCode, verifyMagicCode } from "./magic-link.ts";
 
 interface LoginBody {
   email?: string;
@@ -16,7 +17,9 @@ interface LoginBody {
 }
 
 interface CallbackQuery {
+  op?: string;
   code?: string;
+  return?: string;
 }
 
 interface DeviceBody {
@@ -57,7 +60,7 @@ function authBaseUrl(request: FastifyRequest): string {
 }
 
 function safeReturnPath(raw: string | undefined): string {
-  return raw && isSafeReturnPath(raw) ? raw : "/admin";
+  return raw && isSafeReturnPath(raw) ? raw : DEFAULT_RETURN_PATH;
 }
 
 const invalidLinkPage = htmlPage(
@@ -81,21 +84,22 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
    * participation-shaped dispatcher entirely.
    */
   async function sendMagicLink(
-    operator: Pick<OperatorRecord, "email" | "name" | "kind">,
+    operator: Pick<OperatorRecord, "id" | "email" | "name" | "kind">,
     request: FastifyRequest,
     returnPath: string,
     trigger: { kind: "web" } | { kind: "device"; userCode: string },
   ): Promise<void> {
-    const minted = await fastify.auth.mint(
-      "magic",
-      { email: operator.email, name: operator.name, kind: operator.kind },
-      { returnPath, site: request.site.slug },
-    );
-    // `specs/api/auth.md`: the token never appears in a URL or an email —
-    // only a short code that maps to it in memory for the token's lifetime.
-    const code = fastify.auth.magicCodes.put(minted.token, minted.expiresAt.getTime());
+    // `specs/api/auth.md`: the link carries a short code that signs the
+    // site, the operator, the expiry and the return path — nothing is kept
+    // in memory, so the link still works after a scale-to-zero restart.
+    const { code } = signMagicCode(fastify.auth.secret(), {
+      site: request.site.slug,
+      operatorId: operator.id,
+      operatorEmail: operator.email,
+      returnPath,
+    });
     const base = authBaseUrl(request);
-    const link = `${base}/auth/callback?code=${code}`;
+    const link = magicLinkUrl(base, operator.id, code, returnPath);
     // `specs/behaviors/notifications.md` § `operator-magic-link`: the one
     // message that belongs to the **resolved** site rather than to a
     // document's, because it is not about a document.
@@ -238,22 +242,27 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         return invalidLinkPage;
       };
 
-      const code = request.query.code;
-      if (!code) return fail();
-      const token = fastify.auth.magicCodes.take(code);
-      if (!token) return fail();
+      const { op, code } = request.query;
+      if (typeof op !== "string" || typeof code !== "string" || !op || !code) return fail();
+      // The return path is part of what the code signs; an unsafe one was
+      // never signed, so it fails like any other tampering.
+      const returnPath = request.query.return ?? DEFAULT_RETURN_PATH;
+      if (typeof returnPath !== "string" || !isSafeReturnPath(returnPath)) return fail();
 
-      const verified = await fastify.auth.verifyMagic(token);
-      if (!verified || !verified.jti) return fail();
-      // A magic link is built on the host the sign-in was requested on, so
-      // it is only good there (`specs/behaviors/sites.md`).
-      if (verified.site !== request.site.slug) return fail();
-      if (fastify.auth.usedMagicJti.isUsed(verified.jti)) return fail();
-
-      const operator = fastify.storage.readModel.getOperatorByEmail(verified.sub);
+      const operator = fastify.storage.readModel.listOperators().find((o) => o.id === op);
       if (!operator || !operator.active) return fail();
 
-      fastify.auth.usedMagicJti.markUsed(verified.jti, verified.exp * 1000);
+      // The resolved site is inside the MAC, so a link is only good on the
+      // host it was sent from (`specs/behaviors/sites.md`).
+      const expiresAt = verifyMagicCode(fastify.auth.secret(), code, {
+        site: request.site.slug,
+        operatorId: operator.id,
+        operatorEmail: operator.email,
+        returnPath,
+      });
+      if (!expiresAt) return fail();
+      if (fastify.auth.usedMagicCodes.isUsed(code)) return fail();
+      fastify.auth.usedMagicCodes.markUsed(code, expiresAt.getTime());
 
       const minted = await fastify.auth.mint(
         "session",
@@ -261,7 +270,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         { site: request.site.slug },
       );
       reply.header("set-cookie", fastify.auth.sessionSetCookieHeader(minted.token));
-      reply.redirect(safeReturnPath(verified.returnPath), 302);
+      reply.redirect(returnPath, 302);
     },
   );
 
