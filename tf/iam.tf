@@ -146,6 +146,21 @@ resource "google_project_iam_member" "github_actions_wif_pool_admin" {
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+# The scheduler tick (scheduler.tf): the release apply manages the Cloud
+# Scheduler job, and creating or updating a job whose OIDC token names the
+# tick service account requires acting as that account.
+resource "google_project_iam_member" "github_actions_cloudscheduler_admin" {
+  project = var.project_id
+  role    = "roles/cloudscheduler.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_service_account_iam_member" "github_actions_actas_tick" {
+  service_account_id = google_service_account.tick.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
 # --- The pull-request `tofu plan` gate's own principal (#99) ---
 #
 # `specs/architecture.md` § Deployment: the read-only plan gate "runs under a
@@ -203,6 +218,13 @@ resource "google_project_iam_member" "github_actions_plan_dns_reader" {
 resource "google_project_iam_member" "github_actions_plan_wif_pool_viewer" {
   project = var.project_id
   role    = "roles/iam.workloadIdentityPoolViewer"
+  member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
+}
+
+# The Cloud Scheduler job (scheduler.tf).
+resource "google_project_iam_member" "github_actions_plan_cloudscheduler_viewer" {
+  project = var.project_id
+  role    = "roles/cloudscheduler.viewer"
   member  = "serviceAccount:${google_service_account.github_actions_plan.email}"
 }
 

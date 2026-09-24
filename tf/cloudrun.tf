@@ -10,12 +10,15 @@ resource "google_cloud_run_v2_service" "community_drafter" {
   template {
     service_account = google_service_account.cloudrun.email
 
-    # Singleton (specs/architecture.md § Deployment: "max_instance_count = 1
-    # (load-bearing: single writer)"). min = 1 so a participant's first
-    # click never pays for a cold clone of the data repo.
+    # specs/architecture.md § Deployment: max = 1 is load-bearing (the
+    # service is the data repo's single writer; two instances would be two
+    # writers). min = 0: the service scales to zero when idle, which is safe
+    # because every commit is pushed before the write is acknowledged and
+    # SIGTERM flushes and pushes the rest, and because nothing scheduled
+    # runs on an in-process timer (scheduler.tf calls /internal/tick).
     scaling {
       max_instance_count = 1
-      min_instance_count = 1
+      min_instance_count = 0
     }
 
     containers {
@@ -76,6 +79,18 @@ resource "google_cloud_run_v2_service" "community_drafter" {
         value = "/secrets/deploy-key/latest"
       }
 
+      # The scheduler tick's OIDC token must carry this audience and be for
+      # this service account (scheduler.tf; specs/architecture.md
+      # § Deployment, "The scheduler"). Either unset: every tick is refused.
+      env {
+        name  = "TICK_AUDIENCE"
+        value = local.tick_audience
+      }
+      env {
+        name  = "TICK_INVOKER_EMAIL"
+        value = google_service_account.tick.email
+      }
+
       # Empty until a second apply sets it from the service_url output (or
       # the domain mapping below finishes verification).
       dynamic "env" {
@@ -121,18 +136,19 @@ resource "google_cloud_run_v2_service" "community_drafter" {
 
       # Probes hit `/_health` (no auth required, returns 200 once
       # `server.listen` has fired and the storage plugin's boot clone of
-      # the data repo has completed).
+      # the data repo has completed). Every idle period now ends in a cold
+      # start, so poll often (a request waiting on a cold start is let in
+      # within 2 s of the server listening) and keep a generous budget
+      # (60 x 2 s = 2 min) so a slow clone never fails a boot.
       startup_probe {
         http_get {
           path = "/_health"
           port = 8080
         }
         initial_delay_seconds = 0
-        period_seconds        = 4
-        # Generous window (§ risk in plans/deploy.md: "the boot clone must
-        # finish within the startup probe window") — 40 x 4s = 160s budget.
-        failure_threshold = 40
-        timeout_seconds   = 3
+        period_seconds        = 2
+        failure_threshold     = 60
+        timeout_seconds       = 2
       }
 
       liveness_probe {
@@ -155,6 +171,14 @@ resource "google_cloud_run_v2_service" "community_drafter" {
           cpu    = "1"
           memory = "1Gi"
         }
+        # Request-based billing (specs/architecture.md § Deployment): CPU
+        # while serving, starting and shutting down. Nothing correct depends
+        # on work after a response — writes push before they respond, and
+        # scheduled work arrives as a request (/internal/tick).
+        cpu_idle = true
+        # Extra CPU while the container boots: the clone and the read-model
+        # build are what a participant waits on after an idle period.
+        startup_cpu_boost = true
       }
     }
 
