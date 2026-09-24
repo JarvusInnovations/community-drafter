@@ -9,7 +9,13 @@
 export * from "./anchor/index.ts";
 export * from "./anchor/dom.ts";
 export * from "./diff/index.ts";
-export type { Block, BlockTag, RenderResult } from "./render/types.ts";
+export type {
+  Block,
+  BlockTag,
+  CodeBlock,
+  ComparableVersion,
+  RenderResult,
+} from "./render/types.ts";
 // Pure string logic (NFC + whitespace collapse), browser-safe — needed by
 // `apps/web`'s comment-mode to reconstruct `Block[]`-shaped data from the
 // live DOM for `computeAnchor` (`render/normalize.ts`'s own doc comment).

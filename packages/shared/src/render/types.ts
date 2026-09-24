@@ -42,6 +42,30 @@ export interface Block {
   container?: BlockContainer;
 }
 
+/**
+ * A fenced code block. It is a comparison unit (`specs/behaviors/versioning.md`
+ * § Diff step 1) but not a commentable block
+ * (`specs/behaviors/inline-comments.md` § Block identity), so it rides beside
+ * `blocks` rather than in it: nothing that anchors a comment ever sees one,
+ * and no block's id or text depends on it.
+ */
+export interface CodeBlock {
+  /** `c-<8 hex>` (with an `-2`, `-3`, … ordinal suffix on collision), from its own counter. */
+  id: string;
+  /** The code exactly as written, minus the one trailing newline every fence ends with. */
+  text: string;
+  /** Serialized HTML for the whole `<pre>`. */
+  html: string;
+  /** How many commentable blocks precede it in document order: where it sits among `blocks`. */
+  position: number;
+}
+
+/** What a comparison reads from one rendered version: its blocks and, optionally, its code blocks. */
+export interface ComparableVersion {
+  blocks: Block[];
+  code?: CodeBlock[];
+}
+
 /** Options that change presentation only (`specs/behaviors/versioning.md` § Rendering). */
 export interface RenderOptions {
   /**
@@ -58,4 +82,6 @@ export interface RenderResult {
   /** Full sanitized document HTML, with `data-block` ids and heading slugs baked in. */
   html: string;
   blocks: Block[];
+  /** Code blocks in document order: compared, never commented on. */
+  code: CodeBlock[];
 }

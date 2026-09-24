@@ -1,6 +1,6 @@
 import { diffWordsWithSpace } from "diff";
 
-import type { Block } from "../render/types.ts";
+import type { Block, ComparableVersion } from "../render/types.ts";
 import { alignBlocks } from "./align.ts";
 import { escapeHtml, replaceInnerHtml, replaceOnce, wrapBlockHtml } from "./html.ts";
 import type { DiffUnit, DiffUnitKind, TableUnit } from "./units.ts";
@@ -9,7 +9,7 @@ import { toUnits } from "./units.ts";
 export type { AlignedOp, Alignable } from "./align.ts";
 export { SIMILARITY_THRESHOLD } from "./align.ts";
 export { textSimilarity } from "./similarity.ts";
-export type { BlockUnit, DiffUnit, DiffUnitKind, TableUnit } from "./units.ts";
+export type { BlockUnit, CodeUnit, DiffUnit, DiffUnitKind, TableUnit } from "./units.ts";
 export { toUnits } from "./units.ts";
 
 export type BlockDiffStatus = "same" | "changed" | "added" | "removed";
@@ -53,7 +53,7 @@ export interface DiffResult {
 }
 
 const CHANGE_ORDER: DiffChange[] = ["changed", "added", "removed"];
-const KIND_ORDER: DiffUnitKind[] = ["paragraph", "heading", "list item", "table"];
+const KIND_ORDER: DiffUnitKind[] = ["paragraph", "heading", "list item", "table", "code block"];
 
 function isFormatChange(from: Block, to: Block): boolean {
   return from.tag !== to.tag || from.ordered !== to.ordered;
@@ -136,18 +136,33 @@ function redlineTableHtml(from: TableUnit, to: TableUnit): string {
     return html;
   }
 
+  return stackedHtml(to.id, from.container.html, to.container.html);
+}
+
+/**
+ * The whole old unit struck and labelled "Removed" above the whole new unit
+ * underlined and labelled "Added" (`specs/behaviors/versioning.md` § Diff
+ * steps 4 and 5): a restructured table, or any changed code block.
+ */
+function stackedHtml(id: string, fromHtml: string, toHtml: string): string {
   return [
-    `<div class="diff-stack" data-block="${to.id}">`,
+    `<div class="diff-stack" data-block="${id}">`,
     '<p class="diff-stack-label" data-change="removed">Removed</p>',
-    `<del class="diff-stack-old">${from.container.html}</del>`,
+    `<del class="diff-stack-old">${fromHtml}</del>`,
     '<p class="diff-stack-label" data-change="added">Added</p>',
-    `<ins class="diff-stack-new">${to.container.html}</ins>`,
+    `<ins class="diff-stack-new">${toHtml}</ins>`,
     "</div>",
   ].join("");
 }
 
 function unitHtml(unit: DiffUnit): string {
-  return unit.type === "table" ? unit.container.html : unit.block.html;
+  if (unit.type === "table") return unit.container.html;
+  if (unit.type === "code") return unit.code.html;
+  return unit.block.html;
+}
+
+function asComparable(version: Block[] | ComparableVersion): ComparableVersion {
+  return Array.isArray(version) ? { blocks: version } : version;
 }
 
 /** Tallies the summary line's clauses in the order the spec prints them. */
@@ -174,10 +189,17 @@ function summarize(tally: Map<string, DiffSummaryItem>): DiffSummary {
 /**
  * Unit-aligned redline between two versions' rendered blocks, per
  * `specs/behaviors/versioning.md` § Diff. Browser-safe: operates on already
- * rendered `Block[]`, not markdown (no `unified` dependency).
+ * rendered blocks, not markdown (no `unified` dependency). Pass a render
+ * result (or `{ blocks, code }`) to include code blocks; a bare `Block[]`
+ * compares the commentable blocks alone.
  */
-export function diffVersions(fromBlocks: Block[], toBlocks: Block[]): DiffResult {
-  const ops = alignBlocks(toUnits(fromBlocks), toUnits(toBlocks));
+export function diffVersions(
+  fromVersion: Block[] | ComparableVersion,
+  toVersion: Block[] | ComparableVersion,
+): DiffResult {
+  const older = asComparable(fromVersion);
+  const newer = asComparable(toVersion);
+  const ops = alignBlocks(toUnits(older.blocks, older.code), toUnits(newer.blocks, newer.code));
 
   const tally = new Map<string, DiffSummaryItem>();
   const count = (kind: DiffUnitKind, change: DiffChange): void => {
@@ -210,6 +232,20 @@ export function diffVersions(fromBlocks: Block[], toBlocks: Block[]): DiffResult
       }
       count(to.kind, "changed");
       blocks.push({ status: "changed", id: to.id, html: redlineTableHtml(from, to) });
+      continue;
+    }
+
+    if (from.type === "code" && to.type === "code") {
+      if (from.text === to.text) {
+        blocks.push({ status: "same", id: to.id, html: to.code.html });
+        continue;
+      }
+      count(to.kind, "changed");
+      blocks.push({
+        status: "changed",
+        id: to.id,
+        html: stackedHtml(to.id, from.code.html, to.code.html),
+      });
       continue;
     }
 

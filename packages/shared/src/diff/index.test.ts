@@ -277,3 +277,78 @@ describe("diffVersions", () => {
     });
   });
 });
+
+/** `specs/behaviors/versioning.md` § Diff steps 1 and 5 (#84). */
+describe("diffVersions code blocks", () => {
+  const doc = (code: string, tail = "After.") =>
+    render(`Before.\n\n\`\`\`\n${code}\n\`\`\`\n\n${tail}\n`);
+
+  it("shows a changed code block once, stacked old above new with word labels", () => {
+    const result = diffVersions(doc("let a = 1;"), doc("let a = 2;"));
+
+    expect(result.summary).toEqual({
+      changed: 1,
+      added: 0,
+      removed: 0,
+      items: [{ kind: "code block", change: "changed", count: 1 }],
+    });
+    const changed = result.blocks.filter((entry) => entry.status === "changed");
+    expect(changed).toHaveLength(1);
+    expect(changed[0]?.id).toMatch(/^c-/);
+    expect(changed[0]?.html).toBe(
+      [
+        `<div class="diff-stack" data-block="${changed[0]?.id}">`,
+        '<p class="diff-stack-label" data-change="removed">Removed</p>',
+        '<del class="diff-stack-old"><pre><code>let a = 1;\n</code></pre></del>',
+        '<p class="diff-stack-label" data-change="added">Added</p>',
+        '<ins class="diff-stack-new"><pre><code>let a = 2;\n</code></pre></ins>',
+        "</div>",
+      ].join(""),
+    );
+    // Code sits between the two paragraphs, where it was written.
+    expect(result.blocks.map((entry) => entry.status)).toEqual(["same", "changed", "same"]);
+  });
+
+  it("shows an unchanged code block once, as the same block", () => {
+    const result = diffVersions(
+      doc("same();", "The closing paragraph says what we ask for."),
+      doc("same();", "The closing paragraph says what we ask for today."),
+    );
+    expect(result.blocks.filter((entry) => entry.id.startsWith("c-"))).toEqual([
+      {
+        status: "same",
+        id: expect.stringMatching(/^c-/),
+        html: "<pre><code>same();\n</code></pre>",
+      },
+    ]);
+    expect(result.summary.items).toEqual([{ kind: "paragraph", change: "changed", count: 1 }]);
+  });
+
+  it("counts a code block added or removed", () => {
+    const plain = render("Before.\n\nAfter.\n");
+    const withCode = doc("echo hi");
+
+    const added = diffVersions(plain, withCode);
+    expect(added.summary.items).toEqual([{ kind: "code block", change: "added", count: 1 }]);
+    expect(added.blocks.find((entry) => entry.status === "added")?.html).toBe(
+      "<pre><code>echo hi\n</code></pre>",
+    );
+
+    const removed = diffVersions(withCode, plain);
+    expect(removed.summary.items).toEqual([{ kind: "code block", change: "removed", count: 1 }]);
+  });
+
+  it("compares the commentable blocks alone when given bare Block[]", () => {
+    const result = diffVersions(doc("a();").blocks, doc("b();").blocks);
+    expect(result.summary.items).toEqual([]);
+  });
+
+  it("does not report a code block inside a list item separately", () => {
+    const item = "An item long enough that one changed word leaves it similar.";
+    const from = render(`- ${item}\n\n  \`\`\`\n  one\n  \`\`\`\n`);
+    const to = render(`- ${item}\n\n  \`\`\`\n  two\n  \`\`\`\n`);
+    expect(diffVersions(from, to).summary.items).toEqual([
+      { kind: "list item", change: "changed", count: 1 },
+    ]);
+  });
+});

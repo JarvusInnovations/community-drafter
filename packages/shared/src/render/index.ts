@@ -13,7 +13,14 @@ import { rehypeCitations, type CitationsMode } from "./citations.ts";
 import { RENDER_SANITIZE_SCHEMA } from "./sanitize-schema.ts";
 import type { Block, RenderOptions, RenderResult } from "./types.ts";
 
-export type { Block, BlockTag, RenderOptions, RenderResult } from "./types.ts";
+export type {
+  Block,
+  BlockTag,
+  CodeBlock,
+  ComparableVersion,
+  RenderOptions,
+  RenderResult,
+} from "./types.ts";
 export { normalizeText } from "./normalize.ts";
 export { BLOCK_CLASSES, type BlockClass } from "./block-classes.ts";
 export {
@@ -68,5 +75,6 @@ export function render(markdown: string, options: RenderOptions = {}): RenderRes
   return {
     html: String(file),
     blocks,
+    code: file.data.codeBlocks ?? [],
   };
 }
