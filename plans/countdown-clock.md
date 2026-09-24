@@ -1,5 +1,6 @@
 ---
-status: in-progress
+status: done
+pr: 123
 depends: []
 issues: []
 specs:
@@ -22,9 +23,9 @@ and schedule no timers; otherwise behave as today. `Timeline` passes its `now` p
 
 ## Validation
 
-- [ ] `Timeline.test.tsx` passes regardless of the real date.
-- [ ] Web gates green.
+- [x] `Timeline.test.tsx` passes regardless of the real date.
+- [x] Web gates green (lint, typecheck, 121/121 tests).
 
 ## Notes
 
-(closeout)
+Found while reviewing PR #121, whose web suite failed only on this test; it had been failing on develop since the real clock passed the fixture deadline (2026-09-24).
