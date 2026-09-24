@@ -5,9 +5,9 @@ import { ReadModel } from "./read-model.ts";
 import { openDataRepo } from "./repo.ts";
 import { createTestDataRepo } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 describe("ReadModel — version derivation", () => {

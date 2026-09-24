@@ -21,9 +21,9 @@ import {
   WEBHOOK_ROUTE,
 } from "./gateway.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 beforeEach(() => {

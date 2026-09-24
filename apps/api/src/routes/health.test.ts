@@ -4,9 +4,9 @@ import Fastify from "fastify";
 import { app } from "../app.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 describe("GET /_health", () => {

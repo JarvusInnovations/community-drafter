@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { initDataRepo } from "./init.ts";
 import { createTestDataRepoWithRemote } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function runGitsheetsCli(

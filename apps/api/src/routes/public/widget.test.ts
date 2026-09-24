@@ -9,9 +9,9 @@ import { app } from "../../app.ts";
 import { createTestDataRepo } from "../../storage/test-helpers.ts";
 import { seedDocument } from "../test-support.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 function buildFixtureDist(widgetSource: string): { root: string; cleanup: () => void } {
@@ -42,7 +42,7 @@ describe("GET /d/:slug/widget.js", () => {
       static: { root },
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     await seedDocument(server, { slug: "doc-widget", public_access: "read" });
 

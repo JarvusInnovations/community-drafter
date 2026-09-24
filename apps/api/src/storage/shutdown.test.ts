@@ -8,9 +8,9 @@ import { buildTestServer, seedDocument, seedParticipant } from "../routes/test-s
  * GitHub. The instance can be stopped whenever it is idle and its disk goes
  * with it, so what matters is what the remote holds.
  */
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function git(args: string[], cwd: string): Promise<string> {

@@ -7,9 +7,9 @@ import Fastify from "fastify";
 import { app } from "../app.ts";
 import { createTestDataRepo } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   delete process.env.BOOTSTRAP_OPERATOR_EMAIL;
 });
 
@@ -94,7 +94,7 @@ describe("people site migration", () => {
     });
 
     const first = await boot(dataDir);
-    cleanups.push(() => void first.close());
+    cleanups.push(() => first.close());
 
     // The records are readable again, at their new path, carrying the site.
     const jane = first.storage.readModel.getPerson("default", "jane-doe");
@@ -120,7 +120,7 @@ describe("people site migration", () => {
 
     // Second boot: nothing left in the old layout, so nothing is committed.
     const second = await boot(dataDir);
-    cleanups.push(() => void second.close());
+    cleanups.push(() => second.close());
     expect((await runGit(["rev-parse", "HEAD"], dataDir)).trim()).toBe(headAfterFirst);
     expect(second.storage.readModel.getPerson("default", "jane-doe")?.name).toBe("Jane Doe");
     await second.close();
@@ -133,7 +133,7 @@ describe("people site migration", () => {
 
     const before = (await runGit(["rev-parse", "HEAD"], dataDir)).trim();
     const server = await boot(dataDir);
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
     expect((await runGit(["rev-parse", "HEAD"], dataDir)).trim()).toBe(before);
     await server.close();
   });

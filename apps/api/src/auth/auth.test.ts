@@ -11,9 +11,9 @@ import { FixedWindowLimiter } from "../gateway/rate-limit.ts";
 import { FakeMailer } from "../lib/mailer/index.ts";
 import { mintOperatorToken } from "./tokens.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   delete process.env.DEV_ADMIN_EMAIL;
   delete process.env.BOOTSTRAP_OPERATOR_EMAIL;
 });

@@ -13,9 +13,9 @@ import {
 } from "../routes/test-support.ts";
 import { sendOperatorDigest } from "./operator-digest.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 const TODAY = "2026-09-20";

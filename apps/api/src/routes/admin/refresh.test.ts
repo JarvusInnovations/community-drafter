@@ -11,9 +11,9 @@ import { commit } from "../../storage/commit.ts";
 import { openDataRepo } from "../../storage/repo.ts";
 import { createTestDataRepoWithRemote } from "../../storage/test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   delete process.env.DATA_REPO_WEBHOOK_SECRET;
 });
 
@@ -116,7 +116,7 @@ describe("POST /admin/api/refresh", () => {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
     // Not visible until refreshed.
     expect(server.storage.readModel.getDocument("out-of-band-doc")).toBeUndefined();
 
@@ -143,7 +143,7 @@ describe("POST /admin/api/refresh", () => {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
     const response = await callRefreshRetryingBusy(server);
     expect(response.statusCode).toBe(200);
     const body = response.json();
@@ -167,7 +167,7 @@ describe("POST /admin/api/refresh", () => {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     await server.storage.commit(
       "settings",
@@ -205,7 +205,7 @@ describe("POST /admin/api/refresh", () => {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     const response = await server.inject({ method: "POST", url: "/admin/api/refresh" });
     expect(response.statusCode).toBe(401);

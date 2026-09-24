@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { commit } from "./commit.ts";
-import { Pusher } from "./pusher.ts";
+import { Pusher, runGit } from "./pusher.ts";
 import { openDataRepo } from "./repo.ts";
 import { createTestDataRepoWithRemote } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function git(args: string[], cwd: string): Promise<string> {
@@ -142,5 +142,29 @@ describe("Pusher", () => {
     // The push itself carried on.
     expect((await pusher.push()).ok).toBe(true);
     expect(pusher.status().pendingCommits).toBe(0);
+  });
+});
+
+describe("runGit", () => {
+  it("returns a failed result instead of throwing when the working copy is gone", async () => {
+    const result = await runGit(["status"], "/nonexistent/removed-data-dir");
+    expect(result.code).toBe(-1);
+    expect(result.stderr).toBeTruthy();
+  });
+});
+
+describe("Pusher with its repo gone", () => {
+  it("reports a classified failure, never an exception, when the data dir was removed", async () => {
+    const { dataDir, cleanup } = await createTestDataRepoWithRemote();
+    const pusher = new Pusher({ dataDir, branch: "main" });
+    await makeCommit(dataDir, "doc");
+    pusher.notifyCommit();
+    cleanup();
+
+    const outcome = await pusher.push();
+    expect(outcome).toMatchObject({ ok: false, reason: "unknown" });
+    expect(pusher.status().pendingCommits).toBe(1);
+    expect(pusher.status().lastError?.message).toBeTruthy();
+    await pusher.idle();
   });
 });

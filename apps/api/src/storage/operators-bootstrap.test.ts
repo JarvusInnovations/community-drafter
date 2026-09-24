@@ -7,9 +7,9 @@ import Fastify from "fastify";
 import { app } from "../app.ts";
 import { createTestDataRepo } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   delete process.env.BOOTSTRAP_OPERATOR_EMAIL;
 });
 
@@ -51,7 +51,7 @@ describe("operator bootstrap", () => {
     cleanups.push(cleanup);
 
     const server = await boot(dataDir);
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     const operator = server.storage.readModel.getOperatorByEmail("founder@example.org");
     expect(operator).toBeDefined();
@@ -75,7 +75,7 @@ describe("operator bootstrap", () => {
     cleanups.push(cleanup);
 
     const server = await boot(dataDir);
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     expect(server.storage.readModel.listOperators()).toHaveLength(0);
   });
@@ -92,7 +92,7 @@ describe("operator bootstrap", () => {
 
     process.env.BOOTSTRAP_OPERATOR_EMAIL = "second@example.org";
     const second = await boot(dataDir);
-    cleanups.push(() => void second.close());
+    cleanups.push(() => second.close());
 
     const operators = second.storage.readModel.listOperators();
     expect(operators).toHaveLength(1);
@@ -139,7 +139,7 @@ describe("legacy document migration", () => {
     );
 
     const server = await boot(dataDir);
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     const entry = server.storage.readModel.getDocument("legacy-doc");
     expect(entry?.record.created_by).toBe("migrator@example.org");
@@ -170,7 +170,7 @@ describe("legacy document migration", () => {
     const commitsAfterFirstBoot = (await runGit(["rev-list", "--count", "HEAD"], dataDir)).trim();
 
     const second = await boot(dataDir);
-    cleanups.push(() => void second.close());
+    cleanups.push(() => second.close());
 
     const commitsAfterSecondBoot = (await runGit(["rev-list", "--count", "HEAD"], dataDir)).trim();
     expect(commitsAfterSecondBoot).toBe(commitsAfterFirstBoot);

@@ -70,7 +70,7 @@ export async function buildTestServer(opts: BuildTestServerOptions = {}) {
   const repoFixture = opts.withRemote
     ? await createTestDataRepoWithRemote()
     : { ...(await createTestDataRepo()), remoteDir: undefined };
-  const { dataDir, cleanup, remoteDir } = repoFixture;
+  const { dataDir, cleanup: removeRepo, remoteDir } = repoFixture;
 
   const mailer = opts.mailer ?? new FakeMailer();
   const server = Fastify();
@@ -80,8 +80,30 @@ export async function buildTestServer(opts: BuildTestServerOptions = {}) {
     tick: opts.tick,
   });
   await server.ready();
+  makeCloseIdempotent(server);
+
+  // No push may outlive its repo: close the server (its shutdown flush and
+  // push included) and wait out any push still running before the temp
+  // directories go. Safe to call after the test already closed the server.
+  const cleanup = async (): Promise<void> => {
+    await server.close();
+    await server.storage?.pusher?.idle();
+    removeRepo();
+  };
 
   return { server, dataDir, remoteDir, cleanup, mailer };
+}
+
+/**
+ * Makes `server.close()` idempotent: a test that closed its server and the
+ * cleanup that closes it again share one close, one shutdown flush and one
+ * final push.
+ */
+function makeCloseIdempotent(server: FastifyInstance): void {
+  const original = server.close.bind(server);
+  let pending: Promise<undefined> | undefined;
+  const once = () => (pending ??= original().then(() => undefined));
+  server.close = once as unknown as FastifyInstance["close"];
 }
 
 export function adminHeaders(): Record<string, string> {

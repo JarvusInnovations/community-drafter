@@ -16,9 +16,9 @@ const INVOKER = "signatories-tick@example-project.iam.gserviceaccount.com";
 const google = await generateKeyPair("RS256");
 const stranger = await generateKeyPair("RS256");
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   for (const key of [
     "TICK_AUDIENCE",
     "TICK_INVOKER_EMAIL",

@@ -6,9 +6,9 @@ import { FakeMailer } from "../lib/mailer/index.ts";
 import { buildTestServer, TEST_ACTOR } from "../routes/test-support.ts";
 import { MAGIC_LINK_TTL_SECONDS, signMagicCode, verifyMagicCode } from "./magic-link.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 const SECRET = "magic-link-test-secret-32-bytes-minimum!";

@@ -52,18 +52,34 @@ function classify(stderr: string): PushFailureReason {
   return "unknown";
 }
 
-async function runGit(
+/**
+ * Never throws: a spawn that fails outright (git missing, the working copy
+ * gone) is a failed result like any other, so a push failure is always a
+ * logged, classified outcome and never an unhandled exception, which
+ * matters most during shutdown.
+ */
+export async function runGit(
   args: string[],
   cwd: string,
   timeoutMs?: number,
 ): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
-  const proc = Bun.spawn(["git", ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    // Never wait on a credential prompt: the deploy key is the only way in.
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-  });
+  let proc: ReturnType<typeof Bun.spawn>;
+  try {
+    proc = Bun.spawn(["git", ...args], {
+      cwd,
+      stdout: "pipe",
+      stderr: "pipe",
+      // Never wait on a credential prompt: the deploy key is the only way in.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+  } catch (err) {
+    return {
+      code: -1,
+      stdout: "",
+      stderr: err instanceof Error ? err.message : String(err),
+      timedOut: false,
+    };
+  }
   let timedOut = false;
   const timer =
     timeoutMs === undefined
@@ -72,13 +88,23 @@ async function runGit(
           timedOut = true;
           proc.kill();
         }, timeoutMs);
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (timer) clearTimeout(timer);
-  return { code, stdout, stderr, timedOut };
+  try {
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout as ReadableStream).text(),
+      new Response(proc.stderr as ReadableStream).text(),
+      proc.exited,
+    ]);
+    return { code, stdout, stderr, timedOut };
+  } catch (err) {
+    return {
+      code: -1,
+      stdout: "",
+      stderr: err instanceof Error ? err.message : String(err),
+      timedOut,
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export class Pusher {
@@ -135,6 +161,15 @@ export class Pusher {
   /** Whether the remote has refused a fast-forward: retrying cannot fix that, a person has to. */
   diverged(): boolean {
     return this.lastError?.reason === "non-fast-forward";
+  }
+
+  /** Resolves once no push is running or queued (tests, shutdown). */
+  async idle(): Promise<void> {
+    let seen: Promise<unknown>;
+    do {
+      seen = this.chain;
+      await seen;
+    } while (seen !== this.chain);
   }
 
   /** Push everything pending, after any push already running. */
