@@ -1,161 +1,42 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useCallback } from "react";
+import { Link } from "react-router";
 
-import { ApiError, getPublicCompare } from "./api.ts";
+import { getPublicCompare } from "./api.ts";
 import { copy } from "./copy.ts";
 import { usePublicBundle } from "./PublicBundleContext.tsx";
-import { type CompareResult } from "./types.ts";
+import { type CompareVariant, CompareView } from "../participant/components/CompareView.tsx";
 
-const HIDE_UNCHANGED_THRESHOLD = 30;
+const PUBLIC_COMPARE: CompareVariant = {
+  heading: "h1",
+  headingClass: "text-xl font-semibold text-foreground",
+  selectClass: "rounded border border-border p-1",
+  bodyClass: "doc-body mt-4",
+};
 
 /**
  * `/d/:slug/history/compare` — the public equivalent of
- * `../participant/CompareScreen.tsx`. `from`/`to`/`hide_unchanged` stay in
- * the URL for the same shareable-link reason as the participant version.
+ * `../participant/CompareScreen.tsx`, over the same `CompareView`.
  */
 export function CompareScreen(): JSX.Element {
   const { bundle, slug } = usePublicBundle();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const currentNumber = bundle.version.number;
-  const to = searchParams.has("to") ? Number(searchParams.get("to")) : currentNumber;
-  const from = searchParams.has("from") ? Number(searchParams.get("from")) : Math.max(1, to - 1);
-
-  const [state, setState] = useState<
-    | { status: "loading" }
-    | { status: "error"; error: ApiError }
-    | { status: "same" }
-    | { status: "ready"; result: CompareResult }
-  >({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    if (from === to) {
-      setState({ status: "same" });
-      return () => {
-        cancelled = true;
-      };
-    }
-    setState({ status: "loading" });
-    getPublicCompare(slug, from, to)
-      .then((result) => {
-        if (!cancelled) {
-          setState({ status: "ready", result });
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) {
-          return;
-        }
-        setState({
-          status: "error",
-          error:
-            err instanceof ApiError
-              ? err
-              : new ApiError(500, "internal_error", copy.genericError, {}),
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, from, to]);
-
-  const blocks = state.status === "ready" ? state.result.blocks : [];
-  const hideParam = searchParams.get("hide_unchanged");
-  const hideUnchanged =
-    hideParam !== null ? hideParam === "1" : blocks.length > HIDE_UNCHANGED_THRESHOLD;
-
-  function updateParams(patch: Record<string, string>) {
-    const next = new URLSearchParams(searchParams);
-    for (const [key, value] of Object.entries(patch)) {
-      next.set(key, value);
-    }
-    setSearchParams(next, { replace: true });
-  }
-
-  const versionNumbers = bundle.versions.map((v) => v.number).toSorted((a, b) => a - b);
+  const fetchCompare = useCallback(
+    (from: number, to: number) => getPublicCompare(slug, from, to),
+    [slug],
+  );
 
   return (
     <main className="px-4 py-4 pb-8">
-      <p className="mb-2">
-        <Link to={`/d/${slug}/history`} className="text-sm underline">
-          {copy.history.title}
-        </Link>
-      </p>
-      <h1 className="text-xl font-semibold text-foreground">{copy.compare.title(from, to)}</h1>
-
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-1">
-          {copy.compare.fromLabel}
-          <select
-            value={from}
-            onChange={(event) => updateParams({ from: event.target.value })}
-            className="rounded border border-border p-1"
-          >
-            {versionNumbers.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1">
-          {copy.compare.toLabel}
-          <select
-            value={to}
-            onChange={(event) => updateParams({ to: event.target.value })}
-            className="rounded border border-border p-1"
-          >
-            {versionNumbers.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1">
-          <input
-            type="checkbox"
-            checked={hideUnchanged}
-            onChange={(event) => updateParams({ hide_unchanged: event.target.checked ? "1" : "0" })}
-          />
-          {copy.compare.hideUnchanged}
-        </label>
-      </div>
-
-      {state.status === "ready" ? (
-        <>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {copy.compare.summary(state.result.summary.items)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">{copy.compare.legend}</p>
-
-          {blocks.length === 0 ? (
-            <p className="mt-4 text-muted-foreground">{copy.compare.noChanges}</p>
-          ) : (
-            <div className="doc-body mt-4">
-              {blocks
-                .filter((block) => !(hideUnchanged && block.status === "same"))
-                .map((block) => (
-                  <div
-                    key={block.id}
-                    data-status={block.status}
-                    className="diff-block"
-                    dangerouslySetInnerHTML={{ __html: block.html }}
-                  />
-                ))}
-            </div>
-          )}
-        </>
-      ) : state.status === "loading" ? (
-        <p className="mt-4 text-muted-foreground">{copy.loading}</p>
-      ) : state.status === "same" ? (
-        <p className="mt-4 text-muted-foreground">{copy.compare.sameVersion}</p>
-      ) : (
-        <p role="alert" className="mt-4 text-destructive">
-          {copy.genericError}
-        </p>
-      )}
+      <CompareView
+        currentNumber={bundle.version.number}
+        versionNumbers={bundle.versions.map((v) => v.number)}
+        fetchCompare={fetchCompare}
+        variant={PUBLIC_COMPARE}
+        back={
+          <Link to={`/d/${slug}/history`} className="text-sm underline">
+            {copy.history.title}
+          </Link>
+        }
+      />
     </main>
   );
 }

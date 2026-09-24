@@ -78,7 +78,7 @@ Response: `{ number, summary, published_at, html, my_comments: [...] }` (derived
 
 ## `GET /i/:token/api/compare?from=&to=`
 
-Response: `{ from, to, summary: { changed, added, removed, items: [{ kind: "paragraph"|"heading"|"list item"|"table", change: "changed"|"added"|"removed", count }] }, blocks: [{ status: "same"|"changed"|"added"|"removed", id, html }] }` where `changed` blocks' `html` contains the redline markup. Counts are per comparison unit, not per HTML element: a table is one (`behaviors/versioning.md` § Diff), and `items` is what the summary line is built from.
+Response: `{ from, to, summary: { changed, added, removed, items: [{ kind: "paragraph"|"heading"|"list item"|"table"|"code block", change: "changed"|"added"|"removed", count }] }, blocks: [{ status: "same"|"changed"|"added"|"removed", id, html }] }` where `changed` blocks' `html` contains the redline markup. Counts are per comparison unit, not per HTML element: a table is one, and so is a code block (`behaviors/versioning.md` § Diff); a code block's `id` is a `c-` comparison id, never a commentable block id, and `items` is what the summary line is built from. `to` defaults to the current version and `from` to the one before it. Errors: `invalid_request` when `from` and `to` name the same version, `not_found` for a version that does not exist.
 
 ## `GET /i/:token/api/statement.pdf`
 

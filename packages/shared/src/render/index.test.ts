@@ -257,3 +257,90 @@ describe("render block classes", () => {
     expect(html).not.toContain("<div");
   });
 });
+
+/**
+ * `specs/behaviors/inline-comments.md` § Block identity: code blocks are not
+ * commentable, and adding, removing or editing one never changes another
+ * block's id or text (#84).
+ */
+describe("render code blocks", () => {
+  const WITH_CODE = [
+    "# Setup",
+    "",
+    "Run this first.",
+    "",
+    "```sh",
+    "Run this first.",
+    "```",
+    "",
+    "- An item",
+    "",
+    "  ```",
+    "  nested in the item",
+    "  ```",
+    "",
+    "> Quoted.",
+    "",
+    "| A | B |",
+    "| - | - |",
+    "| 1 | 2 |",
+    "",
+    "```",
+    "second",
+    "block",
+    "```",
+    "",
+    "Run this first.",
+    "",
+  ].join("\n");
+  const WITHOUT_CODE = [
+    "# Setup",
+    "",
+    "Run this first.",
+    "",
+    "- An item",
+    "",
+    "  ```",
+    "  nested in the item",
+    "  ```",
+    "",
+    "> Quoted.",
+    "",
+    "| A | B |",
+    "| - | - |",
+    "| 1 | 2 |",
+    "",
+    "Run this first.",
+    "",
+  ].join("\n");
+
+  it("leaves every non-code block's id, text, tag and heading path unchanged", () => {
+    const withCode = render(WITH_CODE).blocks;
+    const withoutCode = render(WITHOUT_CODE).blocks;
+    const identity = (blocks: typeof withCode) =>
+      blocks.map(({ id, text, tag, headingPath }) => ({ id, text, tag, headingPath }));
+    expect(identity(withCode)).toEqual(identity(withoutCode));
+    // A code block whose text equals a paragraph's takes no ordinal from it.
+    expect(withCode.filter((block) => block.text === "Run this first.").map((b) => b.id)).toEqual(
+      withoutCode.filter((block) => block.text === "Run this first.").map((b) => b.id),
+    );
+  });
+
+  it("gives code blocks no data-block and records them beside the blocks", () => {
+    const { html, blocks, code } = render(WITH_CODE);
+    expect(html).not.toMatch(/<pre[^>]*data-block/);
+    expect(blocks.some((block) => block.html.startsWith("<pre"))).toBe(false);
+    expect(code.map(({ text, position }) => ({ text, position }))).toEqual([
+      { text: "Run this first.", position: 2 },
+      { text: "second\nblock", position: 8 },
+    ]);
+    expect(code[0]?.id).toMatch(/^c-[0-9a-f]{8}$/);
+    expect(code[0]?.html).toStartWith("<pre>");
+  });
+
+  it("leaves a code block inside a list item to that item", () => {
+    const { blocks, code } = render(WITH_CODE);
+    expect(code.some((entry) => entry.text.includes("nested"))).toBe(false);
+    expect(blocks.find((block) => block.tag === "li")?.text).toContain("nested in the item");
+  });
+});

@@ -1,11 +1,11 @@
-import type { Block, BlockContainer } from "../render/types.ts";
+import type { Block, BlockContainer, CodeBlock } from "../render/types.ts";
 
 /**
  * The kinds of thing a reader would name when asked what changed
  * (`specs/screens/version-history.md` § Principles, Local: "Count and show
  * changes the way a reader would name them").
  */
-export type DiffUnitKind = "paragraph" | "heading" | "list item" | "table";
+export type DiffUnitKind = "paragraph" | "heading" | "list item" | "table" | "code block";
 
 /** A single block compared on its own. */
 export interface BlockUnit {
@@ -26,7 +26,16 @@ export interface TableUnit {
   cells: Block[];
 }
 
-export type DiffUnit = BlockUnit | TableUnit;
+/** A whole fenced code block, compared on its exact text. */
+export interface CodeUnit {
+  type: "code";
+  id: string;
+  text: string;
+  kind: "code block";
+  code: CodeBlock;
+}
+
+export type DiffUnit = BlockUnit | TableUnit | CodeUnit;
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
@@ -39,12 +48,22 @@ function kindForBlock(block: Block): DiffUnitKind {
 /**
  * Collapses a version's blocks into the units the comparison aligns
  * (`specs/behaviors/versioning.md` § Diff step 1): every block stands alone
- * except a table's cells, which fold into the one table unit they share.
+ * except a table's cells, which fold into the one table unit they share, and
+ * each code block slots in whole at the position it was rendered at.
  */
-export function toUnits(blocks: Block[]): DiffUnit[] {
+export function toUnits(blocks: Block[], code: CodeBlock[] = []): DiffUnit[] {
   const units: DiffUnit[] = [];
+  let nextCode = 0;
+  const flushCode = (upTo: number): void => {
+    while (nextCode < code.length && code[nextCode]!.position <= upTo) {
+      const entry = code[nextCode]!;
+      units.push({ type: "code", id: entry.id, text: entry.text, kind: "code block", code: entry });
+      nextCode += 1;
+    }
+  };
 
-  for (const block of blocks) {
+  for (const [index, block] of blocks.entries()) {
+    flushCode(index);
     const container = block.container;
     if (!container) {
       units.push({
@@ -73,5 +92,6 @@ export function toUnits(blocks: Block[]): DiffUnit[] {
     });
   }
 
+  flushCode(Number.POSITIVE_INFINITY);
   return units;
 }

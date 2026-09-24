@@ -304,6 +304,10 @@ export const copy = {
     current: "current",
     downloadRaw: "Download raw markdown",
     dispositions: (n: number) => `${n} disposition${n === 1 ? "" : "s"}`,
+    /** § Versions: per row (not on v1) and in the page header. */
+    compareWithPrevious: "Compare with previous",
+    compareVersions: "Compare versions",
+    backToVersions: "Versions",
   },
 
   viewAs: {

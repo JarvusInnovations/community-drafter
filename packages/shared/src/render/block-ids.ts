@@ -4,7 +4,7 @@ import type { Element, ElementContent, Root } from "hast";
 import type { VFile } from "vfile";
 
 import { normalizeText } from "./normalize.ts";
-import type { Block, BlockContainer, BlockTag } from "./types.ts";
+import type { Block, BlockContainer, BlockTag, CodeBlock } from "./types.ts";
 
 /**
  * `rehype-block-ids`: assigns `data-block="b-<8 hex>"` to every commentable
@@ -16,6 +16,13 @@ import type { Block, BlockContainer, BlockTag } from "./types.ts";
  * Table cells additionally carry a shared `container` describing the whole
  * table (`specs/behaviors/versioning.md` § Diff step 1: "A table is one unit,
  * not a loose run of cells"), so the diff can align tables against tables.
+ *
+ * Fenced code blocks are recorded on `file.data.codeBlocks` instead: each is a
+ * comparison unit (§ Diff step 1) but not commentable, so it gets no
+ * `data-block`, never enters `blocks`, and takes its `c-` id from a counter of
+ * its own — adding, removing or editing one cannot shift another block's id.
+ * A code block inside a list item is part of that item's text and is not
+ * recorded separately.
  *
  * Must run after `rehype-sanitize` (so the attribute it adds is never
  * stripped) and after `rehype-slug` (so heading `id`s are already final).
@@ -37,6 +44,21 @@ interface PendingTable {
   cells: number[];
   /** Cells per row, in document order. */
   shape: number[];
+}
+
+/** Every text node under `node`, verbatim: code keeps its whitespace. */
+function extractRawText(node: Element): string {
+  let out = "";
+  const walk = (n: ElementContent): void => {
+    if (n.type === "text") out += n.value;
+    else if (n.type === "element") for (const child of n.children) walk(child);
+  };
+  for (const child of node.children) walk(child);
+  return out;
+}
+
+function shortHash(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 8);
 }
 
 /** Concatenates this element's own text, stopping at nested container tags (their contents get their own blocks). */
@@ -87,6 +109,23 @@ export function rehypeBlockIds() {
     const tables: PendingTable[] = [];
     const tableStack: PendingTable[] = [];
 
+    const codeBlocks: CodeBlock[] = [];
+    const codeCounts = new Map<string, number>();
+    let listItemDepth = 0;
+
+    const recordCode = (node: Element): void => {
+      const text = extractRawText(node).replace(/\n$/, "");
+      const hash = shortHash(text);
+      const seen = codeCounts.get(hash) ?? 0;
+      codeCounts.set(hash, seen + 1);
+      codeBlocks.push({
+        id: seen === 0 ? `c-${hash}` : `c-${hash}-${seen + 1}`,
+        text,
+        html: toHtml(node),
+        position: pending.length,
+      });
+    };
+
     const walk = (parent: Root | Element, parentTag: string | undefined): void => {
       for (const child of parent.children) {
         if (child.type !== "element") continue;
@@ -119,9 +158,13 @@ export function rehypeBlockIds() {
         } else if (tag === "p" && parentTag !== "li") {
           // A `p` directly inside a list item belongs to that item's block, not its own.
           assignId(child, "p", currentHeadingPath());
+        } else if (tag === "pre" && listItemDepth === 0) {
+          recordCode(child);
         }
 
+        if (tag === "li") listItemDepth += 1;
         walk(child, tag);
+        if (tag === "li") listItemDepth -= 1;
 
         if (tag === "table") tableStack.pop();
       }
@@ -162,11 +205,13 @@ export function rehypeBlockIds() {
     }));
 
     file.data.blocks = blocks;
+    file.data.codeBlocks = codeBlocks;
   };
 }
 
 declare module "vfile" {
   interface DataMap {
     blocks: Block[];
+    codeBlocks: CodeBlock[];
   }
 }
