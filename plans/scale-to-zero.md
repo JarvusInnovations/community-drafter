@@ -1,5 +1,6 @@
 ---
-status: in-progress
+status: done
+pr: 124
 depends: []
 specs:
   - specs/architecture.md
@@ -36,14 +37,14 @@ Let the Cloud Run service scale to zero when idle (owner decision, 2026-09-24) w
 
 ## Validation
 
-- [ ] Graceful shutdown against a fake (bare, local) remote: a pending open count and an unpushed commit are both on the remote after `server.close()`, and the sequence finishes inside the deadline.
-- [ ] A write request's commit is on the remote when the response arrives. With the remote broken, the request still succeeds and `storage.push.pendingCommits > 0`.
-- [ ] `POST /internal/tick` with no token, a garbage token, a token signed by the wrong key, or one with the wrong audience or email → 401. With a valid token → 200, and the digest is sent once (a second tick in the same hour sends nothing).
-- [ ] A magic link works on a fresh server instance built over the same data repo and secret (a simulated restart), and is refused on another site's host, after expiry, on a second use, and after tampering with `return`.
-- [ ] No `setInterval` is left in the api for scheduled work other than the tracker's warm flush and the renderer's idle timer.
-- [ ] api gates: lint, format:check, typecheck, tests.
-- [ ] `tofu fmt -check`, `tofu validate` and `tofu plan -concise` show only the intended changes.
-- [ ] Push time and cold start measured and recorded in the PR.
+- [x] Graceful shutdown against a fake (bare, local) remote: a pending open count and an unpushed commit are both on the remote after `server.close()`, and the sequence finishes inside the deadline.
+- [x] A write request's commit is on the remote when the response arrives. With the remote broken, the request still succeeds and `storage.push.pendingCommits > 0`.
+- [x] `POST /internal/tick` with no token, a garbage token, a token signed by the wrong key, or one with the wrong audience or email → 401. With a valid token → 200, and the digest is sent once (a second tick in the same hour sends nothing).
+- [x] A magic link works on a fresh server instance built over the same data repo and secret (a simulated restart), and is refused on another site's host, after expiry, on a second use, and after tampering with `return`.
+- [x] No `setInterval` is left in the api for scheduled work other than the tracker's warm flush and the renderer's idle timer.
+- [x] api gates: lint, format:check, typecheck, tests.
+- [x] `tofu fmt -check`, `tofu validate` and `tofu plan -concise` show only the intended changes.
+- [x] Push time and cold start measured and recorded in the PR.
 
 ## Risks / unknowns
 
@@ -54,4 +55,13 @@ Let the Cloud Run service scale to zero when idle (owner decision, 2026-09-24) w
 
 ## Notes
 
+- Verified in `storage/pusher.test.ts`, `storage/shutdown.test.ts`, `tick/tick.test.ts` and `auth/magic-link.test.ts`. api gates: lint, format:check, typecheck, **331 tests pass**.
+- Push time to GitHub over SSH: 1.1–1.9 s (`git push --dry-run` from devbox; one 4.3 s outlier); a real push of this branch took 1.6 s. Cold start with the current image (1 CPU, 1 GiB, local data repo): about 3.5 s from container start to healthy.
+- `tofu plan -concise`: 7 to add, 1 to change, 0 to destroy. Not applied.
+- The digest and phase-observer test-only options (`disablePhaseObserver`, `disableSchedulers`, interval overrides) went with their timers.
+- #108 is not explained by process memory; it stays open.
+
 ## Follow-ups
+
+- Tracked as: `docs/operations.md` § Scale to zero, the post-apply checks: ticks answer 200, `shutdown: pushed` on the first idle-out (which confirms CPU during SIGTERM under request-based billing), and the next morning's digest.
+- Issue: #108 stays open for a live repro.
