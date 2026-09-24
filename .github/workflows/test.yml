@@ -1,0 +1,58 @@
+name: Tests
+
+# Test gate, kept separate from Lint so a failing test and a failing lint
+# report as distinct checks. Same provisioning + path-filter +
+# lockfile-frozen recipe, one job per workspace package via matrix.
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/test.yml'
+      - '.github/actions/setup-asdf/**'
+  push:
+    branches: [develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/test.yml'
+      - '.github/actions/setup-asdf/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ts-tests:
+    name: Tests (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - '@signatories/api'
+          - '@signatories/web'
+          - '@signatories/shared'
+          - '@signatories/cli'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-asdf
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run bun test
+        run: bun run --filter='${{ matrix.package }}' test
+      # `vite build` resolves the full asset/import graph (CSS, images, route
+      # files) that `tsc -b` never sees — cheap, credential-free, in scope
+      # per ci-quality-gates (container image builds are not). Web-only.
+      - name: Build
+        if: matrix.package == '@signatories/web'
+        run: bun run --filter='${{ matrix.package }}' build
+      # `specs/architecture.md` § Web app: "Bundle budget for the
+      # participant entry: under 120 KB gzipped JS on first load, measured
+      # in CI." Reads the `dist/` this Build step just produced.
+      - name: Check participant bundle size
+        if: matrix.package == '@signatories/web'
+        run: bun run --filter='${{ matrix.package }}' check:bundle-size

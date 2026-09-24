@@ -1,0 +1,168 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  GAR_REGISTRY: us-east4-docker.pkg.dev
+  GAR_PROJECT: community-drafter
+  GAR_REPOSITORY: community-drafter
+  # projects/884668290110 is the community-drafter GCP project's number
+  # (tf/iam.tf's google_iam_workload_identity_pool_provider.github_actions;
+  # see tf's `workload_identity_provider` output).
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/884668290110/locations/global/workloadIdentityPools/github/providers/community-drafter-github-actions'
+  SERVICE_ACCOUNT: 'community-drafter-ci@community-drafter.iam.gserviceaccount.com'
+
+jobs:
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image: ${{ steps.version.outputs.image }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Extract version from release tag
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=${{ env.GAR_REGISTRY }}/${{ env.GAR_PROJECT }}/${{ env.GAR_REPOSITORY }}/community-drafter:${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+          token_format: 'access_token'
+
+      - name: Log in to Google Artifact Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.GAR_REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ env.GAR_REGISTRY }}/${{ env.GAR_PROJECT }}/${{ env.GAR_REPOSITORY }}/community-drafter
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Setup ASDF
+        uses: asdf-vm/actions/setup@v4
+
+      - name: Install OpenTofu
+        run: |
+          asdf plugin add opentofu
+          asdf install opentofu
+          asdf reshim opentofu
+
+      - name: Initialize OpenTofu
+        working-directory: tf
+        run: tofu init
+
+      - name: Plan deployment
+        working-directory: tf
+        run: |
+          tofu plan -concise \
+            -var="image_tag=${{ needs.build.outputs.version }}" \
+            -out=tfplan
+
+      - name: Apply deployment
+        working-directory: tf
+        run: tofu apply -concise -auto-approve tfplan
+
+      - name: Verify deployment health
+        run: |
+          SERVICE_URL=$(gcloud run services describe community-drafter \
+            --project=community-drafter \
+            --region=us-east4 \
+            --format='value(status.url)')
+
+          echo "Service URL: $SERVICE_URL"
+          echo "Waiting for service to become healthy..."
+
+          for i in {1..30}; do
+            if curl -sf "${SERVICE_URL}/_health" > /dev/null 2>&1; then
+              echo "Service is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/30: Service not ready yet..."
+            sleep 10
+          done
+
+          echo "Error: Service did not become healthy within 5 minutes"
+          exit 1
+
+      - name: Post deployment summary
+        if: success()
+        run: |
+          SERVICE_URL=$(gcloud run services describe community-drafter \
+            --project=community-drafter \
+            --region=us-east4 \
+            --format='value(status.url)')
+
+          {
+            echo "## Deployment Summary"
+            echo ""
+            echo "- **Version**: ${{ needs.build.outputs.version }}"
+            echo "- **Image**: \`${{ needs.build.outputs.image }}\`"
+            echo "- **Service URL**: ${SERVICE_URL}"
+            echo "- **Domain**: https://drafter.jarv.us"
+            echo "- **Health Check**: ${SERVICE_URL}/_health"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,53 @@
+name: Lint
+
+# Pre-merge lint + format + type-check gate: fast and credential-free, so it
+# runs on every PR (including forks). One job per workspace package via
+# matrix; a single root `bun install --frozen-lockfile` covers the whole Bun
+# workspace (one lockfile), then each package runs its own scoped scripts.
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.oxlintrc.base.json'
+      - '.github/workflows/lint.yml'
+      - '.github/actions/setup-asdf/**'
+  push:
+    branches: [develop]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.oxlintrc.base.json'
+      - '.github/workflows/lint.yml'
+      - '.github/actions/setup-asdf/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ts-lint:
+    name: oxc (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - '@signatories/api'
+          - '@signatories/web'
+          - '@signatories/shared'
+          - '@signatories/cli'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-asdf
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Lint
+        run: bun run --filter='${{ matrix.package }}' lint
+      - name: Check formatting
+        run: bun run --filter='${{ matrix.package }}' format:check
+      - name: Type check
+        run: bun run --filter='${{ matrix.package }}' typecheck

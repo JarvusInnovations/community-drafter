@@ -1,0 +1,104 @@
+import type { FastifyPluginAsync } from "fastify";
+
+import { ApiError } from "../../errors.ts";
+import { DOCUMENT_SCOPED_ROUTE } from "../../gateway/gateway.ts";
+import { buildSignatureView, isSignatureBehind } from "../../lib/signature-view.ts";
+import { adminActor, notFoundDocument } from "./context.ts";
+
+interface DocumentParams {
+  slug: string;
+}
+
+interface PersonParams extends DocumentParams {
+  person: string;
+}
+
+interface ListSignaturesQuery {
+  include_revoked?: string;
+}
+
+interface RevokeBody {
+  reason: string;
+}
+
+const adminSignaturesRoute: FastifyPluginAsync = async (fastify) => {
+  fastify.get<{ Params: DocumentParams; Querystring: ListSignaturesQuery }>(
+    "/documents/:slug/signatures",
+    { config: DOCUMENT_SCOPED_ROUTE },
+    async (request) => {
+      const document = fastify.storage.readModel.getDocument(request.params.slug);
+      if (!document) throw notFoundDocument(request.params.slug);
+      const includeRevoked = request.query.include_revoked === "true";
+      // `specs/api/admin.md`: each row says whether the signature is behind
+      // the document's current version (`specs/behaviors/signatures.md` § A
+      // signature belongs to a version).
+      const currentVersion = document.versions.length;
+
+      return fastify.storage.readModel
+        .listParticipationsForDocument(document.record.slug)
+        .filter((entry) => entry.record.signature !== undefined)
+        .filter((entry) => includeRevoked || entry.record.signature?.revoked !== true)
+        .map((entry) => {
+          const person = fastify.storage.readModel.getPersonOn(
+            document.record.slug,
+            entry.record.person,
+          );
+          return {
+            person: entry.record.person,
+            name: person?.name ?? "",
+            behind: isSignatureBehind(entry, currentVersion),
+            signature: buildSignatureView(entry),
+          };
+        });
+    },
+  );
+
+  fastify.post<{ Params: PersonParams; Body: RevokeBody }>(
+    "/documents/:slug/signatures/:person/revoke",
+    { config: DOCUMENT_SCOPED_ROUTE },
+    async (request) => {
+      const document = fastify.storage.readModel.getDocument(request.params.slug);
+      if (!document) throw notFoundDocument(request.params.slug);
+      const slug = document.record.slug;
+      const person = request.params.person;
+      const { reason } = request.body;
+
+      const participation = fastify.storage.readModel.getParticipation(slug, person);
+      const signature = participation?.record.signature;
+      if (!participation || !signature || signature.revoked) {
+        throw new ApiError("not_found", `'${person}' has not signed '${slug}'.`);
+      }
+
+      const result = await fastify.storage.commit(
+        "admin-revoke",
+        {
+          actor: adminActor(request),
+          subject: `revoke: ${person} on ${slug} (admin)`,
+          document: slug,
+          person,
+          reason,
+          requestId: request.requestId,
+        },
+        async (tx) => {
+          await tx.participations.patch(
+            { document: slug, person },
+            { signature: { ...signature, revoked: true } },
+          );
+        },
+      );
+
+      await fastify.events.publish({
+        type: "revoke",
+        document: slug,
+        person,
+        commit: result.commitHash ?? "",
+        reason,
+      });
+
+      const updated = fastify.storage.readModel.getParticipation(slug, person);
+      return { ...buildSignatureView(updated!), commit: result.commitHash };
+    },
+  );
+};
+
+export default adminSignaturesRoute;

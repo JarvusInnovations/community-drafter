@@ -1,0 +1,45 @@
+# Screen: Marketing Site (GitHub Pages)
+
+A static homepage for the platform, published from this repository to GitHub Pages. It tells a first-time visitor what Signatories is, walks through how a document runs with real screenshots, tells an operator where they sign in and what the web console and the command line each do, and points them at the repository and the admin skill. It is not part of the running instance and never links to any document or to any particular instance.
+
+## Route
+
+`https://signatories.org/` (the platform domain; GitHub Pages with a custom domain, so `https://jarvusinnovations.github.io/community-drafter/` redirects there), built from `site/` by a workflow on pushes to `develop` that touch `site/**`. The canonical link, share-preview URLs and image URL all name `signatories.org`.
+
+## Data Requirements
+
+None at runtime. Screenshots are static files under `site/img/`, captured from a demo document with fictional participants; none shows a personal-link token, an email address, or a real signer other than the project's own maintainers.
+
+## Display Rules
+
+Top to bottom, one page:
+
+1. **Hero**: the name, a one-sentence definition ("Community drafting and signing of collective statements"), a two-line elaboration in plain words (open it, sign it; comments, versions and revocation behind that), and three calls to action: "See how it works" (anchor), "View on GitHub", and a quiet "I run documents" anchor down to *Getting in*, so an operator who arrives already knowing what the tool is has a path off the hero.
+2. **What it is**: three short cards: the participant's experience (one screen, no account), the team's experience (publish versions with a one-line changelog, answer comments in rounds), the record (every action is a commit in a private git repo).
+3. **Getting in**: what an operator does next, in four short answers, because a first-time operator arrives here with an email address and at most an instance URL. (a) *Where you sign in*: your instance's `/admin`, with a link emailed to your operator address — no password, and there is nothing to sign into on this site. (b) *What you get*: a web console for reading a document — progress, people, submissions, versions, view-as — alongside the command line. (c) *What the command line is for*: everything that writes — create, publish, open, import, invite, remind, export — and it is what an agent drives. (d) *How to get an instance*: ask whoever runs yours for an operator account, or self-host from the repository. Ends with a "Sign in to your instance" note explaining the address is `<your-instance>/admin`, since this site links to no instance of its own.
+4. **How it works**: numbered steps, each with a phone-width screenshot and two or three sentences: personal link and the sign card; sign now, remove later; inline comments and a submission with a position; versions with a changelog and a redline; the final list of signatories in personal or official capacity.
+5. **Principles**: five one-line principles lifted from `specs/principles.md` (sign first; the clock is real; say exactly who signed; nothing pending is lost; the record is a git repo), each with its one-sentence why.
+6. **For teams**: how to run one, naming both surfaces: the web console for reading, the admin skill for writing — install the skill, create, publish, open, invite, export feedback, publish again; a code block with the commands, and a line that the installed skill is invoked as `scripts/signatories-axi` from its own directory rather than from `PATH`.
+7. **Footer**: repository link, license, "built by Jarvus Innovations", and a note that the pilot deployment serves a civic coalition while the tool is generic.
+
+**Share preview and icons** (in the document head, not on the page): the page declares a one-sentence description, its canonical URL, and Open Graph and Twitter card metadata — title, that same description, the canonical URL, `og:type=website`, `og:site_name`, and a 1200×630 card image with alt text — so a link forwarded into a chat or an email previews as the product rather than as a bare URL. The card is a static image under `site/`, drawn from the same tokens and the same Inter file as the page (the name, the one-sentence definition, and the site's own blue), and names no deployment and no tenant, like everything else here. The site also serves its own favicon set: the app's mark as SVG, an `.ico` for older clients, an apple-touch icon, and the two PNG sizes a web manifest names.
+
+Rules: works at phone width with no horizontal scroll; light scheme only, like the app; no external scripts and no third-party requests (the font, the card image and the icons are all served from the site itself); images have alt text describing the state shown; no analytics. **The page names no deployment and no tenant**: it describes the platform, never the pilot organization or any other client, and the disposition label it uses for `partial` is "partly addressed" (`behaviors/review-and-judgement.md`).
+
+## Design
+
+The same design as the app (`document.md` § Design): the cool neutral page, white cards with a 1 px border and rounded corners, near-black ink and a muted ink, one accent blue for links, buttons and the step numbers, Inter served from `site/fonts/` with a system fallback. The hero is a plain band on the page background with a rule beneath it, not a tinted gradient. Buttons are the app's primary (blue, soft shadow) and quiet (bordered) styles. Screenshots sit in a phone frame in the ink color or a bordered card, with a soft shadow. Code blocks use the muted surface. Nothing on the page uses a warm or paper-toned color.
+
+## Actions
+
+Links only.
+
+## Navigation
+
+External entry; links out to GitHub. Nothing links back into a running instance.
+
+## Principles
+
+**Inherited**
+- [One instance, many documents, no lobby](../principles.md#one-instance-many-documents-no-lobby): the site is the only public surface that describes the platform, and it describes it without pointing at any document.
+- [Sign first, everything else after](../principles.md#sign-first-everything-else-after): the story the page tells leads with the one-screen sign flow, not with the comment machinery.

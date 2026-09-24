@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signatories — draft it together, sign it by name</title>
+<meta name="description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#2457f5">
+<link rel="canonical" href="https://signatories.org/">
+
+<!--
+  `specs/screens/marketing-site.md` § Share preview and icons. Everything
+  here is served from this site: the card image is `og.png`, generated from
+  `scripts/og-cards/site-card.html` with the page's own tokens and Inter
+  file, so the no-third-party-requests rule holds for the preview too. The
+  absolute URLs are required — Open Graph has no relative ones.
+-->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Signatories">
+<meta property="og:title" content="Signatories — draft it together, sign it by name">
+<meta property="og:description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
+<meta property="og:url" content="https://signatories.org/">
+<meta property="og:image" content="https://signatories.org/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Signatories: draft it together, sign it by name — community drafting and signing of collective statements.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Signatories — draft it together, sign it by name">
+<meta name="twitter:description" content="Community drafting and signing of collective statements: open letters, coalition charters, position papers. One personal link per person, a real clock, numbered versions, and a git record of who signed.">
+<meta name="twitter:image" content="https://signatories.org/og.png">
+<meta name="twitter:image:alt" content="Signatories: draft it together, sign it by name — community drafting and signing of collective statements.">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Signatories</p>
+    <h1>Draft it together. Sign it by name.</h1>
+    <p class="lede">Community drafting and signing of collective statements: open letters, coalition charters, position papers, anything a group needs to put its name to together.</p>
+    <p class="sub">Everyone you invite gets a personal link. They open it, read it, and sign in one screen. Comments, revisions and the right to remove their name sit behind that first click, never in front of it.</p>
+    <p class="cta">
+      <a class="btn primary" href="#how">See how it works</a>
+      <a class="btn" href="https://github.com/JarvusInnovations/signatories">View on GitHub</a>
+      <a class="btn" href="#getting-in">I run documents</a>
+    </p>
+  </div>
+</header>
+
+<main>
+
+<section class="wrap three">
+  <div class="card">
+    <h2>For the people who sign</h2>
+    <p>No account, no login. A personal link, the document, and a button that says <em>Sign as you</em>. Sign now and remove your name any time until the deadline; you'll be told when the final text is published.</p>
+  </div>
+  <div class="card">
+    <h2>For the team that drafts</h2>
+    <p>Publish versions with a one-line changelog. Read every comment as part of the submission it came in. Answer them in rounds, mark each one accepted, partly addressed, declined or noted, and publish again.</p>
+  </div>
+  <div class="card">
+    <h2>For the record</h2>
+    <p>Every action is a commit in a private git repository: who signed, who removed their name, what changed and why. "How was this statement approved?" always has a real answer.</p>
+  </div>
+</section>
+
+<section id="getting-in" class="wrap">
+  <h2 class="section-title">Getting in</h2>
+  <div class="three getting-in">
+    <div class="card">
+      <h3>Where you sign in</h3>
+      <p>At your instance, not here. Go to <code>&lt;your-instance&gt;/admin</code>, type the email address your account was made with, and follow the link that arrives. No password. This site has nothing to sign into.</p>
+    </div>
+    <div class="card">
+      <h3>What the console shows you</h3>
+      <p>Once you're in, <code>/admin</code> is a web console for reading a document: progress and deadlines, the people you invited and where each one stands, submissions and comments, versions, and "view as" to see exactly the page a given person was sent.</p>
+    </div>
+    <div class="card">
+      <h3>What the command line does</h3>
+      <p>Everything that writes. Create a document, publish a version, open it on a clock, import invitees, send and remind, export the feedback bundle. It installs as an agent skill, so your team's agent can run a document the same way you would.</p>
+    </div>
+    <div class="card">
+      <h3>How to get an instance</h3>
+      <p>If your group already runs one, ask whoever administers it to create your operator account, then sign in at their address. Otherwise the whole service is in the repository and one deployment serves any number of groups and documents.</p>
+    </div>
+  </div>
+  <p class="note">There is no directory of instances and no shared sign-in: every deployment stands alone, and the only address that matters is the one your group uses.</p>
+</section>
+
+<section id="how" class="wrap">
+  <h2 class="section-title">How a document runs</h2>
+
+  <div class="step">
+    <div class="step-text">
+      <span class="num">1</span>
+      <h3>A personal link, and a sign card first</h3>
+      <p>Each invited person gets their own link, pre-bound to their identity from your contact list. The page opens on the clock, the person's name, and the sign card, prefilled. The document sits right below.</p>
+      <p>Signing works from the first minute of the comment period. The card says exactly what that means: you can remove your name until a stated date, and we'll email you when the final version lands.</p>
+    </div>
+    <figure class="phone"><img src="img/sign-card.png" alt="A phone-width page titled 'Community statement: keep the museum open' showing the comment-period clock, 'You're here as Alex Kim', and an 'Add your name' card with capacity choice, name, an optional description, and a 'Sign as Alex Kim' button." width="390" height="844"></figure>
+  </div>
+
+  <div class="step">
+    <div class="step-text">
+      <span class="num">2</span>
+      <h3>Personal or official capacity</h3>
+      <p>People sign as themselves, with a line about who they are, or on behalf of an organization, with their title and an attestation that they are authorized. The public list keeps the two apart and never blends in petition or mailing-list counts.</p>
+      <p>A conditional signature is a first-class choice: <em>I'm signing, and I want to see my comments addressed.</em> The team sees the flag; the public list does not.</p>
+    </div>
+    <figure class="phone"><img src="img/conditional.png" alt="The same page for Jane Doe after signing: 'You signed on as Jane Doe. You signed conditionally; we'll show you what changed when the final version is published', with 'Change how you're listed', 'Remove my name' and 'Add comments' actions." width="390" height="844"></figure>
+  </div>
+
+  <div class="step wide">
+    <div class="step-text">
+      <span class="num">3</span>
+      <h3>Comments the way reviewers work</h3>
+      <p>Select a passage and comment on it, or write about the document as a whole. Nothing you write is lost: your comments are kept as you go, and the tray shows what you've sent and what you haven't.</p>
+      <p>Submitting attaches a position: sign, sign conditionally, comment without signing, or decline. A submission is read as one unit, because people spread one thought across several comments.</p>
+    </div>
+    <figure class="screen"><img src="img/comment-mode.png" alt="Comment mode on a wide screen: the document on the left; on the right a tray titled 'Your submission on v2' with one saved inline comment quoting 'We will not attack the museum', a general-note box, and a 'Where do you stand?' choice of sign, sign conditionally, comment without signing, or decline." width="1200" height="800"></figure>
+  </div>
+
+  <div class="step">
+    <div class="step-text">
+      <span class="num">4</span>
+      <h3>Versions for people, not for programmers</h3>
+      <p>The team revises and publishes v2, v3, each with a date and a one-line note about what changed. Anyone can read any version, and "see what changed" shows a redline between two of them: struck for removed, underlined for added.</p>
+      <p>Comments follow the text. When a passage moves, a comment moves with it; when a passage is gone, the comment is still shown with the words it pointed at.</p>
+    </div>
+    <figure class="phone"><img src="img/compare.png" alt="Phone-width comparison page 'What changed from version 1 to version 2' with a summary line '2 paragraphs changed, 0 added, 0 removed' and a redline of the changed paragraphs." width="390" height="844"></figure>
+  </div>
+
+  <div class="step">
+    <div class="step-text">
+      <span class="num">5</span>
+      <h3>A clock that is real, and a list that is exact</h3>
+      <p>Comments close on the deadline shown, enforced by the server. Signing and removals continue until the second deadline. Publishing a final text during that window extends it, so nobody is caught by a change they didn't see.</p>
+      <p>When the window closes, the list is final: exactly the organizations and individuals named, and a count that means what it says.</p>
+    </div>
+    <figure class="phone"><img src="img/signatories.png" alt="Public signatories page: 'Signed by 1 organization and 2 individuals', listing Example Science Alliance — Jane Doe, Executive Director; Chris Alfano, Philadelphia resident and museum member; Sam Rivera, former museum educator; with a last-updated time." width="390" height="844"></figure>
+  </div>
+</section>
+
+<section class="wrap principles">
+  <h2 class="section-title">Why it works this way</h2>
+  <dl>
+    <div><dt>Sign first, everything else after.</dt><dd>If it isn't at least as fast to sign as a petition page, people defer, and deferred action is lost action.</dd></div>
+    <div><dt>The clock is real.</dt><dd>"Silence is consent" is only a fair claim when the deadline was what it said it was.</dd></div>
+    <div><dt>Say exactly who signed.</dt><dd>A coalition's credibility rests on answering "who is 'we'?" precisely.</dd></div>
+    <div><dt>Nothing pending is lost; pending is labeled.</dt><dd>We would rather read a half-finished thought than lose it, and we say which is which.</dd></div>
+    <div><dt>The record is a git repo the team can read without the app.</dt><dd>Versions, signatures and revocations are commits with structured trailers, readable with ordinary tools.</dd></div>
+  </dl>
+</section>
+
+<section class="wrap teams">
+  <h2 class="section-title">Running one</h2>
+  <p>Two surfaces, one account. The <strong>web console</strong> at <code>&lt;your-instance&gt;/admin</code> is where you read a document — progress, people, submissions, versions, view-as. The <strong>admin skill</strong> is where you write: a command-line tool that installs into the repository your team, or your team's agent, already works from. Import invitees from your own contact list, publish, open, export the feedback bundle for a revision round, and publish again.</p>
+<pre><code>npx skills add JarvusInnovations/signatories --skill signatories-axi
+
+signatories-axi docs create our-letter --title "…" --sender-name "…" --reply-to …
+signatories-axi versions publish our-letter --file draft.md --summary "Initial draft"
+signatories-axi docs open our-letter --comments-close 2026-10-01T21:00Z --signing-closes 2026-10-08T21:00Z
+signatories-axi people import our-letter invitees.ndjson
+signatories-axi people links our-letter --out links.csv
+signatories-axi feedback export our-letter --format md
+signatories-axi versions publish our-letter --file v2.md --summary "…" --dispositions d.json</code></pre>
+  <p>The installed skill is not on your <code>PATH</code>: run it as <code>scripts/signatories-axi …</code> from the skill's own directory.</p>
+  <p>One instance serves any number of organizations and documents. There is no public homepage inside the product: a document is reachable only through the links made for it, plus an optional anyone-with-the-link read view and an embeddable signatory count for your own site.</p>
+  <p class="cta"><a class="btn primary" href="https://github.com/JarvusInnovations/signatories">Read the code and the specs</a></p>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <p><a href="https://github.com/JarvusInnovations/signatories">JarvusInnovations/signatories</a> · built by <a href="https://jarv.us">Jarvus Innovations</a>. The pilot deployment serves a civic coalition; the tool itself is generic. Screenshots show a demo document with fictional participants.</p>
+</footer>
+
+</body>
+</html>

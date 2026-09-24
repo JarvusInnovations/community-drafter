@@ -1,0 +1,31 @@
+<!doctype html>
+<!--
+  Source for `apps/web/public/og.png`, the generic instance card every share
+  preview the API serves points at (`specs/screens/public-and-embed.md`
+  § Share Preview). One static image for every document and every page:
+  nothing about a document is ever rendered into it. Regenerate with:
+
+    chrome-devtools-axi resize 1200 630
+    chrome-devtools-axi open file://<repo>/scripts/og-cards/instance-card.html
+    chrome-devtools-axi screenshot <repo>/apps/web/public/og.png
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="_card.css">
+</head>
+<body>
+<div class="card">
+  <p class="eyebrow">Signatories</p>
+  <div>
+    <h1>Read it.<br>Sign it by name.</h1>
+    <p class="lede" style="margin-top: 26px; max-width: 32ch;">Open your own link, read the statement, and add your name before the deadline.</p>
+  </div>
+  <p class="foot">
+    <span class="pill">Sign in one screen</span>
+    <span class="pill">Remove your name any time</span>
+    <span class="pill">See exactly who signed</span>
+  </p>
+</div>
+</body>
+</html>

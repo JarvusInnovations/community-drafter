@@ -1,0 +1,44 @@
+# specs/data-model.md → `operators`. One record per person or bot allowed
+# to run documents (specs/behaviors/operators.md). Managed only through the
+# admin API and CLI, so the service stays the single writer.
+
+[gitsheet]
+root = 'operators'
+path = '${{ id }}'
+
+[gitsheet.schema]
+type = 'object'
+required = ['id', 'email', 'name', 'kind', 'active']
+additionalProperties = false
+
+[gitsheet.schema.properties.id]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.email]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.name]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.kind]
+type = 'string'
+enum = ['person', 'bot']
+
+[gitsheet.schema.properties.active]
+type = 'boolean'
+
+[gitsheet.schema.properties.title]
+type = 'string'
+
+[gitsheet.schema.properties.org]
+type = 'string'
+
+[gitsheet.schema.properties.notes]
+type = 'string'
+
+# specs/behaviors/operators.md § Superadmins: sees and may act on every document.
+[gitsheet.schema.properties.superadmin]
+type = 'boolean'

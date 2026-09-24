@@ -1,0 +1,148 @@
+# specs/data-model.md → `documents`. Copied into the data repo by
+# `initDataRepo()` (apps/api/src/storage/init.ts). One markdown record per
+# document: settings in frontmatter, the text as the body. The body's
+# history (body-changing commits) is the version history.
+
+[gitsheet]
+root = 'documents'
+path = '${{ slug }}'
+
+[gitsheet.format]
+type = 'markdown'
+body = 'body'
+
+[gitsheet.schema]
+type = 'object'
+required = ['slug', 'title', 'state', 'body', 'created_by', 'operators']
+additionalProperties = false
+
+[gitsheet.schema.properties.slug]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.title]
+type = 'string'
+minLength = 1
+
+[gitsheet.schema.properties.state]
+type = 'string'
+enum = ['draft', 'open', 'closed', 'withdrawn']
+
+[gitsheet.schema.properties.opened_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.comments_close_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.signing_closes_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.revocation_window_hours]
+type = 'integer'
+default = 72
+
+[gitsheet.schema.properties.capacities]
+type = 'array'
+default = ['personal', 'official']
+
+[gitsheet.schema.properties.capacities.items]
+type = 'string'
+enum = ['personal', 'official']
+
+# `specs/data-model.md` § Audience: who the *finished* statement is for.
+# Stored, never derived, and orthogonal to `public_access` below, which is
+# read access to the *working* document. Optional in the schema so every
+# record written before the field existed still validates; such a record
+# reads as `closed`.
+[gitsheet.schema.properties.audience]
+type = 'string'
+enum = ['public', 'closed']
+
+# Who the finished statement is published or delivered to. Required when
+# `audience = 'closed'` — enforced by the admin API rather than the schema,
+# because the schema cannot make one field's presence depend on another's
+# value here without rejecting pre-field records.
+[gitsheet.schema.properties.addressed_to]
+type = 'array'
+
+[gitsheet.schema.properties.addressed_to.items]
+type = 'string'
+
+# Drafting-time read access to the working document (`specs/data-model.md`
+# § Audience). Independent of `audience`.
+[gitsheet.schema.properties.public_access]
+type = 'string'
+enum = ['none', 'read', 'participate']
+default = 'none'
+
+[gitsheet.schema.properties.show_signatories]
+type = 'string'
+enum = ['list', 'count', 'none']
+default = 'list'
+
+# `specs/behaviors/sites.md`: the site this document belongs to. Absent =
+# the derived default site, which is what every document written before the
+# field existed reads as — no migration. It decides the hostname every
+# personal link, public link and message for this document is built on.
+[gitsheet.schema.properties.site]
+type = 'string'
+pattern = '^[a-z0-9][a-z0-9-]{1,60}$'
+
+[gitsheet.schema.properties.created_by]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.operators]
+type = 'array'
+minItems = 1
+
+[gitsheet.schema.properties.operators.items]
+type = 'string'
+format = 'email'
+
+# `specs/behaviors/notifications.md` § Operator digest: event -> value, the
+# operator messages this document has already produced (`digest` holds a
+# date, `first_signature` a timestamp; `first_comment` is a legacy key). Optional and
+# open-keyed, so a record written before it existed still validates.
+[gitsheet.schema.properties.operator_notified]
+type = 'object'
+additionalProperties = true
+
+[gitsheet.schema.properties.sender_name]
+type = 'string'
+
+[gitsheet.schema.properties.reply_to]
+type = 'string'
+format = 'email'
+
+[gitsheet.schema.properties.withdraw_reason]
+type = 'string'
+
+[gitsheet.schema.properties.withdraw_public]
+type = 'boolean'
+
+# `specs/behaviors/signatures.md` § Delivery: set once by `docs delivered`.
+[gitsheet.schema.properties.delivered_at]
+type = 'string'
+format = 'date-time'
+
+[gitsheet.schema.properties.delivered_note]
+type = 'string'
+
+[gitsheet.schema.properties.tags]
+type = 'array'
+
+[gitsheet.schema.properties.tags.items]
+type = 'string'
+
+[gitsheet.schema.properties.body]
+type = 'string'
+
+[gitsheet.fields.addressed_to]
+sort = true
+
+[gitsheet.fields.tags]
+sort = true

@@ -1,0 +1,224 @@
+/**
+ * Golden test fixtures: realistic charter-like prose across revisions, used
+ * by render/diff/anchor tests. Not a test file itself (no `.test.ts` suffix,
+ * so `bun test` skips it).
+ */
+
+export const CHARTER_V1 = `# Save the Academy Charter
+
+## 1. Purpose
+
+We, the undersigned members of the community, affirm our commitment to preserving the academy's mission for future generations.
+
+## 2. Commitments
+
+- Protect the museum collection from deaccession.
+- Preserve public access to the library.
+- Sustain funding for education programs.
+
+## 3. How a statement becomes the coalition's
+
+Comments are open for two weeks before publication.
+
+> Silence is consent, and we say so on the post.
+
+## 4. Signatories
+
+| Name | Capacity |
+| --- | --- |
+| Jane Doe | Individual |
+| River Trust | Organization |
+
+Thank you for reading this draft charter.
+`;
+
+/**
+ * Relative to v1: four content changes (Purpose paragraph, first Commitments
+ * item, the blockquote, the "Individual" cell) and one addition (a fourth
+ * Commitments item) — exactly "4 changed, 1 added, 0 removed", matching
+ * `plans/render-and-diff.md`'s Validation criterion. Everything else is
+ * byte-identical so those blocks must keep their v1 ids.
+ */
+export const CHARTER_V2 = `# Save the Academy Charter
+
+## 1. Purpose
+
+We, the undersigned members of the community, affirm our commitment to preserving the academy's mission for future generations and the community it serves.
+
+## 2. Commitments
+
+- Protect the museum collection from deaccession or sale.
+- Preserve public access to the library.
+- Sustain funding for education programs.
+- Report progress to the community quarterly.
+
+## 3. How a statement becomes the coalition's
+
+Comments are open for two weeks before publication.
+
+> Silence is consent, and we say so clearly on the post.
+
+## 4. Signatories
+
+| Name | Capacity |
+| --- | --- |
+| Jane Doe | Individual signer |
+| River Trust | Organization |
+
+Thank you for reading this draft charter.
+`;
+
+/**
+ * Relative to v2: the Purpose paragraph is rewritten past the similarity
+ * threshold (removed + added rather than matched), the first Commitments
+ * item is removed outright, the "3." heading drops one level (format-only:
+ * text unchanged), and the blockquote is untouched (for re-anchoring tests).
+ */
+export const CHARTER_V3 = `# Save the Academy Charter
+
+## 1. Purpose
+
+The coalition's core team publishes this charter on behalf of everyone who signs it, present and future.
+
+## 2. Commitments
+
+- Preserve public access to the library.
+- Sustain funding for education programs.
+- Report progress to the community quarterly.
+
+### 3. How a statement becomes the coalition's
+
+Comments are open for two weeks before publication.
+
+> Silence is consent, and we say so clearly on the post.
+
+## 4. Signatories
+
+| Name | Capacity |
+| --- | --- |
+| Jane Doe | Individual signer |
+| River Trust | Organization |
+
+Thank you for reading this draft charter.
+`;
+
+/** Two identical list items in one render: exercises the ordinal-suffix rule. */
+export const DUPLICATE_BLOCKS_FIXTURE = `- Sign here.
+- Sign here.
+`;
+
+/** A `<script>` tag and an `onclick` attribute: exercises HTML sanitization. */
+export const RAW_HTML_FIXTURE = `# Notice
+
+<script>alert(1)</script>
+
+<a href="#" onclick="evil()">Click</a> this link, or don't.
+`;
+
+/**
+ * A staffing-standards ask, the shape of a real revision round: prose, a
+ * ratios table and a timeline list. v1 → v2 exercises the readability rules
+ * in `specs/behaviors/versioning.md` § Diff — a reworded sentence, a changed
+ * number, one changed table cell, one added list item — and v2 → v3 adds a
+ * column so the table's shape changes.
+ */
+export const STAFFING_V1 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Require a named medication coordinator in every building, available four days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Notes |
+| --- | --- | --- |
+| School nurse | 1:750 | Statewide floor |
+| Health aide | 1:300 | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+`;
+
+/** Relative to v1: the ask is reworded, the nurse ratio moves, one timeline item is added. The table keeps its shape. */
+export const STAFFING_V2 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Name one medication coordinator per building, available five days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Notes |
+| --- | --- | --- |
+| School nurse | 1:700 | Statewide floor |
+| Health aide | 1:300 | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+- The legislature reviews the gap analysis in April.
+`;
+
+/** Relative to v2: the ratios table gains a Funding column — a shape change, nothing else touched. */
+export const STAFFING_V3 = `# School Health Staffing Standards
+
+## 1. What we are asking for
+
+Name one medication coordinator per building, available five days a week.
+
+## 2. Ratios
+
+| Role | Ratio | Funding | Notes |
+| --- | --- | --- | --- |
+| School nurse | 1:700 | State | Statewide floor |
+| Health aide | 1:300 | Local | Districts may exceed |
+
+## 3. Timeline
+
+- Districts report current staffing by January.
+- The department publishes a gap analysis by March.
+- The legislature reviews the gap analysis in April.
+`;
+
+/**
+ * `specs/behaviors/versioning.md` § Citations: the shapes that decide the
+ * numbering — one source cited from two text fragments of the same article,
+ * a second source, a visible URL that is never a citation, an autolink, a
+ * `mailto:`, and a real GFM footnote whose own link stays untouched.
+ */
+export const CITATIONS_FIXTURE = `# The ask
+
+Announced with less than a month's [notice](https://news.example/story#:~:text=one) and in
+[the absence](https://news.example/story#:~:text=two) of a roadmap, per [the board](https://board.example/minutes).
+
+The filing is at https://news.example/story and the text of it is
+[https://board.example/minutes](https://board.example/minutes). Write to
+[the team](mailto:team@example.org) or read [the summary](#the-ask).
+
+There is a real footnote here[^1].
+
+[^1]: Which itself cites [a source](https://footnote.example/paper).
+`;
+
+/** Both block-class syntaxes, one class off the whitelist, and a section break. */
+export const BLOCK_CLASSES_FIXTURE = `# Heading {.center}
+
+We are asking for a written, interim agreement. {.lede}
+
+---
+
+::: callout
+The core terms.
+
+The interim operating terms.
+:::
+
+::: sneaky
+Nothing here may carry a class.
+:::
+
+A paragraph mentioning 12:30 and a :stray colon word.
+`;

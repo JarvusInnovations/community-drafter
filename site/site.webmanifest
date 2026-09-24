@@ -1,0 +1,14 @@
+{
+  "name": "Signatories",
+  "short_name": "Signatories",
+  "description": "Community drafting and signing of collective statements.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#f4f6f8",
+  "theme_color": "#2457f5",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}

@@ -1,0 +1,270 @@
+/**
+ * Hand-authored wire types mirroring `specs/api/admin.md`'s JSON shapes —
+ * same rationale as `participant/types.ts`: keeps the heavy
+ * `@signatories/shared` render-pipeline barrel out of the web bundle.
+ * The admin bundle isn't budget-constrained the way the participant entry
+ * is, but every admin screen is lazy-loaded (`App.tsx`), so there's no
+ * reason to pull that barrel in either.
+ */
+
+export type Capacity = "personal" | "official";
+export type ShowSignatories = "list" | "count" | "none";
+export type DocumentState = "draft" | "open" | "closed" | "withdrawn";
+export type Phase = "draft" | "commenting" | "signing" | "closed" | "withdrawn";
+export type ParticipationStatus =
+  | "not_sent"
+  | "unopened"
+  | "opened"
+  | "drafting"
+  | "commented"
+  | "signed"
+  | "signed_conditional"
+  | "declined"
+  | "revoked";
+
+export interface DocumentSummary {
+  slug: string;
+  title: string;
+  /** `specs/api/admin.md`: the document's site — `default` when it names none. */
+  site?: string;
+  /** The origin this document's personal and public links are built on. */
+  site_url?: string;
+  state: DocumentState;
+  phase: Phase;
+  opened_at?: string;
+  comments_close_at?: string;
+  signing_closes_at?: string;
+  created_by?: string;
+  operators?: string[];
+  sender_name?: string;
+  reply_to?: string;
+  capacities?: Capacity[];
+  /**
+   * `specs/data-model.md` § Audience. `public_access` is drafting-time read
+   * access to the working document; `audience` and `addressed_to` say who
+   * the finished statement is published or delivered to. Independent.
+   */
+  public_access?: "none" | "read" | "participate";
+  audience: "public" | "closed";
+  addressed_to?: string[];
+  show_signatories?: ShowSignatories;
+  revocation_window_hours?: number;
+  tags?: string[];
+  commit?: string | null;
+  counts: {
+    versions: number;
+    participations: number;
+    signatures: { organizations: number; individuals: number; unlisted: number; behind?: number };
+    submissions: { submitted: number; draft: number };
+    /** `specs/behaviors/notifications.md` § Segments: who the operator commands reach. */
+    unopened?: number;
+    undecided?: number;
+    needs_confirmation?: number;
+  };
+  /** `specs/behaviors/signatures.md` § Delivery. */
+  delivered_at?: string;
+  delivered_note?: string;
+}
+
+export interface DocumentDetail extends DocumentSummary {
+  versions: VersionListItem[];
+}
+
+export interface VersionListItem {
+  number: number;
+  summary: string;
+  published_at: string;
+  dispositions: number;
+}
+
+export interface VersionDetail {
+  number: number;
+  summary: string;
+  published_at: string;
+  commit?: string | null;
+  published_by?: string;
+  notes?: string;
+  body: string;
+  dispositions: unknown[];
+}
+
+export interface SignatureView {
+  capacity: Capacity;
+  display_name: string;
+  descriptor?: string;
+  org?: string;
+  title?: string;
+  conditional: boolean;
+  listed: boolean;
+  signed_on_version?: number;
+  revoked: boolean;
+  signed_at?: string;
+  revoked_at?: string;
+  resigned_at?: string;
+}
+
+export interface NotifyPrefs {
+  channel: string;
+  my_comments_addressed: boolean;
+  reminders: boolean;
+}
+
+export interface InvitationRow {
+  person: string;
+  /**
+   * `specs/screens/admin-dashboard.md` § People: the name and organization
+   * **this document** prefills for that person — the participation's own
+   * prefill where it has one, else the person's site-level default — so the
+   * table and "view as" agree.
+   */
+  name: string;
+  org: string;
+  prefill: { name?: string; org?: string; role?: string; descriptor?: string };
+  email: string;
+  status: ParticipationStatus;
+  source?: string;
+  opened_at?: string;
+  last_seen_at?: string;
+  opens: number;
+  sent_at?: string;
+  link_revoked: boolean;
+  signature: SignatureView | null;
+  notify: NotifyPrefs;
+}
+
+export interface CommentView {
+  id: string;
+  anchor: unknown | null;
+  body: string;
+  disposition: { outcome: string; note?: string; version?: number } | null;
+}
+
+export interface SubmissionView {
+  id: string;
+  author: string;
+  person: string;
+  version: number;
+  state: "draft" | "submitted";
+  judgement: string | null;
+  reason?: string;
+  started_at?: string;
+  submitted_at?: string;
+  comments: CommentView[];
+}
+
+export interface ActivityEntry {
+  commit: string;
+  date: string;
+  subject: string;
+  action: string;
+  person?: string;
+  version?: number;
+  judgement?: string;
+  reason?: string;
+  /**
+   * `specs/screens/admin-dashboard.md` § Recent activity: the deadlines an
+   * `extend`/`reopen` moved, with the literal times they moved from and to.
+   */
+  deadlines?: DeadlineShift[];
+  actor: string;
+  /**
+   * `specs/behaviors/operators.md` § Superadmins: set when the actor is
+   * not one of the document's operators and holds the superadmin flag.
+   */
+  actor_superadmin?: boolean;
+}
+
+export interface DeadlineShift {
+  deadline: "comments_close_at" | "signing_closes_at";
+  /** Absent when the document had no such deadline before. */
+  from?: string;
+  to: string;
+}
+
+export interface NotificationFailure {
+  event: string;
+  person?: string;
+  at?: string;
+  error?: string;
+}
+
+export interface NotificationsHealth {
+  sent: Record<string, number>;
+  /**
+   * `specs/screens/admin-dashboard.md` § Notification health: the date the
+   * last operator digest went out for this document, absent when none has.
+   */
+  operator_digest_sent?: string;
+  pending: number;
+  failed: number;
+  /**
+   * `specs/screens/admin-dashboard.md` § Notification health — the
+   * dispatcher's in-memory failure list, shown alongside the count so the
+   * panel says what failed and not only how much (#60).
+   */
+  failures?: NotificationFailure[];
+}
+
+export interface SessionInfo {
+  email: string;
+  name?: string;
+  kind?: "person" | "bot";
+  superadmin?: boolean;
+  expires_at: string;
+  /**
+   * `specs/api/auth.md`: the **resolved site**, shown in the admin frame on
+   * every page. Replaces the earlier `instance_name` string.
+   */
+  site?: SessionSite;
+}
+
+export interface SessionSite {
+  slug: string;
+  name: string;
+  hostname?: string;
+  logo_url?: string;
+  accent?: string;
+}
+
+/**
+ * `specs/api/admin.md` § Sites — one row of the superadmin Sites page
+ * (`specs/screens/admin-dashboard.md`). `hostname_verified` and
+ * `sender_verified` are observations: `null` is "not observed yet".
+ */
+export interface SiteRow {
+  slug: string;
+  hostname?: string;
+  name: string;
+  sender_name?: string;
+  sender_email?: string;
+  reply_to?: string;
+  logo_url?: string;
+  accent?: string;
+  operators: string[];
+  documents: number;
+  from_line: string;
+  hostname_verified: boolean;
+  sender_verified: boolean | null;
+  dns: Array<{ type: string; name: string; value: string; purpose: string }>;
+  default: boolean;
+}
+
+/** `specs/api/admin.md` § Operators — the global operator directory. */
+export interface OperatorRecord {
+  email: string;
+  name: string;
+  kind: "person" | "bot";
+  active: boolean;
+  superadmin?: boolean;
+  title?: string;
+  org?: string;
+  notes?: string;
+  commit?: string | null;
+}
+
+/** The JSON error envelope, `specs/api/conventions.md` § Responses. */
+export interface ApiErrorBody {
+  error: string;
+  message: string;
+  details?: Record<string, unknown>;
+}

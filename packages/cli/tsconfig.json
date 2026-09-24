@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "types": ["@types/bun"],
+    "lib": ["ESNext"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*", "scripts/**/*"],
+  // `src/e2e.test.ts` boots `apps/api` in-process by relative import, which
+  // would otherwise pull the composite project's inferred `rootDir` outside
+  // this package. `bun test` still runs it (it transpiles TS directly and
+  // ignores this file); only `tsc -b` skips it.
+  "exclude": ["src/e2e.test.ts"]
+}

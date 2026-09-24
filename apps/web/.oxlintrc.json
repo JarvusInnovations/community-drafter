@@ -1,0 +1,46 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "import", "typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "react/react-in-jsx-scope": "off",
+    // This stack has no router loader or data-fetching library (`jarvus-react`
+    // doesn't mandate one, and adding one is out of scope for the bundle
+    // budget in `specs/architecture.md`), so every participant route's
+    // fetch-on-mount effect calls `setState` from inside its (async)
+    // callback — the standard, cleanup-guarded ("cancelled" flag) mitigation
+    // for exactly the race the rule is warning about. The rule flags that
+    // shape unconditionally regardless of the `await` boundary, which would
+    // otherwise mean disabling it per call site across every data-fetching
+    // component in `src/participant/`.
+    "react/set-state-in-effect": "off",
+
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "curly": ["warn", "all"],
+    "no-use-before-define": ["error", { "functions": false, "classes": true }],
+    "require-unicode-regexp": "error",
+
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/array-type": ["warn", { "default": "array" }],
+
+    "unicorn/filename-case": [
+      "warn",
+      { "cases": { "pascalCase": true, "camelCase": true, "kebabCase": true } }
+    ],
+    "unicorn/prefer-string-replace-all": "warn",
+
+    "sort-imports": ["warn", { "allowSeparatedGroups": true, "ignoreDeclarationSort": true }],
+    "import/no-duplicates": ["warn", { "prefer-inline": true }],
+    "import/consistent-type-specifier-style": ["warn", "prefer-inline"],
+    "import/first": "warn",
+    "import/newline-after-import": "warn",
+    "import/no-unassigned-import": "off"
+  }
+}
