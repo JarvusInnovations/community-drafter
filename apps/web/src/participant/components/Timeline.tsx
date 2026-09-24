@@ -50,8 +50,8 @@ export function Timeline({
   now?: Date;
 }): JSX.Element {
   const now = nowProp ?? new Date();
-  const commentsCountdown = useCountdown(document.comments_close_at);
-  const signingCountdown = useCountdown(document.signing_closes_at);
+  const commentsCountdown = useCountdown(document.comments_close_at, nowProp);
+  const signingCountdown = useCountdown(document.signing_closes_at, nowProp);
 
   if (document.phase === "withdrawn") {
     return <p className="mt-1 text-sm text-muted-foreground">{copy.phase.withdrawnLine}</p>;

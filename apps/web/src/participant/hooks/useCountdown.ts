@@ -11,13 +11,14 @@ import { type Countdown, formatCountdown } from "../format.ts";
  * the deadline crosses into the last 24 hours without waiting on a prop
  * change to re-arm.
  */
-export function useCountdown(deadlineIso: string | undefined): Countdown {
+export function useCountdown(deadlineIso: string | undefined, fixedNow?: Date): Countdown {
   const [countdown, setCountdown] = useState<Countdown>(() =>
-    formatCountdown(deadlineIso, new Date()),
+    formatCountdown(deadlineIso, fixedNow ?? new Date()),
   );
 
   useEffect(() => {
-    if (!deadlineIso) {
+    // A fixed clock (tests, previews) renders one moment and never ticks.
+    if (!deadlineIso || fixedNow) {
       return;
     }
 
@@ -39,7 +40,7 @@ export function useCountdown(deadlineIso: string | undefined): Countdown {
     scheduleNext(formatCountdown(deadlineIso, new Date()));
 
     return () => clearTimeout(timeoutId);
-  }, [deadlineIso]);
+  }, [deadlineIso, fixedNow]);
 
-  return countdown;
+  return fixedNow ? formatCountdown(deadlineIso, fixedNow) : countdown;
 }
