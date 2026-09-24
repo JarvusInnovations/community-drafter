@@ -21,8 +21,7 @@ import {
   type TokenPurpose,
   type VerifiedOperatorToken,
 } from "./tokens.ts";
-import { MagicCodeStore } from "./magic-code-store.ts";
-import { UsedJtiStore } from "./used-jti-store.ts";
+import { UsedCodeStore } from "./used-code-store.ts";
 
 export interface OperatorIdentity {
   email: string;
@@ -37,18 +36,18 @@ export interface AuthDecoration {
   /** Set only outside production (`env.ts`'s `DEV_ADMIN_EMAIL`) — the local-dev sign-in shortcut. */
   devEmail: string | null;
   deviceCodes: DeviceCodeStore;
-  usedMagicJti: UsedJtiStore;
-  /** Short emailed codes → signed magic tokens (`api/auth.md`). */
-  magicCodes: MagicCodeStore;
+  /** Magic-link codes already followed, until they expire (`api/auth.md`). */
+  usedMagicCodes: UsedCodeStore;
+  /** `AUTH_SECRET`; throws when it is not configured. Signs magic-link codes. */
+  secret(): string;
   /** `specs/api/auth.md`: 5 per address and 5 per source IP per 15 minutes, on `/auth/login` and `/auth/device`. */
   loginRateLimiters: { perEmail: FixedWindowLimiter; perIp: FixedWindowLimiter };
   mint(
     purpose: TokenPurpose,
     operator: OperatorIdentity,
-    opts?: { returnPath?: string; site?: string },
+    opts?: { site?: string },
   ): Promise<MintedToken>;
   verifyBearer(token: string): Promise<VerifiedOperatorToken | null>;
-  verifyMagic(token: string): Promise<VerifiedOperatorToken | null>;
   /** Reads the session cookie off a `Cookie` header and verifies it (`purpose: session` only). */
   resolveCookie(cookieHeader: string | undefined): Promise<VerifiedOperatorToken | null>;
   sessionSetCookieHeader(token: string): string;
@@ -64,7 +63,7 @@ declare module "fastify" {
 /**
  * `specs/behaviors/operators.md` + `specs/api/auth.md`. Decorates
  * `fastify.auth` with token mint/verify helpers, cookie plumbing, and the
- * in-memory device-code + used-magic-jti stores the auth routes and the
+ * in-memory device-code + used-magic-code stores the auth routes and the
  * gateway's operator resolution both read. Must register after `envPlugin`
  * (reads `fastify.config`) and before `gatewayPlugin` (see `app.ts`'s
  * numbered comments).
@@ -94,7 +93,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   async function mint(
     purpose: TokenPurpose,
     operator: OperatorIdentity,
-    opts?: { returnPath?: string; site?: string },
+    opts?: { site?: string },
   ): Promise<MintedToken> {
     return mintOperatorToken({
       purpose,
@@ -102,7 +101,6 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       name: operator.name,
       kind: operator.kind,
       secret: requireSecret(),
-      returnPath: opts?.returnPath,
       // `specs/behaviors/sites.md` § Operators and tenancy: "sessions are
       // per host" — every token names the site it was minted on.
       site: opts?.site,
@@ -111,10 +109,6 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
   async function verifyBearer(token: string): Promise<VerifiedOperatorToken | null> {
     return verifyBearerOperatorToken(token, requireSecret());
-  }
-
-  async function verifyMagic(token: string): Promise<VerifiedOperatorToken | null> {
-    return verifyOperatorToken(token, requireSecret(), "magic");
   }
 
   async function resolveCookie(
@@ -139,8 +133,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     cookieName,
     devEmail,
     deviceCodes: new DeviceCodeStore(),
-    usedMagicJti: new UsedJtiStore(),
-    magicCodes: new MagicCodeStore(),
+    usedMagicCodes: new UsedCodeStore(),
+    secret: requireSecret,
     loginRateLimiters: {
       // `specs/api/auth.md`: "5 per address and 5 per source IP per 15 minutes"
       // by default; `AUTH_LOGIN_RATE_LIMIT` raises both for test runs.
@@ -149,7 +143,6 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     },
     mint,
     verifyBearer,
-    verifyMagic,
     resolveCookie,
     sessionSetCookieHeader,
     clearCookieHeader,

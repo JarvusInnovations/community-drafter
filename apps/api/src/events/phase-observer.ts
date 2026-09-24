@@ -6,36 +6,20 @@ const OBSERVER_ACTOR = { kind: "system" } as const;
 
 /**
  * `specs/behaviors/document-lifecycle.md`: "closed (state is also flipped
- * to `closed` by the first read or the scheduler that observes it)".
+ * to `closed` by the scheduler tick that observes it)".
  * `derivePhase` is a pure read-time function (never mutates); this timer is
  * "the scheduler that observes it" — it walks every open document each
- * tick and flips `state = closed` the moment `signing_closes_at` passes (an
+ * tick and flips `state = closed` once `signing_closes_at` has passed (an
  * ordinary `close`-action commit, attributed to `system`). It announces
  * nothing: a phase change is a state change, and state changes don't speak
  * (`specs/principles.md` § Operators speak; state changes don't).
+ *
+ * It runs on the scheduler tick (`POST /internal/tick`), not on a timer: the
+ * service scales to zero, and nothing waits on the flip because every read
+ * derives the phase from the clock (`specs/architecture.md` § API server).
  */
 export class PhaseObserver {
-  private timer: ReturnType<typeof setInterval> | undefined;
-
-  constructor(
-    private readonly fastify: FastifyInstance,
-    private readonly intervalMs = 30_000,
-  ) {}
-
-  start(): void {
-    if (this.timer) return;
-    this.timer = setInterval(() => {
-      void this.tick();
-    }, this.intervalMs);
-    this.timer.unref?.();
-  }
-
-  stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = undefined;
-    }
-  }
+  constructor(private readonly fastify: FastifyInstance) {}
 
   /** One observation pass over every document; exposed for tests to call directly. */
   async tick(): Promise<void> {

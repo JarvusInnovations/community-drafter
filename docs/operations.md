@@ -453,8 +453,8 @@ cd /tmp/community-drafter-data-init && git push origin main
 rm -rf /tmp/community-drafter-data-init
 ```
 
-Cloud Run's `min_instance_count = 1` singleton will retry its boot clone on
-the next probe/restart and come up healthy once `main` exists.
+The next request (or scheduler tick) starts a fresh instance, whose boot
+clone succeeds once `main` exists.
 
 ## Deploying
 
@@ -481,6 +481,45 @@ authenticated via Workload Identity Federation (no long-lived key). See
 
 **Manual applies:** `tf/terraform.tfvars` pins `image_tag` and `public_url`, so a bare `tofu apply -concise` (for example to change IAM) keeps the running service as it is. Update `image_tag` there on each manual deploy. The CI service account holds the template's project admin roles (issue #7, applied 2026-09-19), so the release workflow's `tofu apply` can manage secrets, the registry and IAM on its own.
 
+### Scale to zero: the order of a deploy that changes it
+
+The service scales to zero when idle (`specs/architecture.md` §
+Deployment). An instance is safe to stop only if the image it runs pushes
+every commit before acknowledging a write and flushes on `SIGTERM`, so
+**the image carrying that code must be live before, or in the same apply
+as, `min_instance_count = 0`**. An apply that lowers the minimum while
+`image_tag` still points at an older build would let Cloud Run stop an
+instance whose shutdown does not push what it holds.
+
+In practice: set `image_tag` in `tf/terraform.tfvars` to the build of the
+merged commit, then run one `tofu apply -concise`. Cloud Run rolls the new
+revision (new image, minimum 0) and stops the old one; the old one's
+`SIGTERM` runs the old shutdown, as every deploy has until now.
+
+After the apply, watch for these, once:
+
+- The scheduler job `community-drafter-tick` runs every 15 minutes
+  (`gcloud scheduler jobs describe community-drafter-tick
+  --location=us-east4`), each run answered `200 {"ok":true,"ran":[...]}`.
+  A `401` means the token's audience or email does not match
+  `TICK_AUDIENCE` / `TICK_INVOKER_EMAIL` on the service.
+- When the instance next idles out, the log line `shutdown: pushed`. If
+  `shutdown: commits not pushed` or `shutdown: deadline reached` ever
+  appears, commits were lost with that instance; read the error that came
+  before it.
+- The next morning, the operator digest arrives at `INSTANCE_DIGEST_HOUR`
+  as before; it is now sent by a tick, not a timer.
+
+### What a cold start looks like
+
+The first request after an idle period waits for a container to start, the
+data repo to clone and the read model to build, roughly 5 to 15 seconds
+end to end; measured locally at about 3.5 seconds from container start to
+healthy, before the image fetch and the clone from GitHub. Everything after
+is warm. The GitHub webhook to `/admin/api/refresh` may record a failed
+(timed-out) delivery when it is the request that wakes the service; the
+boot clone already picked up the change, so there is nothing to redeliver.
+
 ## Verifying a deploy
 
 ```sh
@@ -490,9 +529,15 @@ curl -s "$SERVICE_URL/_health" | jq .
 ```
 
 `storage.ready: true` means the boot clone succeeded and the read model
-built. `storage.pushDaemon.running: true` (once a remote origin is
-configured, which it always is in the deployed container) means the push
-daemon started cleanly.
+built. `storage.push` reports the push path to the data repo
+(`specs/architecture.md` § Storage, "Pushed before acknowledged"):
+`pendingCommits` should be `0` whenever nobody is mid-write, `lastPushMs`
+is how long the last push to GitHub took, and a non-null `lastError` names
+why the last push failed (`reason: "non-fast-forward"` means someone
+pushed to the data repo behind the service's back and needs a person).
+
+Calling `/_health` on a service that has scaled to zero starts it; expect
+the first call after an idle period to take several seconds.
 
 ### The one-time people-to-sites migration
 
@@ -504,8 +549,8 @@ record from `people/<id>.toml` to `people/default/<id>.toml` with
 - The log line `storage: migrated N people record(s) to site 'default'`,
   with `N` equal to the number of files that were directly under `people/`.
 - One commit in the data repo with `Action: migrate` and `Actor: system`,
-  whose diff is only renames-plus-one-added-field. The push daemon pushes
-  it like any other commit.
+  whose diff is only renames-plus-one-added-field. It is pushed before the
+  instance starts serving, like any other boot-time commit.
 - `/_health`'s `storage.people` afterwards equal to `N`. The read model is
   built before the migration runs, so the `storage: read model built` line
   at boot reports `people: 0` on this one boot — that is expected, and the

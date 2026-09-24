@@ -6,9 +6,9 @@ import { openDataRepo } from "./repo.ts";
 import { createTestDataRepo } from "./test-helpers.ts";
 import { OpenTracker } from "./tracker.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function countCommits(dataDir: string): Promise<number> {

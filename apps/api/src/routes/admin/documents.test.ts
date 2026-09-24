@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { FakeMailer } from "../../lib/mailer/index.ts";
 import { adminHeaders, buildTestServer, seedDocument } from "../test-support.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 describe("POST /admin/api/documents/:slug/schedule", () => {

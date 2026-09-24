@@ -2,17 +2,25 @@ import type { OperatorKind } from "@signatories/shared";
 
 /**
  * `specs/api/conventions.md`: "every route declares `participant`,
- * `operator`, `webhook`, or `public`; undeclared routes fail closed."
+ * `operator`, `webhook`, `scheduler`, or `public`; undeclared routes fail
+ * closed."
  * Replaces the old three-capability (`participant`/`admin`/`public`) set —
  * `admin` is gone, `operator` takes its place (`plans/operators-auth.md`),
  * and `webhook` is new (the `refresh` route's HMAC-signature transport,
  * never an operator token).
  */
-export type Capability = "participant" | "operator" | "webhook" | "public";
+export type Capability = "participant" | "operator" | "webhook" | "scheduler" | "public";
 
 export const PARTICIPANT_ROUTE = { capability: "participant" as const };
 export const PUBLIC_ROUTE = { capability: "public" as const };
 export const WEBHOOK_ROUTE = { capability: "webhook" as const };
+
+/**
+ * `specs/architecture.md` § Deployment, "The scheduler": `POST
+ * /internal/tick`, authenticated by a Google-signed OIDC ID token for the
+ * tick invoker's service account. Like `webhook`, it has no principal.
+ */
+export const SCHEDULER_ROUTE = { capability: "scheduler" as const };
 
 /** An operator route with no document-membership scoping (e.g. `GET /documents`, `/operators`, `/whoami`). */
 export const OPERATOR_ROUTE = { capability: "operator" as const };

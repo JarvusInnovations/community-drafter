@@ -16,7 +16,7 @@ draft ──open──► commenting ──clock──► signing ──clock─
 | --- | --- |
 | `now < comments_close_at` | **commenting** |
 | `comments_close_at ≤ now < signing_closes_at` | **signing** |
-| `now ≥ signing_closes_at` | **closed** (state is also flipped to `closed` by the first read or the scheduler that observes it) |
+| `now ≥ signing_closes_at` | **closed** (state is also flipped to `closed` by the scheduler tick that observes it — `architecture.md` § Deployment; nothing waits on the flip, because every read derives the phase from the clock) |
 
 ## Applies To
 

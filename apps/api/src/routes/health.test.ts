@@ -4,9 +4,9 @@ import Fastify from "fastify";
 import { app } from "../app.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 describe("GET /_health", () => {
@@ -26,7 +26,7 @@ describe("GET /_health", () => {
     expect(body.status).toBe("healthy");
     expect(body.storage.ready).toBe(true);
     expect(body.storage.documents).toBe(0);
-    expect(body.storage.pushDaemon).toBeNull(); // no 'origin' remote configured in this fixture
+    expect(body.storage.push).toBeNull(); // no 'origin' remote configured in this fixture
 
     await server.close();
   });

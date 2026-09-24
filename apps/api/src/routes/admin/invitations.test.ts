@@ -13,9 +13,9 @@ import {
   TEST_ACTOR,
 } from "../test-support.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 describe("POST /admin/api/documents/:slug/invitations/import", () => {

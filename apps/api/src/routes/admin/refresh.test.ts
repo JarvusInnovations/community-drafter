@@ -11,9 +11,9 @@ import { commit } from "../../storage/commit.ts";
 import { openDataRepo } from "../../storage/repo.ts";
 import { createTestDataRepoWithRemote } from "../../storage/test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
   delete process.env.DATA_REPO_WEBHOOK_SECRET;
 });
 
@@ -55,13 +55,10 @@ async function callRefresh(server: import("fastify").FastifyInstance) {
 }
 
 /**
- * The push daemon's own startup backlog check (`checkStartupBacklog`) runs
- * its own `git fetch` a tick after boot (deferred via `setImmediate`, per
- * gitsheets) and can leave `pendingCommits` transiently nonzero right after
- * `server.ready()` — precisely the condition `refresh_busy` exists for. The
- * spec's own contract is "respond 409 and let the caller retry"
- * (`specs/behaviors/operators.md`), so that's what this test helper does,
- * rather than trying to out-guess the daemon's internal timing.
+ * `refresh_busy` is the spec's "respond 409 and let the caller retry"
+ * (`specs/behaviors/operators.md`) whenever commits are waiting to be
+ * pushed, so this helper retries it like a caller would rather than
+ * assuming a boot never leaves anything pending.
  */
 async function callRefreshRetryingBusy(server: import("fastify").FastifyInstance, attempts = 20) {
   let response = await callRefresh(server);
@@ -117,10 +114,9 @@ describe("POST /admin/api/refresh", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
     // Not visible until refreshed.
     expect(server.storage.readModel.getDocument("out-of-band-doc")).toBeUndefined();
 
@@ -145,10 +141,9 @@ describe("POST /admin/api/refresh", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
     const response = await callRefreshRetryingBusy(server);
     expect(response.statusCode).toBe(200);
     const body = response.json();
@@ -156,7 +151,7 @@ describe("POST /admin/api/refresh", () => {
     expect(body.head_before).toBe(body.head_after);
   }, 20_000);
 
-  it("409 refresh_busy while the push daemon has commits it can't push", async () => {
+  it("409 refresh_busy while there are commits it can't push", async () => {
     process.env.NODE_ENV = "test";
     delete process.env.BOOTSTRAP_OPERATOR_EMAIL;
     process.env.DATA_REPO_WEBHOOK_SECRET = WEBHOOK_SECRET;
@@ -170,10 +165,9 @@ describe("POST /admin/api/refresh", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     await server.storage.commit(
       "settings",
@@ -190,14 +184,8 @@ describe("POST /admin/api/refresh", () => {
       },
     );
 
-    const deadline = Date.now() + 5_000;
-    while (
-      (server.storage.pushDaemon?.status().pendingCommits ?? 0) === 0 &&
-      Date.now() < deadline
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    expect(server.storage.pushDaemon?.status().pendingCommits).toBeGreaterThan(0);
+    // The write waited for its push, which failed; the commit stays pending.
+    expect(server.storage.pusher?.status().pendingCommits).toBeGreaterThan(0);
 
     const response = await callRefresh(server);
     expect(response.statusCode).toBe(409);
@@ -215,10 +203,9 @@ describe("POST /admin/api/refresh", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     const response = await server.inject({ method: "POST", url: "/admin/api/refresh" });
     expect(response.statusCode).toBe(401);

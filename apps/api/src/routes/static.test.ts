@@ -10,9 +10,9 @@ import { GENERIC_DESCRIPTION } from "../lib/share-preview.ts";
 import { createTestDataRepo } from "../storage/test-helpers.ts";
 import { seedDocument, seedParticipant, TEST_ACTOR } from "./test-support.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 /** A tiny stand-in for a real `vite build` output, just enough to exercise the routes. */
@@ -43,7 +43,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -82,7 +81,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -106,7 +104,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -160,7 +157,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -209,7 +205,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -239,7 +234,6 @@ describe("static SPA serving", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
@@ -304,14 +298,13 @@ describe("share preview metadata", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
       static: { root },
     });
     await server.ready();
     cleanups.push(() => {
       delete process.env.PUBLIC_URL;
       delete process.env.INSTANCE_NAME;
-      void server.close();
+      return server.close();
     });
     return server;
   }

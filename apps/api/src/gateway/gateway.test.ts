@@ -21,9 +21,9 @@ import {
   WEBHOOK_ROUTE,
 } from "./gateway.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 beforeEach(() => {
@@ -41,7 +41,6 @@ async function buildServer() {
   const server = Fastify();
   await server.register(app, {
     storage: { dataDir, trackerIntervalMs: 3_600_000 },
-    disablePhaseObserver: true,
   });
 
   // Test-only routes exercising each capability, added after `app` so the

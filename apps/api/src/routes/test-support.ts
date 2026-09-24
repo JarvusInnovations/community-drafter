@@ -12,7 +12,8 @@ import { app } from "../app.ts";
 import { mintOperatorToken } from "../auth/tokens.ts";
 import { FakeMailer, type Mailer } from "../lib/mailer/index.ts";
 import type { Actor } from "../storage/actor.ts";
-import { createTestDataRepo } from "../storage/test-helpers.ts";
+import { createTestDataRepo, createTestDataRepoWithRemote } from "../storage/test-helpers.ts";
+import type { TickPluginOptions } from "../tick/plugin.ts";
 
 export const TEST_ACTOR = { kind: "operator", email: "team@example.org" } as const satisfies Actor;
 
@@ -47,8 +48,13 @@ export const TEST_ADMIN_TOKEN = (
 export interface BuildTestServerOptions {
   /** Defaults to a fresh `FakeMailer` — pass one in to assert on `.sent`/force failures. */
   mailer?: Mailer;
-  /** Test-only override for the operator-digest scheduler poll interval. */
-  schedulerIntervalMs?: number;
+  /**
+   * Give the data repo a bare remote (`origin`), so commits are pushed
+   * before a write responds (`specs/architecture.md` § Storage).
+   */
+  withRemote?: boolean;
+  /** How the scheduler tick verifies its token (`tick/plugin.ts`); tests pass their own key. */
+  tick?: TickPluginOptions;
   /** Set env vars before boot (e.g. `DEV_ADMIN_EMAIL`, or `undefined` to unset one of the defaults below). */
   env?: Record<string, string | undefined>;
 }
@@ -61,22 +67,43 @@ export async function buildTestServer(opts: BuildTestServerOptions = {}) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  const { dataDir, cleanup } = await createTestDataRepo();
+  const repoFixture = opts.withRemote
+    ? await createTestDataRepoWithRemote()
+    : { ...(await createTestDataRepo()), remoteDir: undefined };
+  const { dataDir, cleanup: removeRepo, remoteDir } = repoFixture;
 
   const mailer = opts.mailer ?? new FakeMailer();
   const server = Fastify();
   await server.register(app, {
     storage: { dataDir, trackerIntervalMs: 3_600_000 },
-    disablePhaseObserver: true,
-    notifications: {
-      disableSchedulers: true,
-      mailer,
-      schedulerIntervalMs: opts.schedulerIntervalMs,
-    },
+    notifications: { mailer },
+    tick: opts.tick,
   });
   await server.ready();
+  makeCloseIdempotent(server);
 
-  return { server, dataDir, cleanup, mailer };
+  // No push may outlive its repo: close the server (its shutdown flush and
+  // push included) and wait out any push still running before the temp
+  // directories go. Safe to call after the test already closed the server.
+  const cleanup = async (): Promise<void> => {
+    await server.close();
+    await server.storage?.pusher?.idle();
+    removeRepo();
+  };
+
+  return { server, dataDir, remoteDir, cleanup, mailer };
+}
+
+/**
+ * Makes `server.close()` idempotent: a test that closed its server and the
+ * cleanup that closes it again share one close, one shutdown flush and one
+ * final push.
+ */
+function makeCloseIdempotent(server: FastifyInstance): void {
+  const original = server.close.bind(server);
+  let pending: Promise<undefined> | undefined;
+  const once = () => (pending ??= original().then(() => undefined));
+  server.close = once as unknown as FastifyInstance["close"];
 }
 
 export function adminHeaders(): Record<string, string> {

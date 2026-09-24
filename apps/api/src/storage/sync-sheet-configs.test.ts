@@ -7,9 +7,9 @@ import Fastify from "fastify";
 import app from "../app.ts";
 import { createTestDataRepo } from "./test-helpers.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function runGit(args: string[], cwd: string): Promise<string> {
@@ -41,10 +41,9 @@ describe("sheet-config sync at boot", () => {
     const server = Fastify();
     await server.register(app, {
       storage: { dataDir, trackerIntervalMs: 3_600_000 },
-      disablePhaseObserver: true,
     });
     await server.ready();
-    cleanups.push(() => void server.close());
+    cleanups.push(() => server.close());
 
     expect(readFileSync(configPath, "utf8")).toBe(fresh);
     const log = await runGit(["log", "--format=%s"], dataDir);

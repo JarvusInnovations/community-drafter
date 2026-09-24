@@ -17,14 +17,38 @@ const server = Fastify({
   // favor of `logController` (`plans/api-core.md`, absorbed from
   // `workspace-bootstrap`).
   logController: new LogController({ disableRequestLogging: true }),
+  // `specs/architecture.md` § Deployment, "Cold start": boot clones the data
+  // repo from GitHub before the storage plugin resolves. Fastify's default
+  // 10 s plugin timeout would turn a slow clone into a crashed cold start.
+  pluginTimeout: 60_000,
 });
 
 server.register(app);
 
+/**
+ * `specs/architecture.md` § Deployment, "Shutdown": Cloud Run kills the
+ * container 10 seconds after SIGTERM, and scale-to-zero means that happens
+ * every time the service goes idle. `server.close()` stops taking requests
+ * (503 for new ones), lets in-flight ones finish, then runs the storage
+ * plugin's `onClose`: flush open counts, push every pending commit. The
+ * deadline makes sure the process exits on its own terms, with its log
+ * lines written, before the platform's SIGKILL.
+ */
+export const SHUTDOWN_DEADLINE_MS = 9_000;
+let shuttingDown = false;
+
 const gracefulShutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   server.log.info(`Received ${signal}, shutting down gracefully`);
+  const deadline = setTimeout(() => {
+    const pending = server.storage?.pusher?.status().pendingCommits ?? 0;
+    server.log.error({ pendingCommits: pending }, "shutdown: deadline reached, exiting");
+    process.exit(1);
+  }, SHUTDOWN_DEADLINE_MS);
   try {
     await server.close();
+    clearTimeout(deadline);
     server.log.info("Server closed successfully");
     process.exit(0);
   } catch (error) {

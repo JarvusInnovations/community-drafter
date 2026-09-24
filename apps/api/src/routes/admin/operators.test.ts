@@ -10,9 +10,9 @@ import {
   TEST_AUTH_SECRET,
 } from "../test-support.ts";
 
-const cleanups: Array<() => void> = [];
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+const cleanups: Array<() => unknown> = [];
+afterEach(async () => {
+  while (cleanups.length) await cleanups.pop()?.();
 });
 
 async function bearerFor(server: import("fastify").FastifyInstance, email: string) {
