@@ -304,15 +304,14 @@ const adminVersionsRoute: FastifyPluginAsync = async (fastify) => {
 
       const from = resolveVersion(entry, fromNumber);
       const to = resolveVersion(entry, toNumber);
+      // `specs/api/admin.md`: same defaults and errors as the participant compare.
+      if (from.number === to.number) {
+        throw new ApiError("invalid_request", "from and to must name different versions.");
+      }
 
       const fromRendered = fastify.rendering.render(from.commit, from.body);
       const toRendered = fastify.rendering.render(to.commit, to.body);
-      const diff = fastify.rendering.diff(
-        from.commit,
-        to.commit,
-        fromRendered.blocks,
-        toRendered.blocks,
-      );
+      const diff = fastify.rendering.diff(from.commit, to.commit, fromRendered, toRendered);
 
       return { from: from.number, to: to.number, summary: diff.summary, blocks: diff.blocks };
     },

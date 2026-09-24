@@ -32,12 +32,7 @@ const compareRoute: FastifyPluginAsync = async (fastify) => {
 
       const fromRendered = fastify.rendering.render(from.commit, from.body);
       const toRendered = fastify.rendering.render(to.commit, to.body);
-      const diff = fastify.rendering.diff(
-        from.commit,
-        to.commit,
-        fromRendered.blocks,
-        toRendered.blocks,
-      );
+      const diff = fastify.rendering.diff(from.commit, to.commit, fromRendered, toRendered);
 
       return { from: from.number, to: to.number, summary: diff.summary, blocks: diff.blocks };
     },

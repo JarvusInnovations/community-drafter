@@ -1,5 +1,10 @@
 import { diffVersions, render } from "@signatories/shared";
-import type { Block, CitationsMode, DiffResult, RenderResult } from "@signatories/shared";
+import type {
+  CitationsMode,
+  ComparableVersion,
+  DiffResult,
+  RenderResult,
+} from "@signatories/shared";
 import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 
@@ -12,8 +17,8 @@ import type { FastifyPluginAsync } from "fastify";
  * HTML (`specs/behaviors/versioning.md` § Citations).
  *
  * Diffs are not keyed by mode because they never see one: the comparison
- * view is always `links`, and the blocks a diff runs on are identical in
- * every mode by construction.
+ * view is always `links`, and the blocks and code blocks a diff runs on are
+ * identical in every mode by construction.
  */
 export class RenderCache {
   private readonly renders = new Map<string, RenderResult>();
@@ -28,11 +33,17 @@ export class RenderCache {
     return result;
   }
 
-  diff(fromCommit: string, toCommit: string, fromBlocks: Block[], toBlocks: Block[]): DiffResult {
+  /** Takes the render results whole so code blocks reach the comparison with the blocks. */
+  diff(
+    fromCommit: string,
+    toCommit: string,
+    from: ComparableVersion,
+    to: ComparableVersion,
+  ): DiffResult {
     const key = `${fromCommit}:${toCommit}`;
     const cached = this.diffs.get(key);
     if (cached) return cached;
-    const result = diffVersions(fromBlocks, toBlocks);
+    const result = diffVersions(from, to);
     this.diffs.set(key, result);
     return result;
   }

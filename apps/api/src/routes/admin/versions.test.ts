@@ -203,3 +203,69 @@ describe("POST /admin/api/documents/:slug/versions", () => {
     await server.close();
   });
 });
+
+/** `specs/api/admin.md` § Versions: the admin compare (#107), code blocks included (#84). */
+describe("GET /admin/api/documents/:slug/compare", () => {
+  it("returns latest-vs-previous by default, a changed code block counted as one", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, {
+      slug: "doc-compare",
+      body: "Intro paragraph.\n\n```\nrun the first step now\n```\n",
+    });
+    const publish = await server.inject({
+      method: "POST",
+      url: "/admin/api/documents/doc-compare/versions",
+      headers: adminHeaders(),
+      payload: {
+        body: "Intro paragraph.\n\n```\nrun the second step now\n```\n",
+        summary: "New step.",
+      },
+    });
+    expect(publish.statusCode).toBe(200);
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-compare/compare",
+      headers: adminHeaders(),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.from).toBe(1);
+    expect(body.to).toBe(2);
+    expect(body.summary.items).toEqual([{ kind: "code block", change: "changed", count: 1 }]);
+    const changed = body.blocks.filter((b: { status: string }) => b.status === "changed");
+    expect(changed).toHaveLength(1);
+    expect(changed[0].html).toContain('<del class="diff-stack-old"><pre><code>run the first step');
+    expect(changed[0].html).toContain('<ins class="diff-stack-new"><pre><code>run the second step');
+
+    await server.close();
+  });
+
+  it("refuses a same-version pair with invalid_request and an unknown version with not_found", async () => {
+    const { server, cleanup } = await buildTestServer();
+    cleanups.push(cleanup);
+
+    await seedDocument(server, { slug: "doc-compare-one", body: "Only version." });
+
+    const same = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-compare-one/compare?from=1&to=1",
+      headers: adminHeaders(),
+    });
+    expect(same.statusCode).toBe(400);
+    expect(same.json().error).toBe("invalid_request");
+
+    const missing = await server.inject({
+      method: "GET",
+      url: "/admin/api/documents/doc-compare-one/compare?from=1&to=7",
+      headers: adminHeaders(),
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error).toBe("not_found");
+
+    await server.close();
+  });
+});
