@@ -11,6 +11,7 @@ import {
   type VersionDetail,
   type VersionListItem,
 } from "./types.ts";
+import { type CompareResult } from "../participant/types.ts";
 
 /**
  * Thrown for any non-2xx response from `/admin/api/*` or `/auth/*`. Mirrors
@@ -342,6 +343,16 @@ export function getVersions(slug: string): Promise<VersionListItem[]> {
 
 export function getVersionDetail(slug: string, n: number): Promise<VersionDetail> {
   return request<VersionDetail>(`${BASE}/documents/${encodeURIComponent(slug)}/versions/${n}`);
+}
+
+/**
+ * `specs/api/admin.md` § Versions: the same redline the participant compare
+ * returns, so the admin compare screen can render it with the same view.
+ */
+export function getCompare(slug: string, from: number, to: number): Promise<CompareResult> {
+  return request<CompareResult>(
+    `${BASE}/documents/${encodeURIComponent(slug)}/compare?from=${from}&to=${to}`,
+  );
 }
 
 export function getActivity(slug: string, limit = 50): Promise<ActivityEntry[]> {

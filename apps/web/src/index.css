@@ -327,6 +327,25 @@
   }
 
   /*
+   * § Diff step 5: a changed code block is stacked the same way, old struck
+   * above new underlined. A code block scrolls inside its column rather than
+   * widening the page on a phone.
+   */
+  .doc-body .diff-block pre {
+    overflow-x: auto;
+  }
+
+  .doc-body .diff-stack > del pre {
+    @apply text-destructive;
+    text-decoration: line-through;
+  }
+
+  .doc-body .diff-stack > ins pre {
+    @apply text-ok;
+    text-decoration: underline;
+  }
+
+  /*
    * `specs/screens/comment-mode.md` § Design "Document column": the
    * participant's own pending comments get the pale-blue tint and a blue
    * underline; their own already-submitted comments get the neutral muted

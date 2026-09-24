@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 
 import { ApiError, getVersionDetail } from "./api.ts";
 import { Card } from "./components/Card.tsx";
@@ -54,7 +55,17 @@ export function VersionsScreen(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-[1120px] px-5 py-6">
-      <h2 className="text-lg font-bold tracking-tight text-foreground">{copy.versions.heading}</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-bold tracking-tight text-foreground">
+          {copy.versions.heading}
+        </h2>
+        {/* `specs/screens/admin-dashboard.md` § Versions: latest against previous. */}
+        {document.versions.length >= 2 ? (
+          <Link to={`/admin/d/${document.slug}/versions/compare`} className={quietLinkClass}>
+            {copy.versions.compareVersions}
+          </Link>
+        ) : null}
+      </div>
       {error ? (
         <p role="alert" className="mt-2 text-destructive">
           {error}
@@ -90,6 +101,14 @@ export function VersionsScreen(): JSX.Element {
                 <span className="text-muted-foreground">
                   {formatAbsolute(v.published_at)} · {copy.versions.dispositions(v.dispositions)}
                 </span>
+                {v.number > 1 ? (
+                  <Link
+                    to={`/admin/d/${document.slug}/versions/compare?from=${v.number - 1}&to=${v.number}`}
+                    className={quietLinkClass}
+                  >
+                    {copy.versions.compareWithPrevious}
+                  </Link>
+                ) : null}
               </div>
               {open === v.number ? (
                 <div className="mt-2 rounded-xl bg-muted p-3">

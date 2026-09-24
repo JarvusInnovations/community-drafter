@@ -104,7 +104,7 @@ export interface CompareBlock {
 
 /** One clause of the compare summary line, `specs/api/participant.md` § compare. */
 export interface DiffSummaryItem {
-  kind: "paragraph" | "heading" | "list item" | "table";
+  kind: "paragraph" | "heading" | "list item" | "table" | "code block";
   change: "changed" | "added" | "removed";
   count: number;
 }

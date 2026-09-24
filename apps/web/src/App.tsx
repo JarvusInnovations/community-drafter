@@ -63,6 +63,9 @@ const SubmissionsScreen = lazy(() =>
 const VersionsScreen = lazy(() =>
   import("./admin/VersionsScreen.tsx").then((m) => ({ default: m.VersionsScreen })),
 );
+const AdminCompareScreen = lazy(() =>
+  import("./admin/CompareScreen.tsx").then((m) => ({ default: m.CompareScreen })),
+);
 const ViewAsScreen = lazy(() =>
   import("./admin/ViewAsScreen.tsx").then((m) => ({ default: m.ViewAsScreen })),
 );
@@ -312,6 +315,14 @@ function App(): JSX.Element {
             element={
               <Suspense fallback={<LazyFallback />}>
                 <VersionsScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="versions/compare"
+            element={
+              <Suspense fallback={<LazyFallback />}>
+                <AdminCompareScreen />
               </Suspense>
             }
           />
